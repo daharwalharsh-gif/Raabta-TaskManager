@@ -15,27 +15,27 @@ body{font-family:'Inter',sans-serif;background:#f1f5f9;color:#1e293b;min-height:
 ══════════════════════════════════════ */
 .sidebar{
   width:64px;
-  background:linear-gradient(180deg,#0d1b38 0%,#0a1628 60%,#081120 100%);
+  background:linear-gradient(180deg,#042215 0%,#02140c 60%,#010c07 100%);
   position:fixed;top:0;left:0;bottom:0;
   z-index:100;display:flex;flex-direction:column;
   transition:width .28s cubic-bezier(.4,0,.2,1);overflow:hidden;
-  box-shadow:4px 0 28px rgba(0,0,0,.45),inset -1px 0 0 rgba(59,130,246,.12);
+  box-shadow:4px 0 28px rgba(0,0,0,.45),inset -1px 0 0 rgba(16,185,129,.12);
 }
 .sidebar:hover{ width:236px; }
 
 .sidebar-logo{
   padding:0 14px;height:60px;
-  background:linear-gradient(135deg,rgba(26,86,219,.35),rgba(37,99,235,.2));
-  border-bottom:1px solid rgba(59,130,246,.18);
+  background:linear-gradient(135deg,rgba(5,150,105,.35),rgba(52,211,153,.2));
+  border-bottom:1px solid rgba(16,185,129,.18);
   display:flex;align-items:center;gap:12px;
   white-space:nowrap;overflow:hidden;flex-shrink:0;
 }
 .logo-icon{
   width:36px;height:36px;
-  background:linear-gradient(135deg,#1a56db,#3b82f6);
+  background:linear-gradient(135deg,#10b981,#34d399);
   border-radius:10px;display:grid;place-items:center;color:#fff;
   font-weight:800;font-size:15px;flex-shrink:0;
-  box-shadow:0 4px 14px rgba(26,86,219,.5),0 0 0 1px rgba(255,255,255,.1);
+  box-shadow:0 4px 14px rgba(16,185,129,.5),0 0 0 1px rgba(255,255,255,.1);
 }
 .logo-text{
   font-size:14px;font-weight:700;color:#fff;
@@ -57,29 +57,29 @@ body{font-family:'Inter',sans-serif;background:#f1f5f9;color:#1e293b;min-height:
 .nav-label-text{opacity:0;transition:opacity .2s .1s;}
 .sidebar:hover .nav-label-text{opacity:1;}
 .nav-item:hover{
-  background:rgba(59,130,246,.1);color:#c7d9f9;
-  border-left-color:rgba(59,130,246,.4);
+  background:rgba(16,185,129,.1);color:#a7f3d0;
+  border-left-color:rgba(16,185,129,.4);
 }
-.nav-item:hover svg{filter:drop-shadow(0 0 4px rgba(96,165,250,.5));}
+.nav-item:hover svg{filter:drop-shadow(0 0 4px rgba(52,211,153,.5));}
 .nav-item.active{
-  background:linear-gradient(90deg,rgba(59,130,246,.25),rgba(59,130,246,.08));
-  color:#60a5fa;border-left-color:#3b82f6;
-  box-shadow:inset 0 0 24px rgba(59,130,246,.08),0 2px 8px rgba(0,0,0,.2);
+  background:linear-gradient(90deg,rgba(16,185,129,.25),rgba(16,185,129,.08));
+  color:#6ee7b7;border-left-color:#34d399;
+  box-shadow:inset 0 0 24px rgba(16,185,129,.08),0 2px 8px rgba(0,0,0,.2);
 }
-.nav-item.active svg{filter:drop-shadow(0 0 6px rgba(96,165,250,.7));}
+.nav-item.active svg{filter:drop-shadow(0 0 6px rgba(52,211,153,.7));}
 .nav-divider{border-top:1px solid rgba(255,255,255,.06);margin:8px 4px;}
 
 .sidebar-user{
-  padding:10px 12px;border-top:1px solid rgba(59,130,246,.15);
-  background:rgba(26,86,219,.08);
+  padding:10px 12px;border-top:1px solid rgba(16,185,129,.15);
+  background:rgba(5,150,105,.08);
   display:flex;align-items:center;gap:10px;overflow:hidden;white-space:nowrap;
 }
 .su-avatar{
   width:34px;height:34px;border-radius:50%;
-  background:linear-gradient(135deg,#1a56db,#3b82f6);
+  background:linear-gradient(135deg,#10b981,#34d399);
   display:grid;place-items:center;font-size:12px;font-weight:700;
   color:#fff;flex-shrink:0;
-  box-shadow:0 0 0 2px rgba(59,130,246,.4),0 3px 10px rgba(26,86,219,.4);
+  box-shadow:0 0 0 2px rgba(16,185,129,.4),0 3px 10px rgba(5,150,105,.4);
 }
 .su-info{opacity:0;transition:opacity .2s .1s;}
 .sidebar:hover .su-info{opacity:1;}
@@ -106,21 +106,22 @@ body{font-family:'Inter',sans-serif;background:#f1f5f9;color:#1e293b;min-height:
 ══════════════════════════════════════ */
 .main{margin-left:64px;min-height:100vh;transition:margin-left .28s cubic-bezier(.4,0,.2,1);}
 .topbar{
-  background:linear-gradient(135deg,#1a56db 0%,#2563eb 100%);
-  border-bottom:none;box-shadow:0 3px 16px rgba(26,86,219,0.32);
+  background:#ffffff;
+  border-bottom:1px solid rgba(16,185,129,0.15);
+  box-shadow:0 4px 20px rgba(0,0,0,0.02);
   padding:0 24px;height:60px;display:flex;align-items:center;
   justify-content:space-between;position:sticky;top:0;z-index:90;
 }
-.topbar-title{font-size:18px;font-weight:700;color:#fff;}
+.topbar-title{font-size:18px;font-weight:700;color:#042215;}
 .topbar-right{display:flex;align-items:center;gap:8px;}
-.topbar-right .btn-outline{background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);}
-.topbar-right .btn-outline:hover{background:rgba(255,255,255,0.25);border-color:rgba(255,255,255,0.5);color:#fff;}
-.topbar-right select{background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:8px;padding:5px 10px;font-size:13px;font-family:'Inter',sans-serif;outline:none;}
+.topbar-right .btn-outline{background:rgba(16,185,129,0.08);color:#10b981;border-color:rgba(16,185,129,0.25);}
+.topbar-right .btn-outline:hover{background:rgba(16,185,129,0.15);border-color:#10b981;color:#10b981;}
+.topbar-right select{background:#ffffff;color:#1e293b;border:1px solid rgba(16,185,129,0.3);border-radius:8px;padding:5px 10px;font-size:13px;font-family:'Inter',sans-serif;outline:none;}
 .topbar-right select option{background:#1e293b;color:#fff;}
 
 .btn{padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer;transition:all .2s;border:none;display:inline-flex;align-items:center;gap:6px;}
-.btn-primary{background:#1a56db;color:#fff;}.btn-primary:hover{background:#1648c0;}
-.btn-outline{background:#fff;color:#374151;border:1.5px solid #e2e8f0;}.btn-outline:hover{border-color:#3b82f6;color:#3b82f6;}
+.btn-primary{background:#10b981;color:#fff;}.btn-primary:hover{background:#059669;}
+.btn-outline{background:#fff;color:#374151;border:1.5px solid #e2e8f0;}.btn-outline:hover{border-color:#34d399;color:#34d399;}
 .btn-danger{background:#ef4444;color:#fff;}.btn-danger:hover{background:#dc2626;}
 .btn-green{background:#10b981;color:#fff;}.btn-green:hover{background:#059669;}
 .btn-yellow{background:#f59e0b;color:#fff;}.btn-yellow:hover{background:#d97706;}
@@ -166,7 +167,7 @@ body{font-family:'Inter',sans-serif;background:#f1f5f9;color:#1e293b;min-height:
 .card-head-title{font-size:14px;font-weight:700;}
 .tab-group{display:flex;gap:4px;background:#f1f5f9;padding:3px;border-radius:8px;}
 .tab{padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;color:#64748b;transition:all .2s;}
-.tab.active{background:#fff;color:#1a56db;box-shadow:0 1px 4px rgba(0,0,0,.1);}
+.tab.active{background:#fff;color:#10b981;box-shadow:0 1px 4px rgba(0,0,0,.1);}
 
 table{width:100%;border-collapse:collapse;}
 thead th{font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:#94a3b8;padding:10px 14px;text-align:left;border-bottom:1px solid #e2e8f0;background:#f8fafc;}
@@ -204,7 +205,7 @@ tbody tr:last-child td{border-bottom:none;}
    PROFILE
 ══════════════════════════════════════ */
 .profile-card{background:#fff;border-radius:18px;border:none;padding:28px;max-width:500px;box-shadow:0 4px 22px rgba(0,0,0,0.08);}
-.profile-avatar-big{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#1a56db,#3b82f6);display:grid;place-items:center;font-size:22px;font-weight:700;color:#fff;margin-bottom:18px;}
+.profile-avatar-big{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#10b981,#34d399);display:grid;place-items:center;font-size:22px;font-weight:700;color:#fff;margin-bottom:18px;}
 .section-title{font-size:14px;font-weight:700;margin-bottom:14px;padding-top:8px;border-top:1px solid #f1f5f9;margin-top:4px;}
 
 /* ══════════════════════════════════════
@@ -223,7 +224,7 @@ tbody tr:last-child td{border-bottom:none;}
   font-size:13px;font-family:'Inter',sans-serif;outline:none;
   transition:border .2s;color:#1e293b;background:#fff;
 }
-.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:#3b82f6;}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:#34d399;}
 .form-group textarea{resize:vertical;min-height:70px;}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 
@@ -238,19 +239,19 @@ tbody tr:last-child td{border-bottom:none;}
 .action-btn{padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;border:none;font-family:'Inter',sans-serif;transition:all .2s;}
 .action-btn.done{background:#dcfce7;color:#16a34a;}.action-btn.done:hover{background:#bbf7d0;}
 .action-btn.revise{background:#fffbeb;color:#d97706;}.action-btn.revise:hover{background:#fef3c7;}
-.action-btn.edit{background:#eff6ff;color:#1d4ed8;}.action-btn.edit:hover{background:#dbeafe;}
+.action-btn.edit{background:#ecfdf5;color:#1d4ed8;}.action-btn.edit:hover{background:#dbeafe;}
 .action-btn.delete{background:#fef2f2;color:#dc2626;}.action-btn.delete:hover{background:#fecaca;}
 
 .role-badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;}
-.role-badge.admin{background:#eff6ff;color:#1d4ed8;}
-.role-badge.pc{background:#fdf4ff;color:#7c3aed;}
-.role-badge.pc{background:#fdf4ff;color:#7c3aed;}
+.role-badge.admin{background:#ecfdf5;color:#1d4ed8;}
+.role-badge.pc{background:#fdf4ff;color:#059669;}
+.role-badge.pc{background:#fdf4ff;color:#059669;}
 .role-badge.hod{background:#fdf4ff;color:#7e22ce;}
 .role-badge.user{background:#f0fdf4;color:#16a34a;}
 
 .priority-badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;text-transform:uppercase;}
 .priority-badge.low{background:#f0fdf4;color:#16a34a;}
-.priority-badge.medium{background:#eff6ff;color:#1d4ed8;}
+.priority-badge.medium{background:#ecfdf5;color:#1d4ed8;}
 .priority-badge.high{background:#fffbeb;color:#d97706;}
 .priority-badge.urgent{background:#fef2f2;color:#dc2626;}
 
@@ -278,23 +279,23 @@ tbody tr:last-child td{border-bottom:none;}
 
 /* FMS */
 .fms-name-tab{padding:8px 16px;border-radius:20px;background:#fff;border:1.5px solid #e2e8f0;font-size:13px;font-weight:600;cursor:pointer;color:#374151;transition:all .2s;}
-.fms-name-tab.active{background:#1a56db;color:#fff;border-color:#1a56db;}
-.fms-name-tab:hover:not(.active){border-color:#1a56db;color:#1a56db;}
+.fms-name-tab.active{background:#10b981;color:#fff;border-color:#10b981;}
+.fms-name-tab:hover:not(.active){border-color:#10b981;color:#10b981;}
 .fms-step-tab{padding:6px 18px;border-radius:8px;background:#f8fafc;border:1.5px solid #e2e8f0;font-size:12px;font-weight:600;cursor:pointer;color:#374151;transition:all .2s;white-space:nowrap;}
-.fms-step-tab.active{background:#1a56db;color:#fff;border-color:#1a56db;}
+.fms-step-tab.active{background:#10b981;color:#fff;border-color:#10b981;}
 .fms-step-box{background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:12px;padding:16px;position:relative;transition:box-shadow .2s;}
-.fms-step-box.drag-over{border-color:#1a56db;box-shadow:0 0 0 3px rgba(26,86,219,.15);}
+.fms-step-box.drag-over{border-color:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,.15);}
 .fms-step-box.selected{border-color:#ef4444;background:#fff5f5;}
-.fms-step-num{font-size:11px;font-weight:700;color:#1a56db;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;}
+.fms-step-num{font-size:11px;font-weight:700;color:#10b981;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;}
 .multi-select-wrap{position:relative;}
 .multi-select-dropdown{position:absolute;top:calc(100% + 2px);left:0;right:0;background:#fff;border:1.5px solid #e2e8f0;border-radius:8px;max-height:180px;overflow-y:auto;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,.12);display:none;}
 .multi-select-dropdown.open{display:block;}
 .multi-select-item{padding:8px 12px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px;transition:background .15s;}
 .multi-select-item:hover{background:#f0f4ff;}
-.multi-select-item input[type=checkbox]{cursor:pointer;width:14px;height:14px;accent-color:#1a56db;}
+.multi-select-item input[type=checkbox]{cursor:pointer;width:14px;height:14px;accent-color:#10b981;}
 .selected-tags{display:flex;flex-wrap:wrap;gap:4px;min-height:38px;padding:5px 10px;border:1.5px solid #e2e8f0;border-radius:8px;cursor:pointer;background:#fff;align-items:center;transition:border .2s;}
-.selected-tags:hover{border-color:#1a56db;}
-.tag-badge{background:#eff6ff;color:#1d4ed8;font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600;}
+.selected-tags:hover{border-color:#10b981;}
+.tag-badge{background:#ecfdf5;color:#1d4ed8;font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600;}
 .extra-row-item{display:flex;align-items:center;gap:8px;margin-top:8px;}
 .drag-handle{cursor:grab;color:#94a3b8;font-size:16px;padding:0 4px;}
 .drag-handle:active{cursor:grabbing;}
@@ -308,20 +309,20 @@ tbody tr:last-child td{border-bottom:none;}
 @keyframes trainScroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 button:disabled{opacity:.65;cursor:not-allowed !important;}
-.fms-train-engine{flex-shrink:0;background:linear-gradient(135deg,#1e293b,#334155);border:2px solid #3b82f6;border-radius:10px 4px 4px 10px;padding:14px 18px;color:#fff;min-width:80px;text-align:center;font-size:24px;display:flex;flex-direction:column;align-items:center;position:relative;}
+.fms-train-engine{flex-shrink:0;background:linear-gradient(135deg,#1e293b,#334155);border:2px solid #34d399;border-radius:10px 4px 4px 10px;padding:14px 18px;color:#fff;min-width:80px;text-align:center;font-size:24px;display:flex;flex-direction:column;align-items:center;position:relative;}
 .fms-train-engine::before,.fms-coach::before{content:'⬤';position:absolute;bottom:-14px;left:12px;color:#64748b;font-size:9px;}
 .fms-train-engine::after,.fms-coach::after{content:'⬤';position:absolute;bottom:-14px;right:12px;color:#64748b;font-size:9px;}
 .fms-coach{flex-shrink:0;border-radius:8px;padding:12px 14px;color:#fff;min-width:160px;max-width:200px;cursor:pointer;position:relative;transition:transform .2s,box-shadow .2s;border:2px solid transparent;display:flex;flex-direction:column;gap:4px;background:#1e3a5f;}
 .fms-coach:hover{transform:translateY(-5px);box-shadow:0 10px 25px rgba(0,0,0,.4);}
 .fms-coach.active{border-color:#f59e0b;box-shadow:0 0 0 3px rgba(245,158,11,.3);transform:translateY(-6px);}
 .fms-coach.not-mine{background:#1e293b;opacity:.55;cursor:not-allowed;pointer-events:none;}
-.fms-coach.mine{background:linear-gradient(135deg,#1a56db,#3b82f6);}
+.fms-coach.mine{background:linear-gradient(135deg,#10b981,#34d399);}
 .fms-coach-num{font-size:10px;font-weight:700;opacity:.7;text-transform:uppercase;letter-spacing:.5px;}
 .fms-coach-name{font-size:12px;font-weight:700;line-height:1.3;word-break:break-word;}
 .fms-coach-doers{font-size:10px;opacity:.75;margin-top:2px;}
 .fms-coach-connector{width:20px;height:8px;background:#475569;border-radius:2px;flex-shrink:0;align-self:flex-end;margin-bottom:14px;}
 .fms-train-speed{display:flex;align-items:center;gap:12px;padding:10px 20px;background:#f8fafc;border-radius:0 0 12px 12px;font-size:12px;color:#64748b;}
-.fms-train-speed input[type=range]{flex:1;accent-color:#1a56db;}
+.fms-train-speed input[type=range]{flex:1;accent-color:#10b981;}
 .fms-step-rows-table{background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;margin-top:4px;}
 .fms-step-rows-scroll{max-height:65vh;overflow:auto;}
 .fms-step-rows-table table{width:100%;border-collapse:separate;border-spacing:0;}
@@ -338,9 +339,9 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
 
 /* Header select dropdowns in step config */
 .header-select{width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;outline:none;background:#fff;color:#1e293b;}
-.header-select:focus{border-color:#3b82f6;}
+.header-select:focus{border-color:#34d399;}
 .multi-select-headers{display:flex;flex-wrap:wrap;gap:6px;padding:8px;border:1.5px solid #e2e8f0;border-radius:8px;min-height:42px;cursor:text;background:#fff;}
-.multi-select-headers .hdr-tag{background:#eff6ff;color:#1d4ed8;font-size:11px;padding:3px 8px;border-radius:8px;font-weight:600;display:flex;align-items:center;gap:4px;cursor:pointer;}
+.multi-select-headers .hdr-tag{background:#ecfdf5;color:#1d4ed8;font-size:11px;padding:3px 8px;border-radius:8px;font-weight:600;display:flex;align-items:center;gap:4px;cursor:pointer;}
 .multi-select-headers .hdr-tag .rm{color:#93c5fd;font-size:10px;margin-left:2px;}
 
 /* Flat tasks table (used in All Tasks page) */
@@ -366,7 +367,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
   color:#64748b;transition:color .15s;border:none;background:none;
   font-family:'Inter',sans-serif;min-width:0;
 }
-.mob-nav-item.active{color:#60a5fa;}
+.mob-nav-item.active{color:#6ee7b7;}
 .mob-nav-item svg{width:20px;height:20px;margin-bottom:2px;flex-shrink:0;}
 .mob-nav-label{font-size:9px;font-weight:600;letter-spacing:.1px;white-space:nowrap;}
 .mob-nav-badge{
@@ -395,8 +396,8 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
   /* ── TOPBAR — gradient ── */
   .topbar{
     padding:0 14px;height:52px;
-    background:linear-gradient(135deg,#1a56db 0%,#3b82f6 100%);
-    box-shadow:0 3px 14px rgba(26,86,219,0.35);
+    background:linear-gradient(135deg,#10b981 0%,#34d399 100%);
+    box-shadow:0 3px 14px rgba(16,185,129,0.3);
   }
   .topbar-title{font-size:15px;font-weight:700;color:#fff !important;}
   .topbar-right .btn{
@@ -414,8 +415,8 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     border-top:1px solid rgba(226,232,240,0.9) !important;
     box-shadow:0 -4px 24px rgba(0,0,0,0.09) !important;
   }
-  .mob-nav-item.active{color:#1a56db;}
-  .mob-nav-item.active svg{filter:drop-shadow(0 0 4px rgba(26,86,219,0.4));}
+  .mob-nav-item.active{color:#10b981;}
+  .mob-nav-item.active svg{filter:drop-shadow(0 0 4px rgba(16,185,129,0.4));}
 
   /* ── DASHBOARD HEADER ── */
   .dash-topbar{display:flex;flex-direction:column;align-items:flex-start;gap:8px;margin-bottom:16px;}
@@ -492,7 +493,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
   }
   .users-grid tr::before{
     content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
-    background:linear-gradient(180deg,#1a56db,#3b82f6);
+    background:linear-gradient(180deg,#10b981,#34d399);
     border-radius:3px 0 0 3px;
   }
   .users-grid td{border:none !important;padding:0 !important;line-height:1.5;}
@@ -662,7 +663,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
       <span class="nav-label-text">Approvals</span>
       <span id="approvalBadge" style="display:none;position:absolute;top:6px;right:8px;background:#ef4444;color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;font-weight:700;align-items:center;justify-content:center">0</span>
-      <span id="transferBadge" style="display:none;position:absolute;top:6px;right:26px;background:#7c3aed;color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;font-weight:700;align-items:center;justify-content:center">0</span>
+      <span id="transferBadge" style="display:none;position:absolute;top:6px;right:26px;background:#059669;color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;font-weight:700;align-items:center;justify-content:center">0</span>
     </div>
     <div class="nav-item" id="nav-users" style="display:none" onclick="navigate('users',this)">
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
@@ -868,9 +869,9 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
             style="padding:8px 12px 8px 32px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;outline:none;width:260px"/>
         </div>
         <button class="btn btn-outline" id="delegateByMeBtn" onclick="openDelegateByMeModal()"
-          style="color:#1a56db;border-color:#bfdbfe">📤 Delegate by Me</button>
+          style="color:#10b981;border-color:#a7f3d0">📤 Delegate by Me</button>
         <button class="btn btn-outline" id="transferModeBtn" onclick="openNewTransferModal()"
-          style="color:#7c3aed;border-color:#c4b5fd">🔀 Transfer</button>
+          style="color:#059669;border-color:#c4b5fd">🔀 Transfer</button>
         <button class="btn btn-primary" id="tasksAssignBtn" onclick="openDelegate()" style="display:none">+ Assign Task</button>
         <button class="btn btn-outline" id="bulkDeleteBtn" onclick="openBulkDeleteModal()"
           style="color:#dc2626;border-color:#fecaca;display:none">🗑 Bulk Delete</button>
@@ -915,8 +916,8 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       <!-- Profile Image Section -->
       <div style="display:flex;align-items:center;gap:20px;margin-bottom:22px;">
         <div style="position:relative;cursor:pointer" onclick="document.getElementById('profileImgInput').click()">
-          <div id="profileAvatar" style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,#1a56db,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;color:#fff;overflow:hidden;flex-shrink:0;border:3px solid #e2e8f0;">?</div>
-          <div style="position:absolute;bottom:0;right:0;width:24px;height:24px;background:#1a56db;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #fff;">
+          <div id="profileAvatar" style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,#10b981,#34d399);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;color:#fff;overflow:hidden;flex-shrink:0;border:3px solid #e2e8f0;">?</div>
+          <div style="position:absolute;bottom:0;right:0;width:24px;height:24px;background:#10b981;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #fff;">
             <span style="color:#fff;font-size:12px">✏️</span>
           </div>
         </div>
@@ -990,7 +991,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
           <div id="fmsSheetInfoText" style="font-size:13px;color:#374151;margin-top:2px"></div>
         </div>
         <div style="display:flex;gap:8px">
-          <button class="btn btn-outline btn-sm" onclick="openEditFMS()" style="color:#1a56db">✏️ Edit FMS</button>
+          <button class="btn btn-outline btn-sm" onclick="openEditFMS()" style="color:#10b981">✏️ Edit FMS</button>
           <button class="btn btn-outline btn-sm" onclick="syncFMSData()" style="color:#10b981">🔄 Sync Data</button>
           <button class="btn btn-outline btn-sm" onclick="deleteFMSSheet(fmsActiveId)" style="color:#dc2626;border-color:#fecaca">🗑 Delete</button>
         </div>
@@ -1031,7 +1032,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       <div style="font-size:12px;font-weight:600;color:#64748b;margin-bottom:8px;text-transform:uppercase;letter-spacing:.4px">
         Process Flow — Click a step to view tasks
         <span id="fmsTrainLegend" style="margin-left:12px;font-weight:400;text-transform:none">
-          <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:3px;background:linear-gradient(135deg,#1a56db,#3b82f6);display:inline-block"></span> Your step</span>
+          <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:3px;background:linear-gradient(135deg,#10b981,#34d399);display:inline-block"></span> Your step</span>
           <span style="margin-left:10px;display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:3px;background:#1e293b;display:inline-block;opacity:.5"></span> Other step</span>
         </span>
       </div>
@@ -1343,8 +1344,8 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       <h3 style="margin:0">✏️ Edit FMS</h3>
       <div style="display:flex;gap:6px">
         <button class="btn btn-outline btn-sm" onclick="addFMSStep()">+ Add Step</button>
-        <button class="btn btn-outline btn-sm" id="editFmsDupModeBtn" style="color:#7c3aed;border-color:#c4b5fd" onclick="toggleFMSDupMode()">📋 Duplicate</button>
-        <button class="btn btn-sm" id="editFmsDupConfirmBtn" style="display:none;background:#7c3aed;color:#fff" onclick="confirmFMSDup()">Duplicate Selected</button>
+        <button class="btn btn-outline btn-sm" id="editFmsDupModeBtn" style="color:#059669;border-color:#c4b5fd" onclick="toggleFMSDupMode()">📋 Duplicate</button>
+        <button class="btn btn-sm" id="editFmsDupConfirmBtn" style="display:none;background:#059669;color:#fff" onclick="confirmFMSDup()">Duplicate Selected</button>
       </div>
     </div>
 
@@ -1438,9 +1439,9 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       <p style="font-size:14px;color:#374151;line-height:1.6">
         Apni FMS Sheet ko is email par share karo taaki data sync ho sake:
       </p>
-      <div id="fmsShareEmail" style="margin-top:10px;font-size:15px;font-weight:700;color:#1a56db;background:#eff6ff;padding:10px;border-radius:8px;letter-spacing:.3px;word-break:break-all;">
+      <div id="fmsShareEmail" style="margin-top:10px;font-size:15px;font-weight:700;color:#10b981;background:#ecfdf5;padding:10px;border-radius:8px;letter-spacing:.3px;word-break:break-all;">
       </div>
-      <button onclick="copyFMSEmail()" style="margin-top:8px;background:none;border:1px solid #1a56db;color:#1a56db;padding:4px 12px;border-radius:6px;font-size:12px;cursor:pointer">📋 Copy Email</button>
+      <button onclick="copyFMSEmail()" style="margin-top:8px;background:none;border:1px solid #10b981;color:#10b981;padding:4px 12px;border-radius:6px;font-size:12px;cursor:pointer">📋 Copy Email</button>
     </div>
     <button id="fmsSkipBtn" class="btn btn-primary" style="width:100%;pointer-events:none;opacity:.6" onclick="proceedToStepsConfig()">
       Skip (<span id="fmsCountdown">7</span>s)
@@ -1615,13 +1616,13 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       <div class="form-group">
         <label>Week Off <span style="color:#94a3b8;font-weight:400;font-size:11px">(checklist skip hogi)</span></label>
         <div id="weekOffWrap" style="display:flex;flex-wrap:wrap;gap:6px;padding:8px;border:1.5px solid #e2e8f0;border-radius:8px;background:#fff;min-height:40px">
-          <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:500;cursor:pointer;text-transform:none;letter-spacing:0"><input type="checkbox" class="woff-cb" value="0" style="accent-color:#1a56db"/> Sun</label>
-          <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:500;cursor:pointer;text-transform:none;letter-spacing:0"><input type="checkbox" class="woff-cb" value="1" style="accent-color:#1a56db"/> Mon</label>
-          <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:500;cursor:pointer;text-transform:none;letter-spacing:0"><input type="checkbox" class="woff-cb" value="2" style="accent-color:#1a56db"/> Tue</label>
-          <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:500;cursor:pointer;text-transform:none;letter-spacing:0"><input type="checkbox" class="woff-cb" value="3" style="accent-color:#1a56db"/> Wed</label>
-          <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:500;cursor:pointer;text-transform:none;letter-spacing:0"><input type="checkbox" class="woff-cb" value="4" style="accent-color:#1a56db"/> Thu</label>
-          <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:500;cursor:pointer;text-transform:none;letter-spacing:0"><input type="checkbox" class="woff-cb" value="5" style="accent-color:#1a56db"/> Fri</label>
-          <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:500;cursor:pointer;text-transform:none;letter-spacing:0"><input type="checkbox" class="woff-cb" value="6" style="accent-color:#1a56db"/> Sat</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:500;cursor:pointer;text-transform:none;letter-spacing:0"><input type="checkbox" class="woff-cb" value="0" style="accent-color:#10b981"/> Sun</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:500;cursor:pointer;text-transform:none;letter-spacing:0"><input type="checkbox" class="woff-cb" value="1" style="accent-color:#10b981"/> Mon</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:500;cursor:pointer;text-transform:none;letter-spacing:0"><input type="checkbox" class="woff-cb" value="2" style="accent-color:#10b981"/> Tue</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:500;cursor:pointer;text-transform:none;letter-spacing:0"><input type="checkbox" class="woff-cb" value="3" style="accent-color:#10b981"/> Wed</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:500;cursor:pointer;text-transform:none;letter-spacing:0"><input type="checkbox" class="woff-cb" value="4" style="accent-color:#10b981"/> Thu</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:500;cursor:pointer;text-transform:none;letter-spacing:0"><input type="checkbox" class="woff-cb" value="5" style="accent-color:#10b981"/> Fri</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:500;cursor:pointer;text-transform:none;letter-spacing:0"><input type="checkbox" class="woff-cb" value="6" style="accent-color:#10b981"/> Sat</label>
         </div>
       </div>
     </div>
@@ -1666,7 +1667,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     <div style="display:flex;gap:12px;margin-bottom:14px">
       <div style="flex:1">
         <div style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Plan Value</div>
-        <div id="fmsDonePlanDisplay" style="font-size:15px;font-weight:700;color:#1a56db;background:#eff6ff;padding:10px 14px;border-radius:8px"></div>
+        <div id="fmsDonePlanDisplay" style="font-size:15px;font-weight:700;color:#10b981;background:#ecfdf5;padding:10px 14px;border-radius:8px"></div>
       </div>
       <div style="flex:1">
         <div style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Actual (Now)</div>
@@ -1760,7 +1761,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
           <select id="bdYearUser" onchange="onBdYearUserChange()" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;outline:none;background:#fff" disabled>
             <option value="">-- Select Employee --</option>
           </select>
-          <div id="bdYearUserEmail" style="display:none;margin-top:5px;padding:5px 10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;font-size:12px;color:#1d4ed8;font-weight:600">📧 <span id="bdYearUserEmailText"></span></div>
+          <div id="bdYearUserEmail" style="display:none;margin-top:5px;padding:5px 10px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:6px;font-size:12px;color:#1d4ed8;font-weight:600">📧 <span id="bdYearUserEmailText"></span></div>
         </div>
         <button class="btn btn-danger btn-sm" style="white-space:nowrap;margin-bottom:1px" onclick="openDelete12MonthsConfirm()">🗑 Delete Checklist</button>
       </div>
@@ -1800,7 +1801,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     <!-- STEP 3: Tasks list -->
     <div id="transferStep3" style="display:none">
       <div style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">
-        Tasks on selected date — <span id="transferDateLabel" style="color:#7c3aed"></span>
+        Tasks on selected date — <span id="transferDateLabel" style="color:#059669"></span>
       </div>
       <div id="transferTasksListNew" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;max-height:220px;overflow-y:auto;margin-bottom:12px"></div>
 
@@ -1813,14 +1814,14 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
         </select>
       </div>
 
-      <div style="background:#faf5ff;border:1px solid #c4b5fd;border-radius:8px;padding:8px 12px;font-size:12px;color:#7c3aed;margin-bottom:12px">
+      <div style="background:#faf5ff;border:1px solid #c4b5fd;border-radius:8px;padding:8px 12px;font-size:12px;color:#059669;margin-bottom:12px">
         ℹ️ Approve hone ke baad task transfer hoga
       </div>
 
       <div style="display:flex;gap:8px;justify-content:flex-end">
         <button class="btn btn-outline" onclick="closeModal('transferModal')">Cancel</button>
-        <button class="btn btn-outline" style="border-color:#7c3aed;color:#7c3aed" onclick="submitTransferSelected()">✅ Transfer Selected</button>
-        <button class="btn btn-sm" style="background:#7c3aed;color:#fff;padding:8px 16px;border-radius:8px;font-family:'Inter',sans-serif;font-weight:600;cursor:pointer;border:none" onclick="submitTransferAll()">🔀 Transfer All</button>
+        <button class="btn btn-outline" style="border-color:#059669;color:#059669" onclick="submitTransferSelected()">✅ Transfer Selected</button>
+        <button class="btn btn-sm" style="background:#059669;color:#fff;padding:8px 16px;border-radius:8px;font-family:'Inter',sans-serif;font-weight:600;cursor:pointer;border:none" onclick="submitTransferAll()">🔀 Transfer All</button>
       </div>
     </div>
 
@@ -1859,7 +1860,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       <div id="planPctPreview" style="margin-top:6px;font-size:12px;color:#64748b;min-height:18px"></div>
     </div>
     <div style="display:flex;flex-direction:column;gap:8px;margin-top:20px">
-      <button class="btn btn-primary" style="background:linear-gradient(135deg,#7c3aed,#1a56db);border:none" onclick="saveWeekPlan()">Save Plan</button>
+      <button class="btn btn-primary" style="background:linear-gradient(135deg,#059669,#10b981);border:none" onclick="saveWeekPlan()">Save Plan</button>
       <button class="btn btn-outline" onclick="closeModal('setPlanModal')">Cancel</button>
     </div>
   </div>
@@ -2165,7 +2166,7 @@ async function loadDashboard() {
     document.getElementById('dPending').textContent = 'Err';
     document.getElementById('dRevised').textContent = 'Err';
     document.getElementById('dCompleted').textContent = 'Err';
-    document.getElementById('dashTbody').innerHTML = `<tr><td colspan="6" style="color:#dc2626;padding:20px;text-align:center">⚠️ Data load failed: ${d.error}<br><button onclick="loadDashboard()" style="margin-top:8px;padding:6px 16px;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">Retry</button></td></tr>`;
+    document.getElementById('dashTbody').innerHTML = `<tr><td colspan="6" style="color:#dc2626;padding:20px;text-align:center">⚠️ Data load failed: ${d.error}<br><button onclick="loadDashboard()" style="margin-top:8px;padding:6px 16px;background:#059669;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">Retry</button></td></tr>`;
     return;
   }
 
@@ -2513,7 +2514,7 @@ function toggleDashDateSort() {
   const icon = document.getElementById('dashDateSortIcon');
   if (icon) {
     icon.textContent = _dashDateSortState === 0 ? '⇅' : _dashDateSortState === 1 ? '↑' : '↓';
-    icon.style.color = _dashDateSortState === 0 ? '#94a3b8' : '#1a56db';
+    icon.style.color = _dashDateSortState === 0 ? '#94a3b8' : '#10b981';
   }
   if (window._lastDashTasks) renderDashTable(window._lastDashTasks, dashType);
 }
@@ -2540,7 +2541,7 @@ function renderDashTable(tasks, type) {
   if (!allPending.length) { tbody.innerHTML=`<tr><td colspan="6" class="empty">No pending tasks 🎉</td></tr>`; return; }
   const typeBadge = t => t.type==='checklist'
     ? `<span style="font-size:10px;background:#f0fdf4;color:#16a34a;padding:2px 8px;border-radius:10px;font-weight:700;border:1px solid #bbf7d0">✅ Checklist</span>`
-    : `<span style="font-size:10px;background:#eff6ff;color:#1d4ed8;padding:2px 8px;border-radius:10px;font-weight:700;border:1px solid #bfdbfe">📋 Delegation</span>`;
+    : `<span style="font-size:10px;background:#ecfdf5;color:#1d4ed8;padding:2px 8px;border-radius:10px;font-weight:700;border:1px solid #a7f3d0">📋 Delegation</span>`;
   tbody.innerHTML = allPending.map(t=>`
     <tr>
       <td style="white-space:nowrap">${typeBadge(t)}</td>
@@ -2692,16 +2693,16 @@ function renderTasksTable() {
     const actionBtns = isAdmin ? `
       <button class="action-btn edit" style="padding:4px 7px" onclick="openEditTask(${t.id},'${tasksType}')" title="Edit">✏️</button>
       <button class="action-btn delete" style="padding:4px 7px;margin-left:3px" onclick="deleteTask(${t.id},'${tasksType}')" title="Delete">🗑</button>
-      <button class="action-btn" style="background:#eff6ff;color:#1d4ed8;padding:4px 7px;margin-left:3px" onclick="openComments(${t.id},'${tasksType}')" title="Comments">💬</button>
+      <button class="action-btn" style="background:#ecfdf5;color:#1d4ed8;padding:4px 7px;margin-left:3px" onclick="openComments(${t.id},'${tasksType}')" title="Comments">💬</button>
       ${!isCompleted && !isWaiting ? `<button class="action-btn done" style="margin-left:3px" onclick="updateStatus(${t.id},'completed','alltasks','${tasksType}')">Done</button>` : ''}
       ${!isChecklist && !isCompleted && !isWaiting ? `<button class="action-btn revise" style="margin-left:3px" onclick="openReviseModal(${t.id},'${tasksType}')">Revise</button>` : ''}
       ${isWaiting ? `<span style="font-size:11px;color:#f59e0b;font-weight:600;margin-left:4px">⏳ Waiting</span>` : ''}
     ` : (ME.role==='pc') ? `
-      <button class="action-btn" style="background:#eff6ff;color:#1d4ed8;padding:4px 7px" onclick="openComments(${t.id},'${tasksType}')" title="Comments">💬</button>
+      <button class="action-btn" style="background:#ecfdf5;color:#1d4ed8;padding:4px 7px" onclick="openComments(${t.id},'${tasksType}')" title="Comments">💬</button>
       ${isChecklist && !isCompleted && !isWaiting ? `<button class="action-btn done" style="margin-left:3px" onclick="updateStatus(${t.id},'completed','alltasks','${tasksType}')">Done</button>` : ''}
       ${isWaiting ? `<span style="font-size:11px;color:#f59e0b;font-weight:600;margin-left:4px">⏳ Waiting</span>` : ''}
     ` : `
-      <button class="action-btn" style="background:#eff6ff;color:#1d4ed8;padding:4px 7px" onclick="openComments(${t.id},'${tasksType}')" title="Comments">💬</button>
+      <button class="action-btn" style="background:#ecfdf5;color:#1d4ed8;padding:4px 7px" onclick="openComments(${t.id},'${tasksType}')" title="Comments">💬</button>
       ${!isCompleted && !isWaiting ? `
         <button class="action-btn done" style="margin-left:3px" onclick="updateStatus(${t.id},'completed','alltasks','${tasksType}')">Done</button>
         ${!isChecklist ? `<button class="action-btn revise" style="margin-left:3px" onclick="openReviseModal(${t.id},'${tasksType}')">Revise</button>` : ''}
@@ -3372,7 +3373,7 @@ function _renderExtraOffList() {
           <label style="display:flex;align-items:center;gap:2px;font-size:11px;cursor:pointer;text-transform:none;letter-spacing:0">
             <input type="checkbox" ${item.weeks.includes(w)?'checked':''}
               onchange="if(this.checked)_extraOffData[${i}].weeks.push(${w});else _extraOffData[${i}].weeks=_extraOffData[${i}].weeks.filter(x=>x!==${w});_renderExtraOffList()"
-              style="accent-color:#1a56db;width:12px;height:12px"/>
+              style="accent-color:#10b981;width:12px;height:12px"/>
             ${weekNames[w]}
           </label>`).join('')}
       </div>
@@ -3918,7 +3919,7 @@ function renderMIS(data) {
 
     return `<tr style="cursor:pointer" onclick="openMISDetail('${r.userId||r.id}','${r.name}')" title="Click to see task details">
       <td>
-        <span style="font-weight:600;color:#1a56db;text-decoration:underline dotted">${r.name}</span>
+        <span style="font-weight:600;color:#10b981;text-decoration:underline dotted">${r.name}</span>
       </td>
       <td style="font-weight:700">${r.total}</td>
       <td style="color:#ef4444;font-weight:600">${r.pending}</td>
@@ -4090,7 +4091,7 @@ function renderFMSMIS(data) {
       <tr>
         <td style="padding-left:24px;color:#64748b;font-size:12px">Step ${s.stepOrder}: ${s.stepName}</td>
         <td style="font-size:12px;color:#64748b">${s.doers}</td>
-        <td style="font-weight:600;color:#1a56db">${s.total}</td>
+        <td style="font-weight:600;color:#10b981">${s.total}</td>
         <td style="color:#ef4444;font-weight:600">${s.pending}</td>
         <td style="color:#10b981;font-weight:600">${s.done}</td>
         <td>
@@ -4107,7 +4108,7 @@ function renderFMSMIS(data) {
         <div style="background:#f8fafc;padding:12px 16px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between">
           <div style="font-size:14px;font-weight:700;color:#1e293b">📊 ${fms.fmsName}</div>
           <div style="display:flex;gap:16px;font-size:13px">
-            <span>Total: <strong style="color:#1a56db">${fms.total}</strong></span>
+            <span>Total: <strong style="color:#10b981">${fms.total}</strong></span>
             <span>Pending: <strong style="color:#ef4444">${fms.pending}</strong></span>
             <span>Done: <strong style="color:#10b981">${fms.done}</strong></span>
             ${hasError ? `<span style="color:#dc2626;font-size:11px">⚠️ ${fms.error}</span>` : ''}
@@ -4187,7 +4188,7 @@ function renderAllMIS(data, fmsData) {
 
     return `<tr style="cursor:pointer" onclick="openAllMISDetail('${emp.userId}','${emp.name.replace(/'/g,"\\'")}')">
       <td>
-        <div style="font-weight:600;color:#1a56db;text-decoration:underline dotted">${emp.name}</div>
+        <div style="font-weight:600;color:#10b981;text-decoration:underline dotted">${emp.name}</div>
         <div style="font-size:11px;color:#94a3b8;margin-top:2px">${emp.department||'—'}</div>
       </td>
       <td style="font-weight:700">${emp.totalAll}</td>
@@ -4320,7 +4321,7 @@ async function openAllMISDetail(userId, userName) {
 
     ${fms.total > 0 ? `
     <div style="margin-top:16px;border-top:1px solid #f1f5f9;padding-top:12px">
-      <div style="font-size:13px;font-weight:700;color:#7c3aed;margin-bottom:8px">📊 FMS (${fms.total} entries) — Completion: ${fms.score !== null ? fms.score.toFixed(1) : 0}%</div>
+      <div style="font-size:13px;font-weight:700;color:#059669;margin-bottom:8px">📊 FMS (${fms.total} entries) — Completion: ${fms.score !== null ? fms.score.toFixed(1) : 0}%</div>
       <div style="display:flex;gap:14px;font-size:12px;flex-wrap:wrap;padding:8px 10px;background:#faf5ff;border-radius:8px">
         <span>Total entries: <strong>${fms.total}</strong></span>
         <span style="color:#10b981">Done: <strong>${fms.done}</strong></span>
@@ -4436,7 +4437,7 @@ function renderRecords(fmsErrors) {
     const nameEsc = r.name.replace(/'/g,"\\'");
     return `<tr>
       <td onclick="openRecordDetail('${r.userId}')" style="cursor:pointer">
-        <div style="font-weight:600;color:#1a56db;text-decoration:underline dotted">${r.name}</div>
+        <div style="font-weight:600;color:#10b981;text-decoration:underline dotted">${r.name}</div>
         <div style="font-size:11px;color:#94a3b8;margin-top:2px">${r.department||'—'}</div>
       </td>
       <td>${committedHtml}</td>
@@ -4523,7 +4524,7 @@ async function openRecordDetail(userId) {
         ${r.revised ? `<span style="color:#f59e0b">🔄 Revised: <strong>${r.revised}</strong></span>` : ''}
       </div>
       <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;font-size:11px;color:#64748b">
-        <span style="padding:2px 8px;background:#eff6ff;border:1px solid #dbeafe;border-radius:8px">Delegation: ${b.delegation.done}/${b.delegation.total} done</span>
+        <span style="padding:2px 8px;background:#ecfdf5;border:1px solid #dbeafe;border-radius:8px">Delegation: ${b.delegation.done}/${b.delegation.total} done</span>
         <span style="padding:2px 8px;background:#f0fdf4;border:1px solid #dcfce7;border-radius:8px">Checklist: ${b.checklist.done}/${b.checklist.total} done</span>
         <span style="padding:2px 8px;background:#faf5ff;border:1px solid #f3e8ff;border-radius:8px">FMS: ${b.fms.done}/${b.fms.total} done</span>
       </div>
@@ -4533,7 +4534,7 @@ async function openRecordDetail(userId) {
     ${r.pending === 0 ? '<div class="empty" style="font-size:12px;margin-top:8px">🎉 Koi pending task nahi — sab complete!</div>' : ''}
     ${section('📋 Delegation', '#1d4ed8', b.delegation.pending, delRows)}
     ${section('✅ Checklist', '#16a34a', b.checklist.pending, chlRows)}
-    ${section('📊 FMS', '#7c3aed', b.fms.pending, fmsRows)}`;
+    ${section('📊 FMS', '#059669', b.fms.pending, fmsRows)}`;
 
   document.getElementById('recordDetailModal').classList.add('open');
 }
@@ -4866,7 +4867,7 @@ async function syncFMSData() {
   // headers are now objects {col, name, index} — extract name for display
   const headerBadges = (r.headers||[]).map(h=>{
     const label = typeof h === 'object' ? `${h.name} (${h.col})` : String(h);
-    return `<span style="background:#eff6ff;color:#1d4ed8;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:600">${label}</span>`;
+    return `<span style="background:#ecfdf5;color:#1d4ed8;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:600">${label}</span>`;
   }).join(' ');
 
   syncEl.style.cssText='display:block;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:16px;margin-top:14px';
@@ -5085,7 +5086,7 @@ function buildStepBoxHTML(idx) {
       <span class="drag-handle" title="Drag to reorder">⠿</span>
       <div class="fms-step-num">Step ${idx+1}</div>
       ${fmsDeleteMode?`<input type="checkbox" class="fms-del-check" style="margin-left:auto" data-idx="${idx}"/>`:''}
-      ${fmsDupMode?`<input type="checkbox" class="fms-dup-check" style="margin-left:auto;accent-color:#7c3aed" data-idx="${idx}"/>`:''}
+      ${fmsDupMode?`<input type="checkbox" class="fms-dup-check" style="margin-left:auto;accent-color:#059669" data-idx="${idx}"/>`:''}
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       <div class="form-group" style="margin:0">
@@ -5134,7 +5135,7 @@ function buildStepBoxHTML(idx) {
           <label style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:500;cursor:pointer;text-transform:none;letter-spacing:0;background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:3px 8px;white-space:nowrap">
             <input type="checkbox" ${showColsSelected.includes(h.index)?'checked':''}
               onchange="if(this.checked){if(!fmsSteps[${idx}].showCols.includes(${h.index}))fmsSteps[${idx}].showCols.push(${h.index})}else{fmsSteps[${idx}].showCols=fmsSteps[${idx}].showCols.filter(x=>x!==${h.index})}"
-              style="accent-color:#1a56db;width:12px;height:12px"/>
+              style="accent-color:#10b981;width:12px;height:12px"/>
             ${h.name}
           </label>`).join('')}
       </div>` : '<span style="color:#94a3b8;font-size:12px">Headers load hone ke baad dikhega</span>'}
@@ -6030,7 +6031,7 @@ async function onBdDateChange() {
       <span style="font-size:13px;flex:1">${t.description||'—'}</span>
       ${freqBadge}
       <span style="font-size:11px;background:${t.status==='pending'?'#fef2f2':'#fef9c3'};color:${t.status==='pending'?'#dc2626':'#854d0e'};padding:2px 7px;border-radius:8px;font-weight:600">${t.status}</span>
-      <span style="font-size:11px;background:#eff6ff;color:#1d4ed8;padding:2px 7px;border-radius:8px;font-weight:600">${t.taskType}</span>
+      <span style="font-size:11px;background:#ecfdf5;color:#1d4ed8;padding:2px 7px;border-radius:8px;font-weight:600">${t.taskType}</span>
     </div>`;
   }).join('');
 }
@@ -6215,9 +6216,9 @@ async function onTransferDateChange() {
         ${isPending
           ? `<span style="font-size:10px;background:#fef9c3;color:#92400e;padding:2px 7px;border-radius:10px;font-weight:600;border:1px solid #fde68a;white-space:nowrap">⏳ Sent</span>`
           : `<input type="checkbox" class="tr-date-cb" data-idx="${i}" checked
-              style="width:15px;height:15px;accent-color:#7c3aed;cursor:pointer;flex-shrink:0"/>`}
+              style="width:15px;height:15px;accent-color:#059669;cursor:pointer;flex-shrink:0"/>`}
         <span style="font-size:13px;flex:1">${t.description||'—'}</span>
-        <span style="font-size:11px;background:#eff6ff;color:#1d4ed8;padding:2px 7px;border-radius:8px;font-weight:600">${t.taskType}</span>
+        <span style="font-size:11px;background:#ecfdf5;color:#1d4ed8;padding:2px 7px;border-radius:8px;font-weight:600">${t.taskType}</span>
       </div>`;
     }).join('');
   }
@@ -6276,7 +6277,7 @@ async function loadTransferApprovals() {
           <td style="font-size:12px;max-width:180px">${t.description}</td>
           <td><span class="status-badge pending" style="font-size:10px">${t.task_type}</span></td>
           <td style="font-weight:600">${t.fromUserName}</td>
-          <td style="color:#7c3aed;font-weight:600">${t.toUserName}</td>
+          <td style="color:#059669;font-weight:600">${t.toUserName}</td>
           <td style="color:#64748b;font-size:12px">${t.requestedByName}</td>
           <td style="color:#64748b;font-size:12px">${new Date(t.created_at).toLocaleDateString('en-IN')}</td>
           <td>
