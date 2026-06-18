@@ -40,3 +40,5 @@ desktop.ini
 *.suo
 *.user
 .idea/
+
+.vercel

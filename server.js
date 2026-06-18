@@ -228,15 +228,32 @@ async function getSheetsClient() {
 
 // Global db instance
 let db = null;
+let dbInitializationPromise = null;
 
-// Wait for db to be ready (handles Vercel cold-start race condition)
+async function initializeDatabase() {
+  const sheetsApi = await getSheetsClient();
+  // Verify connection by reading spreadsheet metadata
+  await withRetry(() => sheetsApi.spreadsheets.get({ spreadsheetId: SHEET_ID, fields: 'spreadsheetId' }));
+  db = new SheetDB(sheetsApi, SHEET_ID);
+  console.log('  Google Sheets DB connected (with 45s in-memory cache)');
+  try {
+    await seedAdminIfNeeded();
+  } catch(e) {
+    console.log('  Seed skipped (will retry on next request):', e.message);
+  }
+  return db;
+}
+
+// Wait for db to be ready (handles Vercel cold-start race condition and lazy init)
 async function getDB() {
   if (db) return db;
-  for (let i = 0; i < 10; i++) {
-    await new Promise(r => setTimeout(r, 500));
-    if (db) return db;
+  if (!dbInitializationPromise) {
+    dbInitializationPromise = initializeDatabase().catch(err => {
+      dbInitializationPromise = null;
+      throw err;
+    });
   }
-  throw new Error('Database not initialized — server still starting up, please retry in a moment');
+  return await dbInitializationPromise;
 }
 
 // deleteRow delegates to db.delete (which has cache invalidation built in)
@@ -419,8 +436,12 @@ function reminderScheduler() {
 // ══════════════════════════════════════════════════════
 // MIDDLEWARE
 // ══════════════════════════════════════════════════════
-function requireAuth(req, res, next) {
-  if (!db) return res.status(503).json({ error: 'Server abhi start ho raha hai — please 5 seconds baad retry karein' });
+async function requireAuth(req, res, next) {
+  try {
+    await getDB();
+  } catch (err) {
+    return res.status(503).json({ error: 'Database connection failed — please retry: ' + err.message });
+  }
   const token = req.cookies?.token || req.headers['authorization']?.replace('Bearer ', '');
   if (!token) return res.status(401).json({ error: 'Not authenticated' });
   try {
@@ -456,7 +477,7 @@ function parseIntSafe(v) { const n = parseInt(v); return isNaN(n) ? 0 : n; }
 // ══════════════════════════════════════════════════════
 app.post('/api/login', async (req, res) => {
   try {
-    if (!db) return res.status(503).json({ error: 'Server start ho raha hai — please retry karein' });
+    await getDB();
     const { email, password } = req.body;
     const user = await db.findOne('Users', { email });
     if (!user || user.password !== password)
@@ -2345,7 +2366,8 @@ app.post('/api/admin/run-reminders', requireAuth, requireAdmin, async (req, res)
 
 app.get('/api/debug', async (req, res) => {
   try {
-    const users = await db.findAll('Users');
+    const database = await getDB();
+    const users = await database.findAll('Users');
     res.json({
       time: new Date().toISOString(),
       db: { connected: true, type: 'Google Sheets' },
@@ -2388,13 +2410,8 @@ async function seedAdminIfNeeded() {
 
 (async () => {
   try {
-    const sheetsApi = await getSheetsClient();
-    // Verify connection by reading spreadsheet metadata
-    await withRetry(() => sheetsApi.spreadsheets.get({ spreadsheetId: SHEET_ID, fields: 'spreadsheetId' }));
-    db = new SheetDB(sheetsApi, SHEET_ID);
-    console.log('  Google Sheets DB connected (with 45s in-memory cache)');
-
-    try { await seedAdminIfNeeded(); } catch(e) { console.log('  Seed skipped (will retry on next start):', e.message); }
+    // Start background DB connection
+    getDB().catch(err => console.error('  Background DB connection failed (will retry on demand):', err.message));
 
     // SMTP verify (non-blocking)
     if (process.env.SMTP_USER && process.env.SMTP_PASS) {
