@@ -64,39 +64,40 @@
     text-align:center;margin-bottom:24px;
     animation:fadeDown .7s cubic-bezier(.34,1.56,.64,1) both;
   }
-  .brand-logo-ring {
-    width:80px;height:80px;border-radius:50%;margin:0 auto 12px;
+  .brand-logo-banner {
+    width:240px;height:76px;border-radius:16px;margin:0 auto 14px;
     background:#000000;
     display:grid;place-items:center;position:relative;
     box-shadow:
-      0 0 0 2px rgba(255, 215, 0, 0.75), /* Glowing gold ring */
-      0 0 16px rgba(255, 215, 0, 0.35),
-      0 8px 24px rgba(0,0,0,0.45);
+      0 0 0 1.5px rgba(255, 215, 0, 0.65), /* Glowing gold border */
+      0 0 12px rgba(255, 215, 0, 0.25),
+      0 6px 18px rgba(0,0,0,0.3);
     overflow:hidden;
   }
-  .brand-logo-ring img {
-    width:100%;height:100%;object-fit:contain;
+  .brand-logo-banner img {
+    width:100%;height:100%;object-fit:cover;
   }
-  .brand-logo-ring .logo-fallback {
-    font-family:'Outfit',sans-serif;font-weight:900;font-size:26px;color:#fff;letter-spacing:-1px;
+  .brand-logo-banner .logo-fallback {
+    font-family:'Outfit',sans-serif;font-weight:900;font-size:24px;color:#fff;letter-spacing:-1px;
   }
   .brand-name {
-    font-family:'Outfit',sans-serif;font-weight:800;font-size:26px;
-    color:#ffffff;letter-spacing:-0.5px;line-height:1;
+    display:none;
   }
   .brand-sub {
-    margin-top:5px;font-size:11px;font-weight:600;letter-spacing:2px;
-    color:rgba(255,255,255,0.7);text-transform:uppercase;
+    font-family:'Inter',sans-serif;
+    margin-top:5px;font-size:11px;font-weight:700;letter-spacing:4px;
+    color:rgba(255,255,255,0.85);text-transform:uppercase;
   }
 
   /* ── CARD — Styled exactly like the phone screen ── */
   .card {
-    background: var(--card-gradient);
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(13, 71, 161, 0.35); /* Elegant semi-transparent glass blue */
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius:28px;
     padding:36px 24px 30px;
     box-shadow:
-      0 24px 64px rgba(0, 0, 0, 0.55),
+      0 24px 64px rgba(0, 0, 0, 0.45),
       inset 0 1px 0 rgba(255, 255, 255, 0.2);
     position:relative;overflow:hidden;
     animation:cardIn .65s cubic-bezier(.34,1.56,.64,1) .1s both;
@@ -177,18 +178,18 @@
   /* ── BUTTON ── */
   .btn-login {
     width:100%;padding:13px;margin-top:6px;
-    background:var(--button-bg);
+    background:linear-gradient(135deg, #1565C0 0%, #0D47A1 100%);
     color:#ffffff;border:none;border-radius:50px;
     font-size:15px;font-weight:700;font-family:'Inter',sans-serif;
     cursor:pointer;position:relative;overflow:hidden;
     transition:all .2s;
-    box-shadow:0 6px 20px rgba(0, 0, 0, 0.2);
+    box-shadow:0 4px 15px rgba(21, 101, 192, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.15);
     letter-spacing:.5px;
   }
   .btn-login:hover {
-    transform:translateY(-1px);
-    background:var(--button-hover);
-    box-shadow:0 8px 25px rgba(0, 0, 0, 0.3);
+    transform:translateY(-1.5px);
+    background:linear-gradient(135deg, #1976D2 0%, #0D47A1 100%);
+    box-shadow:0 8px 24px rgba(21, 101, 192, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.25);
   }
   .btn-login:active{transform:translateY(0);}
   .btn-login:disabled{opacity:.55;cursor:not-allowed;transform:none;}
@@ -233,12 +234,11 @@
 
   <!-- Brand -->
   <div class="brand">
-    <div class="brand-logo-ring">
+    <div class="brand-logo-banner">
       <img src="/raabta-logo.png" alt="Raabta Logo"
            onerror="this.style.display='none';this.nextElementSibling.style.display='block'"/>
       <span class="logo-fallback" style="display:none">RT</span>
     </div>
-    <div class="brand-name">Raabta</div>
     <div class="brand-sub">Task Manager</div>
   </div>
 
