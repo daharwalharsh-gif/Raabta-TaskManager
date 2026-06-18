@@ -9,7 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@700;800;900&display=swap" rel="stylesheet"/>
 <style>
   :root {
-    --deep-bg: #090D16;
+    --deep-bg: radial-gradient(circle at center, #0a1f3d 0%, #050d18 100%);
     --card-gradient: linear-gradient(180deg, #1565C0 0%, #0D47A1 100%);
     --button-bg: #09377a;
     --button-hover: #062b61;
@@ -26,6 +26,23 @@
     display:flex;align-items:center;justify-content:center;
     overflow:hidden;
     position:relative;
+  }
+
+  /* Glowing background blobs */
+  .bg-glow-orbs {
+    position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none;
+  }
+  .bg-orb {
+    position:absolute;border-radius:50%;filter:blur(100px);
+    opacity:0.3;
+  }
+  .orb-blue {
+    width:350px;height:350px;top:-50px;left:-50px;
+    background:radial-gradient(circle, #2979FF, transparent 70%);
+  }
+  .orb-purple {
+    width:450px;height:450px;bottom:-100px;right:-100px;
+    background:radial-gradient(circle, #7c4aed, transparent 75%);
   }
 
   /* Subtle background grid */
@@ -52,8 +69,9 @@
     background:#000000;
     display:grid;place-items:center;position:relative;
     box-shadow:
-      0 0 0 2px rgba(255,255,255,0.25),
-      0 8px 24px rgba(0,0,0,0.35);
+      0 0 0 2px rgba(255, 215, 0, 0.75), /* Glowing gold ring */
+      0 0 16px rgba(255, 215, 0, 0.35),
+      0 8px 24px rgba(0,0,0,0.45);
     overflow:hidden;
   }
   .brand-logo-ring img {
@@ -205,6 +223,10 @@
 </head>
 <body>
 
+<div class="bg-glow-orbs">
+  <div class="bg-orb orb-blue"></div>
+  <div class="bg-orb orb-purple"></div>
+</div>
 <div class="bg-grid"></div>
 
 <div class="wrap">
