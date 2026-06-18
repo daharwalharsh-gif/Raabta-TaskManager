@@ -10,7 +10,7 @@ const { google } = require('googleapis');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.SESSION_SECRET || 'taskmanager_secret_2026';
-const SHEET_ID = process.env.SHEET_ID || '15YPWDhShll1BBE8r-e91o4S7kB-i3BnXq5qeY7dHlZw';
+const SHEET_ID = process.env.SHEET_ID || '1SlUOgq1QN70tbIdlNat_XEY4JYGHG3JQyyh3NBG_lYQ';
 
 app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));

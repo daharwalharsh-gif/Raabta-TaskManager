@@ -2,7 +2,7 @@ require('dotenv').config();
 const { google } = require('googleapis');
 const creds = require('./credentials.json');
 
-const SHEET_ID = '15YPWDhShll1BBE8r-e91o4S7kB-i3BnXq5qeY7dHlZw';
+const SHEET_ID = process.env.SHEET_ID || '1SlUOgq1QN70tbIdlNat_XEY4JYGHG3JQyyh3NBG_lYQ';
 
 const TABS = [
   { name: 'Users',            headers: ['id','name','email','notification_email','password','role','phone','department','week_off','extra_off','profile_image','created_at'] },
@@ -12,6 +12,9 @@ const TABS = [
   { name: 'Task_Comments',    headers: ['id','task_id','task_type','user_id','comment','created_at'] },
   { name: 'Task_Transfers',   headers: ['id','task_id','task_type','from_user','to_user','requested_by','status','note','created_at'] },
   { name: 'Week_Plans',       headers: ['id','employee_id','hod_id','start_date','target_count','improvement_pct','created_at','updated_at'] },
+  { name: 'MIS_Report',       headers: ['period','employee_id','employee_name','department','delegation_total','delegation_done','delegation_pending','checklist_total','checklist_done','checklist_pending'] },
+  { name: 'FMS_Config',       headers: ['id','name','sheet_id','sheet_name','steps','created_at','updated_at'] },
+  { name: 'Holidays',         headers: ['id','date','name','created_at'] },
 ];
 
 (async () => {
