@@ -479,7 +479,8 @@ app.post('/api/login', async (req, res) => {
   try {
     await getDB();
     const { email, password } = req.body;
-    const user = await db.findOne('Users', { email });
+    const allUsers = await db.findAll('Users');
+    const user = allUsers.find(u => u.email && u.email.trim().toLowerCase() === (email || '').trim().toLowerCase());
     if (!user || user.password !== password)
       return res.status(401).json({ error: 'Invalid email or password' });
     const token = jwt.sign(
@@ -729,7 +730,8 @@ app.post('/api/tasks', requireAuth, async (req, res) => {
     if ((type || 'checklist') === 'delegation') {
       let assignedBy = String(req.session.userId);
       if (approverEmail) {
-        const aprUser = await db.findOne('Users', { email: approverEmail });
+        const allUsers = await db.findAll('Users');
+        const aprUser = allUsers.find(u => u.email && u.email.trim().toLowerCase() === (approverEmail || '').trim().toLowerCase());
         if (aprUser) assignedBy = String(aprUser.id);
       }
       await db.insert('Delegation_Tasks', {
@@ -1543,7 +1545,8 @@ app.post('/api/users', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { name, email, notification_email, password, role, phone, department, week_off, extra_off } = req.body;
     if (!name || !email || !password) return res.status(400).json({ error: 'All fields required' });
-    const existing = await db.findOne('Users', { email });
+    const allUsers = await db.findAll('Users');
+    const existing = allUsers.find(u => u.email && u.email.trim().toLowerCase() === (email || '').trim().toLowerCase());
     if (existing) return res.status(400).json({ error: 'Email already exists' });
     const nowStr = new Date().toISOString().replace('T', ' ').split('.')[0];
     await db.insert('Users', {
