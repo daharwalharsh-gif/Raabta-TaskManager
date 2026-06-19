@@ -613,8 +613,6 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
       allowedUserIds = [String(uid)];
     }
 
-    const todayStr = new Date().toISOString().split('T')[0];
-
     const taskFilter = (task) => {
       if (allowedUserIds && !allowedUserIds.includes(String(task.assigned_to))) return false;
       const due = task.due_date || '';
