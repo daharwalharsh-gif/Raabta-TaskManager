@@ -3055,7 +3055,7 @@ function generateDates(startDate, freq, weekOffStr, extraOffStr) {
   while (added < count && safety-- > 0) {
     const day = d.getDay();
     if (freq === 'daily') {
-      if (weekOff.includes(day) || isExtraOff(d)) {
+      if (day === 0 || weekOff.includes(day) || isExtraOff(d)) { // day===0 = Sunday, always skip
         d.setDate(d.getDate() + 1);
         continue;
       }

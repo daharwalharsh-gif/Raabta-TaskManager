@@ -134,6 +134,27 @@ class SheetDB {
     return data;
   }
 
+  // Insert many rows in a single API call — avoids per-row quota hits
+  async batchInsert(tabName, rows) {
+    if (!rows || !rows.length) return [];
+    const headers = await this.getHeaders(tabName);
+    const all = await this.findAll(tabName); // uses cache for max-id lookup
+    let maxId = 0;
+    for (const row of all) { const rid = parseInt(row.id) || 0; if (rid > maxId) maxId = rid; }
+    const rowValues = rows.map((data, i) => {
+      data.id = String(maxId + 1 + i);
+      return headers.map(h => (data[h] != null) ? String(data[h]) : '');
+    });
+    await withRetry(() => this.sheets.spreadsheets.values.append({
+      spreadsheetId: this.spreadsheetId,
+      range: `${tabName}!A:A`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: rowValues }
+    }));
+    this._invalidate(tabName);
+    return rows;
+  }
+
   async _findRowIndex(tabName, id) {
     // Use cached data if available to avoid extra API call
     const cached = this._cache[tabName];
@@ -559,6 +580,8 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
       allowedUserIds = [String(uid)];
     }
 
+    const todayStr = new Date().toISOString().split('T')[0];
+
     const taskFilter = (task) => {
       if (allowedUserIds && !allowedUserIds.includes(String(task.assigned_to))) return false;
       const due = task.due_date || '';
@@ -586,7 +609,8 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
         if (t.status === 'pending') pending++;
         else if (t.status === 'revised') revised++;
         else if (t.status === 'completed') completed++;
-        if (t.status === 'pending') {
+        // Dashboard table: only show tasks due today or overdue (not future)
+        if (t.status === 'pending' && (!t.due_date || t.due_date <= todayStr)) {
           delegationPending.push({
             id: parseInt(t.id), type: 'delegation',
             description: t.description, status: t.status,
@@ -609,7 +633,8 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
         if (t.status === 'pending') pending++;
         else if (t.status === 'revised') revised++;
         else if (t.status === 'completed') completed++;
-        if (t.status === 'pending') {
+        // Dashboard table: only show tasks due today or overdue (not future)
+        if (t.status === 'pending' && (!t.due_date || t.due_date <= todayStr)) {
           checklistPending.push({
             id: parseInt(t.id), type: 'checklist',
             description: t.description, status: t.status,
@@ -771,18 +796,18 @@ app.post('/api/tasks', requireAuth, async (req, res) => {
 
 app.post('/api/tasks/bulk-checklist', requireAuth, requireAdmin, async (req, res) => {
   try {
+    const db = await getDB();
     const { desc, assignedTo, priority, remarks, dates, frequency } = req.body;
     if (!desc || !assignedTo || !dates || !dates.length) return res.status(400).json({ error: 'Missing fields' });
     const freq = (frequency || '').toLowerCase().trim();
     const nowStr = new Date().toISOString().replace('T', ' ').split('.')[0];
-    for (const date of dates) {
-      await db.insert('Checklist_Tasks', {
-        description: desc, assigned_to: String(parseInt(assignedTo)),
-        assigned_by: String(req.session.userId), due_date: date,
-        status: 'pending', priority: priority || 'low',
-        remarks: remarks || '', frequency: freq, created_at: nowStr
-      });
-    }
+    const rows = dates.map(date => ({
+      description: desc, assigned_to: String(parseInt(assignedTo)),
+      assigned_by: String(req.session.userId), due_date: date,
+      status: 'pending', priority: priority || 'low',
+      remarks: remarks || '', frequency: freq, created_at: nowStr
+    }));
+    await db.batchInsert('Checklist_Tasks', rows);
     res.json({ success: true, count: dates.length });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
