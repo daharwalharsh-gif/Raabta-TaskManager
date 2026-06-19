@@ -21,8 +21,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 // GOOGLE SHEETS DB LAYER
 // ══════════════════════════════════════════════════════
 // Retry wrapper for Google Sheets API calls (handles quota exceeded)
-async function withRetry(fn, maxRetries = 2) {
-  let delay = 500;
+async function withRetry(fn, maxRetries = 5) {
+  let delay = 2000; // start at 2s for quota errors
   for (let i = 0; i <= maxRetries; i++) {
     try {
       return await fn();
@@ -35,7 +35,7 @@ async function withRetry(fn, maxRetries = 2) {
       );
       if (isQuota && i < maxRetries) {
         await new Promise(r => setTimeout(r, delay));
-        delay *= 2;
+        delay = Math.min(delay * 2, 30000); // cap at 30s
       } else {
         throw err;
       }
@@ -228,6 +228,39 @@ class SheetDB {
       }
     }));
     this._invalidate(tabName); // clear cache after delete
+  }
+
+  // Delete many rows by id in a single batchUpdate API call
+  async batchDeleteByIds(tabName, ids) {
+    if (!ids || !ids.length) return;
+    const sheetId = await this._getSheetId(tabName);
+    if (sheetId == null) throw new Error(`Tab ${tabName} not found`);
+    // Read col A once to resolve all row indices
+    const res = await withRetry(() => this.sheets.spreadsheets.values.get({
+      spreadsheetId: this.spreadsheetId,
+      range: `${tabName}!A:A`
+    }));
+    const col = res.data.values || [];
+    const idSet = new Set(ids.map(String));
+    const rowNums = []; // 1-based sheet rows
+    for (let i = 1; i < col.length; i++) {
+      const cellId = String((col[i] && col[i][0]) || '').trim();
+      if (idSet.has(cellId)) rowNums.push(i + 1); // +1 because row 1 is header
+    }
+    if (!rowNums.length) { this._invalidate(tabName); return; }
+    // Sort descending so deleting lower rows doesn't shift higher rows
+    rowNums.sort((a, b) => b - a);
+    await withRetry(() => this.sheets.spreadsheets.batchUpdate({
+      spreadsheetId: this.spreadsheetId,
+      requestBody: {
+        requests: rowNums.map(rowNum => ({
+          deleteDimension: {
+            range: { sheetId, dimension: 'ROWS', startIndex: rowNum - 1, endIndex: rowNum }
+          }
+        }))
+      }
+    }));
+    this._invalidate(tabName);
   }
 }
 
@@ -944,9 +977,9 @@ app.delete('/api/tasks/delete-by-date', requireAuth, requireAdmin, async (req, r
     const { date } = req.body;
     if (!date) return res.status(400).json({ error: 'Date required' });
     const tasks = await db.findWhere('Checklist_Tasks', { due_date: date });
-    let deleted = 0;
-    for (const t of tasks) { await deleteRow('Checklist_Tasks', t.id); deleted++; }
-    res.json({ success: true, deleted });
+    const ids = tasks.map(t => t.id);
+    await db.batchDeleteByIds('Checklist_Tasks', ids);
+    res.json({ success: true, deleted: ids.length });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -969,9 +1002,9 @@ app.post('/api/tasks/checklist-year-delete', requireAuth, requireAdmin, async (r
     let tasks = await db.findWhere('Checklist_Tasks', { assigned_to: String(userId) });
     tasks = tasks.filter(t => t.status !== 'completed');
     if (frequency && frequency !== 'all') tasks = tasks.filter(t => t.frequency === frequency);
-    let deleted = 0;
-    for (const t of tasks) { await deleteRow('Checklist_Tasks', t.id); deleted++; }
-    res.json({ success: true, deleted });
+    const ids = tasks.map(t => t.id);
+    await db.batchDeleteByIds('Checklist_Tasks', ids);
+    res.json({ success: true, deleted: ids.length });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

@@ -3012,10 +3012,11 @@ function updateChecklistPreview() {
   const desc = document.getElementById('cDesc').value.trim();
   if (!date || !desc) { document.getElementById('cPreview').style.display='none'; return; }
 
-  const counts = {daily:365, weekly:52, alternative_week:26, monthly:12, quarterly:4, yearly:1};
   const labels = {daily:'Daily', weekly:'Weekly', alternative_week:'Alternative Week', monthly:'Monthly', quarterly:'Quarterly', yearly:'Yearly'};
-  const count = counts[freq];
-  const endDate = getEndDate(date, freq, count);
+  // Use generateDates with empty weekOff so Sunday skip is applied (same logic as actual save)
+  const dates = generateDates(date, freq, '', '');
+  const count = dates.length;
+  const endDate = dates.length > 0 ? dates[dates.length - 1] : date;
 
   document.getElementById('cPreviewText').textContent =
     `"${desc}" — ${count} tasks will be created from ${date} to ${endDate} (${labels[freq]})`;
