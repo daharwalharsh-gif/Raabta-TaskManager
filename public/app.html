@@ -2770,11 +2770,29 @@ function toggleBlock(header) { header.nextElementSibling.classList.toggle('open'
 // TASK ACTIONS
 // ══════════════════════════════════════════════════════
 async function updateStatus(id, status, from, type) {
-  const r = await api(`/api/tasks/${id}/status`,'PUT',{status, type: type || dashType});
-  if (r.needsApproval) {
-    showToast('✅ Approval request sent to your manager!');
+  // Optimistic update for dashboard: remove just this task immediately
+  // so other employees' tasks don't flicker when Sheets cache is invalidated
+  if (from === 'dashboard' && window._lastDashTasks) {
+    window._lastDashTasks = window._lastDashTasks.filter(t => String(t.id) !== String(id));
+    renderDashTable(window._lastDashTasks, dashType);
+    const pendingEl = document.getElementById('dPending');
+    if (pendingEl && !isNaN(parseInt(pendingEl.textContent))) {
+      pendingEl.textContent = Math.max(0, parseInt(pendingEl.textContent) - 1);
+    }
   }
-  if (from==='dashboard') loadDashboard(); else loadAllTasks();
+
+  const r = await api(`/api/tasks/${id}/status`, 'PUT', {status, type: type || dashType});
+  if (r && r.needsApproval) {
+    showToast('✅ Approval request sent to your manager!');
+    loadDashboard(); // full reload needed for approval state
+  } else if (r && r.error) {
+    showToast('⚠️ ' + r.error, 'error');
+    if (from === 'dashboard') loadDashboard(); // reload to restore correct state on error
+    else loadAllTasks();
+  } else if (from !== 'dashboard') {
+    loadAllTasks();
+  }
+  // Dashboard success: optimistic update is already done — no full reload needed
   loadApprovalBadge();
 }
 
