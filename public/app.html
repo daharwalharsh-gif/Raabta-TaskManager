@@ -614,7 +614,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
       <span class="mob-nav-label">Tasks</span>
     </button>
-    <button class="mob-nav-item" id="mob-fms-tasks" style="display:none" onclick="navigate('fms-tasks',this);setMobActive(this)">
+    <button class="mob-nav-item" id="mob-fms-tasks" onclick="navigate('fms-tasks',this);setMobActive(this)">
       <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M3 14h18M3 6h18M3 18h18"/></svg>
       <span class="mob-nav-label">FMS</span>
     </button>
@@ -681,7 +681,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/></svg>
       <span class="nav-label-text">FMS Admin</span>
     </div>
-    <div class="nav-item" id="nav-fms-tasks" style="display:none" onclick="navigate('fms-tasks',this)">
+    <div class="nav-item" id="nav-fms-tasks" onclick="navigate('fms-tasks',this)">
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18M3 6h18M3 18h18"/></svg>
       <span class="nav-label-text">FMS Tasks</span>
     </div>
@@ -2025,7 +2025,7 @@ async function init() {
     if (ME.role === 'admin') {
       document.getElementById('nav-users').style.display = 'flex';
       document.getElementById('nav-mis').style.display = 'flex';
-      // document.getElementById('nav-fms').style.display = 'flex'; // HIDDEN
+      document.getElementById('nav-fms').style.display = 'flex';
       document.getElementById('bulkDeleteBtn').style.display = 'inline-flex';
       // Mobile nav
       document.getElementById('mob-users').style.display = 'flex';
@@ -2037,9 +2037,9 @@ async function init() {
       document.getElementById('mob-mis').style.display = 'flex';
     }
     if (ME.role === 'pc') {}
-    // if (ME.role === 'admin' || ME.role === 'hod' || ME.role === 'pc') { // HIDDEN
-    //   document.getElementById('nav-records').style.display = 'flex';
-    // }
+    if (ME.role === 'admin' || ME.role === 'hod' || ME.role === 'pc') {
+      document.getElementById('nav-records').style.display = 'flex';
+    }
     setMinDates();
     loadDashboard();
     loadApprovalBadge();
