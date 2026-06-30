@@ -448,6 +448,83 @@ class MySqlDB {
   }
 }
 
+// ══════════════════════════════════════════════════════
+// MYSQL SCHEMA (single source of truth) + auto-migration
+// ══════════════════════════════════════════════════════
+// Add a table or a column here and it is created automatically on the next
+// deploy — no manual SQL needed. `id INT AUTO_INCREMENT PRIMARY KEY` is added
+// to every table implicitly. TEXT/LONGTEXT columns omit DEFAULT (MySQL rule).
+const MYSQL_SCHEMA = {
+  Users: {
+    name: "VARCHAR(255) DEFAULT ''", email: "VARCHAR(255) DEFAULT ''",
+    notification_email: "VARCHAR(255) DEFAULT ''", password: "VARCHAR(255) DEFAULT ''",
+    role: "VARCHAR(50) DEFAULT 'user'", phone: "VARCHAR(50) DEFAULT ''",
+    department: "VARCHAR(255) DEFAULT ''", week_off: "VARCHAR(50) DEFAULT ''",
+    extra_off: "TEXT", profile_image: "LONGTEXT", created_at: "VARCHAR(40) DEFAULT ''"
+  },
+  Delegation_Tasks: {
+    description: "TEXT", assigned_to: "VARCHAR(20) DEFAULT ''", assigned_by: "VARCHAR(20) DEFAULT ''",
+    due_date: "VARCHAR(40) DEFAULT ''", status: "VARCHAR(20) DEFAULT 'pending'",
+    priority: "VARCHAR(20) DEFAULT 'low'", approval: "VARCHAR(10) DEFAULT 'no'",
+    waiting_approval: "VARCHAR(5) DEFAULT '0'", remarks: "TEXT", frequency: "VARCHAR(20) DEFAULT ''",
+    last_reminder_date: "VARCHAR(40) DEFAULT ''", created_at: "VARCHAR(40) DEFAULT ''"
+  },
+  Checklist_Tasks: {
+    description: "TEXT", assigned_to: "VARCHAR(20) DEFAULT ''", assigned_by: "VARCHAR(20) DEFAULT ''",
+    due_date: "VARCHAR(40) DEFAULT ''", status: "VARCHAR(20) DEFAULT 'pending'",
+    priority: "VARCHAR(20) DEFAULT 'low'", remarks: "TEXT", frequency: "VARCHAR(20) DEFAULT ''",
+    created_at: "VARCHAR(40) DEFAULT ''"
+  },
+  Task_Approvals: {
+    task_id: "VARCHAR(20) DEFAULT ''", task_type: "VARCHAR(20) DEFAULT ''",
+    requested_by: "VARCHAR(20) DEFAULT ''", requested_to: "VARCHAR(20) DEFAULT ''",
+    action_type: "VARCHAR(20) DEFAULT ''", status: "VARCHAR(20) DEFAULT 'pending'",
+    note: "TEXT", created_at: "VARCHAR(40) DEFAULT ''"
+  },
+  Task_Comments: {
+    task_id: "VARCHAR(20) DEFAULT ''", task_type: "VARCHAR(20) DEFAULT ''",
+    user_id: "VARCHAR(20) DEFAULT ''", comment: "TEXT", created_at: "VARCHAR(40) DEFAULT ''"
+  },
+  Task_Transfers: {
+    task_id: "VARCHAR(20) DEFAULT ''", task_type: "VARCHAR(20) DEFAULT ''",
+    from_user: "VARCHAR(20) DEFAULT ''", to_user: "VARCHAR(20) DEFAULT ''",
+    requested_by: "VARCHAR(20) DEFAULT ''", status: "VARCHAR(20) DEFAULT 'pending'",
+    note: "TEXT", created_at: "VARCHAR(40) DEFAULT ''"
+  },
+  Week_Plans: {
+    employee_id: "VARCHAR(20) DEFAULT ''", hod_id: "VARCHAR(20) DEFAULT ''",
+    start_date: "VARCHAR(40) DEFAULT ''", target_count: "VARCHAR(20) DEFAULT '0'",
+    improvement_pct: "VARCHAR(20) DEFAULT ''", created_at: "VARCHAR(40) DEFAULT ''",
+    updated_at: "VARCHAR(40) DEFAULT ''"
+  },
+  FMS_Config: {
+    fms_name: "VARCHAR(255) DEFAULT ''", sheet_name: "VARCHAR(255) DEFAULT ''",
+    sheet_id: "VARCHAR(255) DEFAULT ''", header_row: "VARCHAR(10) DEFAULT '1'",
+    total_steps: "VARCHAR(10) DEFAULT '1'", steps_json: "TEXT", created_at: "VARCHAR(40) DEFAULT ''"
+  }
+};
+
+// Idempotent: creates missing tables and adds missing columns. Safe to run on
+// every startup; never drops or alters existing data.
+async function ensureMySqlSchema(pool) {
+  let added = 0;
+  for (const [table, cols] of Object.entries(MYSQL_SCHEMA)) {
+    await pool.query('CREATE TABLE IF NOT EXISTS `' + table +
+      '` (id INT AUTO_INCREMENT PRIMARY KEY) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+    const [existing] = await pool.query(
+      'SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?', [table]);
+    const have = new Set(existing.map(r => r.COLUMN_NAME));
+    for (const [col, def] of Object.entries(cols)) {
+      if (!have.has(col)) {
+        await pool.query('ALTER TABLE `' + table + '` ADD COLUMN `' + col + '` ' + def);
+        console.log(`  schema: + ${table}.${col}`);
+        added++;
+      }
+    }
+  }
+  console.log(added ? `  schema auto-migrate: ${added} column(s)/table(s) added` : '  schema up to date');
+}
+
 // Global db instance
 let db = null;
 let dbInitializationPromise = null;
@@ -475,6 +552,7 @@ async function initializeDatabase() {
       dateStrings: true
     });
     await pool.query('SELECT 1');
+    await ensureMySqlSchema(pool); // auto-create missing tables/columns
     db = new MySqlDB(pool, sheetsApi);
     console.log(`  MySQL DB connected (${process.env.DB_NAME})`);
   } else {
