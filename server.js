@@ -316,16 +316,174 @@ async function getSheetsClient() {
   return _sheetsClient;
 }
 
+// ══════════════════════════════════════════════════════
+// MYSQL DB LAYER — drop-in replacement for SheetDB
+// ══════════════════════════════════════════════════════
+// Exposes the exact same surface (findAll/findWhere/findOne/insert/
+// batchInsert/update/delete/batchDeleteByIds/getHeaders/_invalidate) so the
+// rest of the app is unchanged. `.sheets` keeps the Google client available
+// for the FMS feature (which reads users' external spreadsheets).
+// All values are returned as strings to match SheetDB behaviour exactly.
+class MySqlDB {
+  constructor(pool, sheetsClient) {
+    this.pool = pool;
+    this.sheets = sheetsClient;
+    this._cache = {};       // { table: { data, ts } }
+    this._hdrCache = {};    // { table: string[] }
+    this._colsCache = {};   // { table: Set<colName> }
+    this.TTL = 2000;        // short cache to coalesce repeat reads within a request
+  }
+
+  _invalidate(table) { delete this._cache[table]; }
+
+  async _columns(table) {
+    if (this._colsCache[table]) return this._colsCache[table];
+    const [rows] = await this.pool.query(
+      'SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION',
+      [table]);
+    const cols = rows.map(r => r.COLUMN_NAME);
+    if (!cols.length) throw new Error(`Table not found: ${table}`);
+    this._hdrCache[table] = cols;
+    this._colsCache[table] = new Set(cols);
+    return this._colsCache[table];
+  }
+
+  async getHeaders(table) {
+    if (this._hdrCache[table]) return this._hdrCache[table];
+    await this._columns(table);
+    return this._hdrCache[table];
+  }
+
+  _stringifyRow(row) {
+    const obj = {};
+    for (const k of Object.keys(row)) {
+      const v = row[k];
+      obj[k] = (v === null || v === undefined) ? ''
+        : (v instanceof Date ? v.toISOString() : String(v));
+    }
+    return obj;
+  }
+
+  async findAll(table) {
+    const c = this._cache[table];
+    if (c && (Date.now() - c.ts) < this.TTL) return c.data;
+    const [rows] = await this.pool.query('SELECT * FROM `' + table + '` ORDER BY id ASC');
+    const data = rows.map(r => this._stringifyRow(r));
+    this._cache[table] = { data, ts: Date.now() };
+    return data;
+  }
+
+  async findWhere(table, filter) {
+    const all = await this.findAll(table);
+    return all.filter(row =>
+      Object.keys(filter).every(key =>
+        String(row[key] || '').trim() === String(filter[key] || '').trim()));
+  }
+
+  async findOne(table, filter) {
+    return (await this.findWhere(table, filter))[0] || null;
+  }
+
+  async insert(table, data) {
+    const cols = await this._columns(table);
+    const keys = Object.keys(data).filter(k => k !== 'id' && cols.has(k));
+    let insertId;
+    if (keys.length) {
+      const colList = keys.map(k => '`' + k + '`').join(', ');
+      const placeholders = keys.map(() => '?').join(', ');
+      const vals = keys.map(k => (data[k] == null) ? null : String(data[k]));
+      const [res] = await this.pool.query(
+        'INSERT INTO `' + table + '` (' + colList + ') VALUES (' + placeholders + ')', vals);
+      insertId = res.insertId;
+    } else {
+      const [res] = await this.pool.query('INSERT INTO `' + table + '` () VALUES ()');
+      insertId = res.insertId;
+    }
+    this._invalidate(table);
+    data.id = String(insertId);
+    return data;
+  }
+
+  async batchInsert(table, rows) {
+    if (!rows || !rows.length) return [];
+    const cols = await this._columns(table);
+    const keySet = new Set();
+    for (const r of rows) for (const k of Object.keys(r)) if (k !== 'id' && cols.has(k)) keySet.add(k);
+    const keys = [...keySet];
+    if (!keys.length) { for (const r of rows) await this.insert(table, r); return rows; }
+    const colList = keys.map(k => '`' + k + '`').join(', ');
+    const values = rows.map(r => keys.map(k => (r[k] == null) ? null : String(r[k])));
+    const [res] = await this.pool.query(
+      'INSERT INTO `' + table + '` (' + colList + ') VALUES ?', [values]);
+    const first = res.insertId;
+    rows.forEach((r, i) => { r.id = String(first + i); });
+    this._invalidate(table);
+    return rows;
+  }
+
+  async update(table, id, data) {
+    const cols = await this._columns(table);
+    const keys = Object.keys(data).filter(k => k !== 'id' && cols.has(k));
+    if (keys.length) {
+      const setClause = keys.map(k => '`' + k + '` = ?').join(', ');
+      const vals = keys.map(k => (data[k] == null) ? null : String(data[k]));
+      vals.push(String(id));
+      await this.pool.query('UPDATE `' + table + '` SET ' + setClause + ' WHERE id = ?', vals);
+    }
+    this._invalidate(table);
+    const [rows] = await this.pool.query('SELECT * FROM `' + table + '` WHERE id = ? LIMIT 1', [String(id)]);
+    return rows.length ? this._stringifyRow(rows[0]) : { ...data, id: String(id) };
+  }
+
+  async delete(table, id) {
+    await this.pool.query('DELETE FROM `' + table + '` WHERE id = ?', [String(id)]);
+    this._invalidate(table);
+  }
+
+  async batchDeleteByIds(table, ids) {
+    if (!ids || !ids.length) return;
+    const placeholders = ids.map(() => '?').join(', ');
+    await this.pool.query('DELETE FROM `' + table + '` WHERE id IN (' + placeholders + ')', ids.map(String));
+    this._invalidate(table);
+  }
+}
+
 // Global db instance
 let db = null;
 let dbInitializationPromise = null;
 
 async function initializeDatabase() {
-  const sheetsApi = await getSheetsClient();
-  // Verify connection by reading spreadsheet metadata
-  await withRetry(() => sheetsApi.spreadsheets.get({ spreadsheetId: SHEET_ID, fields: 'spreadsheetId' }));
-  db = new SheetDB(sheetsApi, SHEET_ID);
-  console.log('  Google Sheets DB connected (with 45s in-memory cache)');
+  const driver = (process.env.DB_DRIVER || 'sheets').toLowerCase();
+
+  if (driver === 'mysql') {
+    // Google client is still needed for the FMS feature — load it but don't
+    // fail MySQL startup if credentials are unavailable.
+    let sheetsApi = null;
+    try { sheetsApi = await getSheetsClient(); }
+    catch (e) { console.log('  Google Sheets client unavailable — FMS features disabled:', e.message); }
+
+    const mysql = require('mysql2/promise');
+    const pool = mysql.createPool({
+      host: process.env.DB_HOST || 'localhost',
+      port: parseInt(process.env.DB_PORT) || 3306,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME,
+      waitForConnections: true,
+      connectionLimit: 5,
+      charset: 'utf8mb4',
+      dateStrings: true
+    });
+    await pool.query('SELECT 1');
+    db = new MySqlDB(pool, sheetsApi);
+    console.log(`  MySQL DB connected (${process.env.DB_NAME})`);
+  } else {
+    const sheetsApi = await getSheetsClient();
+    await withRetry(() => sheetsApi.spreadsheets.get({ spreadsheetId: SHEET_ID, fields: 'spreadsheetId' }));
+    db = new SheetDB(sheetsApi, SHEET_ID);
+    console.log('  Google Sheets DB connected (with in-memory cache)');
+  }
+
   try {
     await seedAdminIfNeeded();
   } catch(e) {
