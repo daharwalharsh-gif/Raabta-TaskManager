@@ -264,13 +264,49 @@ class SheetDB {
   }
 }
 
+// ── Google service-account credentials loader ──
+// Robust against various hosting panels (Hostinger/Vercel/etc.) that mangle
+// long JSON env values: surrounding quotes, double-escaping, or base64.
+function loadGoogleCreds() {
+  // 1. Preferred: base64-encoded JSON (no special chars → never mangled on import)
+  const b64 = process.env.GOOGLE_CREDENTIALS_B64;
+  if (b64 && b64.trim()) {
+    return JSON.parse(Buffer.from(b64.trim(), 'base64').toString('utf8'));
+  }
+
+  let raw = process.env.GOOGLE_CREDENTIALS;
+  if (!raw || !raw.trim()) return require('./credentials.json');
+  raw = raw.trim();
+
+  // Strip a single layer of surrounding quotes some panels add
+  if ((raw.startsWith("'") && raw.endsWith("'")) ||
+      (raw.startsWith('"') && raw.endsWith('"'))) {
+    raw = raw.slice(1, -1);
+  }
+
+  // 2. Plain JSON
+  try { return JSON.parse(raw); } catch (e) { /* fall through */ }
+
+  // 3. Looks base64 (doesn't start with `{`) → decode then parse
+  if (!raw.startsWith('{')) {
+    try {
+      const decoded = Buffer.from(raw, 'base64').toString('utf8').trim();
+      if (decoded.startsWith('{')) return JSON.parse(decoded);
+    } catch (e) { /* fall through */ }
+  }
+
+  // 4. Over-escaped (e.g. `\{"type\":...` or `\\n` in key) → remove one backslash layer
+  try { return JSON.parse(raw.replace(/\\(.)/g, '$1')); } catch (e) { /* fall through */ }
+
+  throw new Error('GOOGLE_CREDENTIALS is set but could not be parsed as JSON/base64. ' +
+    'Tip: use GOOGLE_CREDENTIALS_B64 with a base64-encoded service-account JSON.');
+}
+
 // ── Sheets client (singleton) ──
 let _sheetsClient = null;
 async function getSheetsClient() {
   if (_sheetsClient) return _sheetsClient;
-  const creds = process.env.GOOGLE_CREDENTIALS
-    ? JSON.parse(process.env.GOOGLE_CREDENTIALS)
-    : require('./credentials.json');
+  const creds = loadGoogleCreds();
   const auth = new google.auth.GoogleAuth({
     credentials: creds,
     scopes: ['https://www.googleapis.com/auth/spreadsheets']
@@ -2484,17 +2520,17 @@ async function seedAdminIfNeeded() {
       console.log('  SMTP credentials missing — emails disabled');
     }
 
-    app.listen(PORT, () => {
-      console.log(`\n  Task Manager: http://localhost:${PORT}`);
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`\n  Task Manager listening on port ${PORT}`);
       console.log(`  Login: admin@test.com / admin123\n`);
     });
   } catch (err) {
     console.error('  Startup error:', err.message);
     // Still start server so app is reachable; DB calls will retry on demand
     if (!app.listening) {
-      app.listen(PORT, () => {
-        console.log(`\n  Task Manager (degraded): http://localhost:${PORT}`);
-        console.log('  Warning: Google Sheets connection failed — retrying on first request\n');
+      app.listen(PORT, '0.0.0.0', () => {
+        console.log(`\n  Task Manager (degraded) listening on port ${PORT}`);
+        console.log('  Warning: DB connection failed — retrying on first request\n');
       });
     }
   }
