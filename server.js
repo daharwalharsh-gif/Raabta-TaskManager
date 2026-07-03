@@ -760,6 +760,187 @@ function reminderScheduler() {
 }
 
 // ══════════════════════════════════════════════════════
+// WHATSAPP  (Aumpfy custom trigger API)
+// ══════════════════════════════════════════════════════
+// Sends task alerts + daily reminders to each user's WhatsApp number.
+// Configure via .env — defaults below let it work out of the box.
+// Secrets come from .env only — never hardcode the API key/URL (repo may be public).
+const WA = {
+  enabled: (process.env.WHATSAPP_ENABLED || 'true').toLowerCase() !== 'false',
+  url: process.env.AUMPFY_API_URL || '',
+  apiKey: process.env.AUMPFY_API_KEY || '',
+  countryCode: (process.env.WHATSAPP_COUNTRY_CODE || '91').replace(/\D/g, ''),
+  reminderHour: parseInt(process.env.WHATSAPP_REMINDER_HOUR) || 10
+};
+
+// Turn any stored phone value into WhatsApp digits: country code + number, no +/spaces.
+function normalizePhone(raw) {
+  if (!raw) return '';
+  let d = String(raw).replace(/\D/g, '');   // keep digits only
+  if (!d) return '';
+  d = d.replace(/^0+/, '');                  // drop leading zeros (e.g. 098765...)
+  if (d.length <= 10) d = WA.countryCode + d; // local number → prepend country code
+  return d;
+}
+
+// Fire-and-forget WhatsApp send. Never throws — logs and returns a status object.
+async function sendWhatsApp(rawPhone, message) {
+  if (!WA.enabled) return { skipped: 'disabled' };
+  const phone = normalizePhone(rawPhone);
+  if (!phone) return { skipped: 'no-phone' };
+  if (!WA.url || !WA.apiKey) return { skipped: 'not-configured' };
+  try {
+    const resp = await fetch(WA.url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': WA.apiKey },
+      body: JSON.stringify({ phone, message }),
+      signal: AbortSignal.timeout(20000)
+    });
+    const body = await resp.text();
+    if (!resp.ok) {
+      console.error(`  WhatsApp failed (${phone}) [${resp.status}]: ${body.slice(0, 200)}`);
+      return { ok: false, status: resp.status, body };
+    }
+    console.log(`  WhatsApp sent to ${phone}`);
+    return { ok: true, status: resp.status, body };
+  } catch (err) {
+    console.error(`  WhatsApp error (${phone}): ${err.message}`);
+    return { ok: false, error: err.message };
+  }
+}
+
+// Resolve a user's WhatsApp target ({ name, phone }) or null if no usable phone.
+async function getWhatsAppTarget(userId) {
+  try {
+    const user = await db.findOne('Users', { id: String(userId) });
+    if (!user || !user.phone) return null;
+    const phone = normalizePhone(user.phone);
+    if (!phone) return null;
+    return { name: user.name, phone };
+  } catch { return null; }
+}
+
+// ── Message templates (English) ──
+function waDelegationMsg({ assigneeName, assignerName, desc, dueDate, priority, approval, remarks }) {
+  const url = process.env.APP_URL || '';
+  const lines = [
+    '*Raabta Task Manager*',
+    '',
+    `Hello ${assigneeName || 'there'},`,
+    `A new *delegation task* has been assigned to you by ${assignerName || 'Admin'}.`,
+    '',
+    `*Task:* ${desc}`,
+    `*Due Date:* ${dueDate}`,
+    `*Priority:* ${priority || 'low'}`,
+    `*Approval Required:* ${approval || 'no'}`
+  ];
+  if (remarks) lines.push(`*Remarks:* ${remarks}`);
+  lines.push('', 'Please complete it and mark it as Done in the app.');
+  if (url) lines.push(`Open: ${url}`);
+  return lines.join('\n');
+}
+
+function waChecklistMsg({ assigneeName, desc, dueText, count }) {
+  const url = process.env.APP_URL || '';
+  const lines = [
+    '*Raabta Task Manager*',
+    '',
+    `Hello ${assigneeName || 'there'},`,
+    count > 1
+      ? `A new *checklist* with *${count}* tasks has been assigned to you.`
+      : 'A new *checklist task* has been assigned to you.',
+    '',
+    `*Task:* ${desc}`,
+    `*Due:* ${dueText}`,
+    '',
+    'Please complete it and mark it as Done in the app.'
+  ];
+  if (url) lines.push(`Open: ${url}`);
+  return lines.join('\n');
+}
+
+function waReminderMsg(name, tasks, todayStr) {
+  const url = process.env.APP_URL || '';
+  const shown = tasks.slice(0, 10);
+  const lines = [
+    '*Raabta Task Manager — Daily Reminder*',
+    '',
+    `Hello ${name || 'there'}, you have *${tasks.length}* pending task${tasks.length > 1 ? 's' : ''} not yet marked Done:`,
+    ''
+  ];
+  shown.forEach((t, i) => {
+    const tag = t.due_date < todayStr ? ' (OVERDUE)' : (t.due_date === todayStr ? ' (Today)' : '');
+    lines.push(`${i + 1}. [${t.kind}] ${t.description || '—'} — Due: ${t.due_date || '—'}${tag}`);
+  });
+  if (tasks.length > shown.length) lines.push(`…and ${tasks.length - shown.length} more.`);
+  lines.push('', 'Please complete them and mark each as Done.');
+  if (url) lines.push(`Open: ${url}`);
+  return lines.join('\n');
+}
+
+// ── Daily WhatsApp reminder pass (delegation + checklist, one message per user) ──
+async function runWhatsAppReminders() {
+  if (!WA.enabled) return { skipped: 'disabled' };
+  try {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const cutoff = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+    const [delegation, checklist, users] = await Promise.all([
+      db.findAll('Delegation_Tasks'),
+      db.findAll('Checklist_Tasks'),
+      db.findAll('Users')
+    ]);
+    const userMap = {};
+    for (const u of users) userMap[String(u.id)] = u;
+
+    const isPending = t => t.status === 'pending' && t.due_date && t.due_date <= cutoff;
+    const byUser = {};
+    const push = (t, kind) => {
+      const uid = String(t.assigned_to);
+      (byUser[uid] = byUser[uid] || []).push({ ...t, kind });
+    };
+    for (const t of delegation) if (isPending(t)) push(t, 'Delegation');
+    for (const t of checklist) if (isPending(t)) push(t, 'Checklist');
+
+    let sent = 0, skipped = 0;
+    for (const uid of Object.keys(byUser)) {
+      const user = userMap[uid];
+      const phone = user && user.phone ? normalizePhone(user.phone) : '';
+      if (!phone) { skipped++; continue; }
+      const tasks = byUser[uid].sort((a, b) => (a.due_date || '').localeCompare(b.due_date || ''));
+      const r = await sendWhatsApp(phone, waReminderMsg(user.name, tasks, todayStr));
+      if (r.ok) sent++; else skipped++;
+    }
+    console.log(`  WhatsApp reminder pass @ ${todayStr}: ${sent} sent, ${skipped} skipped`);
+    return { sent, skipped };
+  } catch (err) {
+    console.error('  runWhatsAppReminders error:', err.message);
+    return { error: err.message };
+  }
+}
+
+let _lastWaReminderDate = '';
+function whatsAppReminderScheduler() {
+  if (!WA.enabled) { console.log('  WhatsApp reminders disabled (WHATSAPP_ENABLED=false)'); return; }
+  if (!WA.url || !WA.apiKey) {
+    console.log('  WhatsApp NOT configured — add AUMPFY_API_URL and AUMPFY_API_KEY to .env, then restart');
+    return;
+  }
+  setInterval(async () => {
+    try {
+      const now = new Date();
+      const todayStr = now.toISOString().split('T')[0];
+      if (now.getHours() >= WA.reminderHour && _lastWaReminderDate !== todayStr) {
+        _lastWaReminderDate = todayStr;
+        await getDB();
+        await runWhatsAppReminders();
+      }
+    } catch (e) { console.error('  WA scheduler tick error:', e.message); }
+  }, 60 * 1000);
+  console.log(`  WhatsApp reminder scheduler started (fires daily at ${WA.reminderHour}:00)`);
+}
+
+// ══════════════════════════════════════════════════════
 // MIDDLEWARE
 // ══════════════════════════════════════════════════════
 async function requireAuth(req, res, next) {
@@ -1068,23 +1249,33 @@ app.post('/api/tasks', requireAuth, async (req, res) => {
         approval: approval || 'no', waiting_approval: '0', remarks: remarks || '',
         frequency: '', last_reminder_date: '', created_at: nowStr
       });
-      // Non-blocking email
+      // Non-blocking notifications — WhatsApp and email fire INDEPENDENTLY so a
+      // slow SMTP send can never delay the WhatsApp (it goes within ~1-2 sec).
       (async () => {
-        const target = await getNotifyTarget(parseInt(targetUser));
-        if (!target) return;
         const assigner = await db.findOne('Users', { id: assignedBy });
-        await sendMail(
-          target.email,
-          `New Task Assigned: ${(desc || '').slice(0, 60)}`,
-          delegationEmailHtml({
-            assigneeName: target.name,
-            assignerName: assigner?.name || 'Admin',
+        const assignerName = assigner?.name || 'Admin';
+        // WhatsApp — fire immediately, don't wait for email
+        getWhatsAppTarget(parseInt(targetUser)).then(waTarget => {
+          if (!waTarget) return;
+          return sendWhatsApp(waTarget.phone, waDelegationMsg({
+            assigneeName: waTarget.name, assignerName,
             desc, dueDate: date,
-            priority: priority || 'low',
-            approval: approval || 'no',
-            remarks: remarks || ''
-          })
-        );
+            priority: priority || 'low', approval: approval || 'no', remarks: remarks || ''
+          }));
+        }).catch(e => console.error('  WA notify error:', e.message));
+        // Email — in parallel
+        getNotifyTarget(parseInt(targetUser)).then(target => {
+          if (!target) return;
+          return sendMail(
+            target.email,
+            `New Task Assigned: ${(desc || '').slice(0, 60)}`,
+            delegationEmailHtml({
+              assigneeName: target.name, assignerName,
+              desc, dueDate: date,
+              priority: priority || 'low', approval: approval || 'no', remarks: remarks || ''
+            })
+          );
+        }).catch(e => console.error('  Email notify error:', e.message));
       })();
     } else {
       await db.insert('Checklist_Tasks', {
@@ -1092,6 +1283,15 @@ app.post('/api/tasks', requireAuth, async (req, res) => {
         due_date: date, status: 'pending', priority: priority || 'low',
         remarks: remarks || '', frequency: '', created_at: nowStr
       });
+      // Non-blocking WhatsApp to the assignee
+      (async () => {
+        const waTarget = await getWhatsAppTarget(parseInt(targetUser));
+        if (waTarget) {
+          await sendWhatsApp(waTarget.phone, waChecklistMsg({
+            assigneeName: waTarget.name, desc, dueText: date, count: 1
+          }));
+        }
+      })();
     }
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -1111,6 +1311,18 @@ app.post('/api/tasks/bulk-checklist', requireAuth, requireAdmin, async (req, res
       remarks: remarks || '', frequency: freq, created_at: nowStr
     }));
     await db.batchInsert('Checklist_Tasks', rows);
+    // Non-blocking WhatsApp — one summary message to the assignee
+    (async () => {
+      const waTarget = await getWhatsAppTarget(parseInt(assignedTo));
+      if (!waTarget) return;
+      const sorted = [...dates].sort();
+      const dueText = dates.length > 1
+        ? `${dates.length} dates (${sorted[0]} … ${sorted[sorted.length - 1]})`
+        : sorted[0];
+      await sendWhatsApp(waTarget.phone, waChecklistMsg({
+        assigneeName: waTarget.name, desc, dueText, count: dates.length
+      }));
+    })();
     res.json({ success: true, count: dates.length });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -2695,6 +2907,20 @@ app.post('/api/admin/run-reminders', requireAuth, requireAdmin, async (req, res)
   res.json(r);
 });
 
+// Manually trigger the daily WhatsApp reminder pass (for testing).
+app.post('/api/admin/run-wa-reminders', requireAuth, requireAdmin, async (req, res) => {
+  const r = await runWhatsAppReminders();
+  res.json(r);
+});
+
+// Send a one-off test WhatsApp: { phone, message }
+app.post('/api/admin/test-whatsapp', requireAuth, requireAdmin, async (req, res) => {
+  const { phone, message } = req.body || {};
+  if (!phone) return res.status(400).json({ error: 'phone required' });
+  const r = await sendWhatsApp(phone, message || 'Test message from Raabta Task Manager ✅');
+  res.json(r);
+});
+
 app.get('/api/debug', async (req, res) => {
   try {
     const database = await getDB();
@@ -2755,6 +2981,9 @@ async function seedAdminIfNeeded() {
     } else {
       console.log('  SMTP credentials missing — emails disabled');
     }
+
+    // WhatsApp reminders run independently of SMTP.
+    setTimeout(() => whatsAppReminderScheduler(), 6000);
 
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`\n  Task Manager listening on port ${PORT}`);

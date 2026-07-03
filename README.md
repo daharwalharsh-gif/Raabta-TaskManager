@@ -114,7 +114,19 @@ SMTP_USER=yourgmail@gmail.com
 SMTP_PASS=abcdefghijklmnop
 SMTP_FROM_NAME=Sohan Healthcare Task Manager
 APP_URL=https://yourdomain.com
+
+# WhatsApp automation (Aumpfy) — task assign hote hi + roz reminder
+WHATSAPP_ENABLED=true
+AUMPFY_API_URL=https://api.aumpfy.com/api/apis/trigger/your-trigger-slug
+AUMPFY_API_KEY=sl_your_api_key_here
+WHATSAPP_COUNTRY_CODE=91
+WHATSAPP_REMINDER_HOUR=10
 ```
+
+> **WhatsApp**: Number har user ke `phone` field se jaata hai (Users list).
+> Assign hote hi instant message + roz `WHATSAPP_REMINDER_HOUR` baje pending-task
+> reminder (English). Delivery ke liye Aumpfy dashboard me WhatsApp session **online**
+> hona chahiye, warna message queue ho jaata hai.
 
 ### Step 4: hPanel se Restart
 - Hostinger hPanel → Node.js section → Restart
