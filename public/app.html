@@ -751,6 +751,11 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
             <div class="tab"        id="dashTabChl"   onclick="dashTab('checklist',this)">Checklist</div>
           </div>
         </div>
+        <div style="padding:8px 2px 10px;">
+          <input type="text" id="dashSearch" oninput="onDashSearch()" autocomplete="off"
+            placeholder="🔍 Search tasks — description, name, priority…"
+            style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;outline:none;color:#1e293b;background:#fff;box-sizing:border-box;">
+        </div>
         <div style="overflow-x:auto;max-height:340px;overflow-y:auto;">
           <table style="min-width:600px">
             <thead style="position:sticky;top:0;z-index:2;background:#f8fafc">
@@ -1985,6 +1990,7 @@ function renderDbmTable() {
 // ══════════════════════════════════════════════════════
 let ME = null;
 let dashType = 'all';
+let dashSearchQuery = '';
 let tasksType = 'delegation';
 let dashChartInst = null;
 let holidays = JSON.parse(localStorage.getItem('tm_holidays') || '[]');
@@ -2279,6 +2285,12 @@ async function refreshPCEmployeeDropdown() {
   }
 }
 
+function onDashSearch() {
+  const el = document.getElementById('dashSearch');
+  dashSearchQuery = (el ? el.value : '').trim().toLowerCase();
+  if (window._lastDashTasks) renderDashTable(window._lastDashTasks, dashType);
+}
+
 function dashTab(type, el) {
   dashType = type;
   document.querySelectorAll('#dashTypeTabGroup .tab').forEach(t=>t.classList.remove('active'));
@@ -2530,6 +2542,15 @@ function renderDashTable(tasks, type) {
     const matchType = (!type || type === 'all') ? true : t.type === type;
     return matchType && (t.status === 'pending' || !t.status);
   });
+  // Apply search query (description, doer/assigner name, priority, type, date)
+  if (dashSearchQuery) {
+    allPending = allPending.filter(t => [
+      t.description || t.desc || '',
+      t.assignedToName || '', t.assignedByName || '',
+      t.priority || '', t.type || '',
+      fmtDate(t.due_date || t.date) || '', t.due_date || t.date || ''
+    ].join(' ').toLowerCase().includes(dashSearchQuery));
+  }
   // Apply date sort
   if (_dashDateSortState === 1) {
     // Ascending: oldest (earliest) date first — aaj ki pehle aaye
@@ -2538,7 +2559,7 @@ function renderDashTable(tasks, type) {
     // Descending: newest (latest) date first
     allPending = [...allPending].sort((a,b) => (b.due_date||b.date||'').localeCompare(a.due_date||a.date||''));
   }
-  if (!allPending.length) { tbody.innerHTML=`<tr><td colspan="6" class="empty">No pending tasks 🎉</td></tr>`; return; }
+  if (!allPending.length) { tbody.innerHTML=`<tr><td colspan="6" class="empty">${dashSearchQuery ? 'No tasks match your search' : 'No pending tasks 🎉'}</td></tr>`; return; }
   const typeBadge = t => t.type==='checklist'
     ? `<span style="font-size:10px;background:#f0fdf4;color:#16a34a;padding:2px 8px;border-radius:10px;font-weight:700;border:1px solid #bbf7d0">✅ Checklist</span>`
     : `<span style="font-size:10px;background:#ecfdf5;color:#1d4ed8;padding:2px 8px;border-radius:10px;font-weight:700;border:1px solid #a7f3d0">📋 Delegation</span>`;
@@ -3616,7 +3637,21 @@ async function saveProfile() {
 // ══════════════════════════════════════════════════════
 // HELPERS
 // ══════════════════════════════════════════════════════
-async function api(url,method='GET',body=null,_retries=2) {
+// ══════════════════════════════════════════════════════
+// API CACHE — stale-while-revalidate for instant navigation
+//   • GET: served from memory instantly if seen recently; refreshed
+//     silently in the background when getting stale (no reload flicker).
+//   • Any POST/PUT/DELETE clears the cache so data is never stale after an action.
+// ══════════════════════════════════════════════════════
+const _apiCache = new Map();        // url -> { data, ts }
+const _apiInflight = new Map();     // url -> Promise (dedupe concurrent GETs)
+const API_STALE_MS = 15 * 1000;     // <15s old: pure cache, no background refresh
+const API_HARD_TTL = 5 * 60 * 1000; // >5min old: force a fresh blocking fetch
+
+function bustApiCache() { _apiCache.clear(); _apiInflight.clear(); }
+
+// Raw network call — keeps the original auth / 401 / 503-retry behaviour.
+async function _apiFetch(url, method, body, _retries) {
   const token = localStorage.getItem('authToken');
   const opts={method, headers:{'Content-Type':'application/json'}, credentials:'include'};
   if (token) opts.headers['Authorization'] = 'Bearer ' + token;
@@ -3637,7 +3672,7 @@ async function api(url,method='GET',body=null,_retries=2) {
   if (r.status===503 && _retries>0) {
     showToast('Server start ho raha hai, retry ho rahi hai...','warning');
     await new Promise(res=>setTimeout(res,3000));
-    return api(url,method,body,_retries-1);
+    return _apiFetch(url,method,body,_retries-1);
   }
   try {
     const data = await r.json();
@@ -3650,6 +3685,40 @@ async function api(url,method='GET',body=null,_retries=2) {
     if (r.status === 502) return { error: 'Server se connection nahi mila (502) — check karein server chal raha hai' };
     return { error: `HTTP ${r.status}` };
   }
+}
+
+// Kick off a network fetch, store the result in cache, dedupe concurrent calls.
+function _apiRevalidate(url, _retries) {
+  if (_apiInflight.has(url)) return _apiInflight.get(url);
+  const p = _apiFetch(url, 'GET', null, _retries).then(fresh => {
+    if (fresh && !fresh.error) _apiCache.set(url, { data: fresh, ts: Date.now() });
+    return fresh;
+  }).finally(() => _apiInflight.delete(url));
+  _apiInflight.set(url, p);
+  return p;
+}
+
+async function api(url,method='GET',body=null,_retries=2) {
+  const isGet = (method || 'GET').toUpperCase() === 'GET';
+
+  // Mutations always hit the network, then clear cache so next GET is fresh.
+  if (!isGet) {
+    const data = await _apiFetch(url, method, body, _retries);
+    bustApiCache();
+    return data;
+  }
+
+  const hit = _apiCache.get(url);
+  if (hit) {
+    const age = Date.now() - hit.ts;
+    if (age < API_HARD_TTL) {
+      // Serve instantly; if it's getting stale, refresh in background for next time.
+      if (age > API_STALE_MS) _apiRevalidate(url, _retries);
+      return hit.data;
+    }
+  }
+  // Cold cache (or too old) — fetch now and cache it.
+  return _apiRevalidate(url, _retries);
 }
 
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
