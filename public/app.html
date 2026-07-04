@@ -752,7 +752,9 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
           </div>
         </div>
         <div style="padding:8px 2px 10px;">
-          <input type="text" id="dashSearch" oninput="onDashSearch()" autocomplete="off"
+          <input type="search" id="dashSearch" oninput="onDashSearch()"
+            autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+            name="dash-task-search-nofill" readonly onfocus="this.removeAttribute('readonly')"
             placeholder="🔍 Search tasks — description, name, priority…"
             style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;outline:none;color:#1e293b;background:#fff;box-sizing:border-box;">
         </div>
