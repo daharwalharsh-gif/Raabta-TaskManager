@@ -793,7 +793,7 @@ async function sendWhatsApp(rawPhone, message) {
     const resp = await fetch(WA.url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': WA.apiKey },
-      body: JSON.stringify({ phone, message }),
+      body: JSON.stringify({ to: phone, text: message }),
       signal: AbortSignal.timeout(20000)
     });
     const body = await resp.text();
