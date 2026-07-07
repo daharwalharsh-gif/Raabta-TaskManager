@@ -2209,6 +2209,7 @@ async function loadDashboard() {
 
     if (isAdmin) {
       document.getElementById('dashBtns').innerHTML = `
+        <button class="btn btn-outline" onclick="sendWaReminders(this)">📲 WhatsApp Reminders</button>
         <button class="btn btn-yellow" onclick="openHoliday()">🗓 Holidays</button>
         <button class="btn btn-green" onclick="openChecklist()">+ Checklist</button>
         <button class="btn btn-primary" onclick="openDelegate()">+ Delegate</button>`;
@@ -2285,6 +2286,18 @@ async function refreshPCEmployeeDropdown() {
   } else {
     empFilter.value = 'all';
   }
+}
+
+// Admin: send WhatsApp reminders now to everyone with pending delegation/checklist tasks
+async function sendWaReminders(btn) {
+  if (!confirm('Sabhi PENDING tasks (delegation + checklist) wale users ko abhi WhatsApp reminder bhejein?')) return;
+  const old = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Bhej rahe hain…'; }
+  showToast('WhatsApp reminders bheje jaa rahe hain…', 'warning');
+  const r = await api('/api/admin/run-wa-reminders', 'POST');
+  if (btn) { btn.disabled = false; btn.textContent = old; }
+  if (r && r.error) { showToast('Failed: ' + r.error, 'error'); return; }
+  showToast(`✅ ${r.sent||0} WhatsApp reminder bheje` + ((r.skipped) ? `, ${r.skipped} skip (number nahi)` : ''), 'success');
 }
 
 function onDashSearch() {
