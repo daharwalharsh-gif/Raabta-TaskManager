@@ -20,6 +20,6 @@ module.exports = {
   // ── Baaki settings ──
   countryCode:  '91',
   reminderHour: 10,
-  timeoutMs:    20000,
+  timeoutMs:    60000,   // Aumpfy real-number send can take ~50s to respond
   appUrl:       process.env.APP_URL || ''
 };

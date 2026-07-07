@@ -2916,10 +2916,13 @@ app.post('/api/admin/run-reminders', requireAuth, requireAdmin, async (req, res)
   res.json(r);
 });
 
-// Manually trigger the daily WhatsApp reminder pass (for testing).
+// Manually trigger the WhatsApp reminder pass. Runs in the background (the
+// Aumpfy API is slow — ~50s/msg), so respond immediately instead of hanging.
 app.post('/api/admin/run-wa-reminders', requireAuth, requireAdmin, async (req, res) => {
-  const r = await runWhatsAppReminders();
-  res.json(r);
+  runWhatsAppReminders()
+    .then(r => console.log('  WA reminders (manual):', JSON.stringify(r)))
+    .catch(e => console.error('  WA reminders (manual) error:', e.message));
+  res.json({ started: true });
 });
 
 // Send a one-off test WhatsApp: { phone, message }

@@ -2293,11 +2293,10 @@ async function sendWaReminders(btn) {
   if (!confirm('Sabhi PENDING tasks (delegation + checklist) wale users ko abhi WhatsApp reminder bhejein?')) return;
   const old = btn ? btn.textContent : '';
   if (btn) { btn.disabled = true; btn.textContent = 'Bhej rahe hain…'; }
-  showToast('WhatsApp reminders bheje jaa rahe hain…', 'warning');
   const r = await api('/api/admin/run-wa-reminders', 'POST');
   if (btn) { btn.disabled = false; btn.textContent = old; }
   if (r && r.error) { showToast('Failed: ' + r.error, 'error'); return; }
-  showToast(`✅ ${r.sent||0} WhatsApp reminder bheje` + ((r.skipped) ? `, ${r.skipped} skip (number nahi)` : ''), 'success');
+  showToast('✅ Reminders bhejna shuru — sabhi pending users ko background me WhatsApp jaa raha hai (thoda time lega).', 'success');
 }
 
 function onDashSearch() {
