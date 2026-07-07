@@ -771,13 +771,16 @@ function reminderScheduler() {
 // Sends task alerts + daily reminders to each user's WhatsApp number.
 // Configure via .env — defaults below let it work out of the box.
 // Secrets come from .env only — never hardcode the API key/URL (repo may be public).
-const WA = {
-  enabled: (process.env.WHATSAPP_ENABLED || 'true').toLowerCase() !== 'false',
-  url: process.env.AUMPFY_API_URL || '',
-  apiKey: process.env.AUMPFY_API_KEY || '',
-  countryCode: (process.env.WHATSAPP_COUNTRY_CODE || '91').replace(/\D/g, ''),
-  reminderHour: parseInt(process.env.WHATSAPP_REMINDER_HOUR) || 10
-};
+// All WhatsApp API settings live in whatsapp.config.js (gitignored — edit that
+// file to change your API key / URL / payload format, then restart the app).
+// If it doesn't exist yet, fall back to the committed example (which reads env).
+let WA;
+try {
+  WA = require('./whatsapp.config');
+} catch (e) {
+  WA = require('./whatsapp.config.example');
+  console.log('  whatsapp.config.js not found — using whatsapp.config.example.js (env-based). Copy it to whatsapp.config.js to set your API.');
+}
 
 // Turn any stored phone value into WhatsApp digits: country code + number, no +/spaces.
 function normalizePhone(raw) {
@@ -798,9 +801,9 @@ async function sendWhatsApp(rawPhone, message) {
   try {
     const resp = await fetch(WA.url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': WA.apiKey },
-      body: JSON.stringify({ to: phone, text: message }),
-      signal: AbortSignal.timeout(20000)
+      headers: { 'Content-Type': 'application/json', [WA.authHeader || 'x-api-key']: WA.apiKey },
+      body: JSON.stringify({ [WA.phoneField || 'to']: phone, [WA.messageField || 'text']: message }),
+      signal: AbortSignal.timeout(WA.timeoutMs || 20000)
     });
     const body = await resp.text();
     if (!resp.ok) {
