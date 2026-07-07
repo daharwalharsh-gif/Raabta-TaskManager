@@ -8,10 +8,6 @@
 credentials.json
 !credentials.example.json
 
-# WhatsApp API config (holds your live API key) — never push; edit on server
-whatsapp.config.js
-!whatsapp.config.example.js
-
 # ================================================================
 # Internal / tooling
 # ================================================================
