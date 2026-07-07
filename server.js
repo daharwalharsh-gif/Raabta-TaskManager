@@ -591,12 +591,17 @@ async function deleteRow(tabName, id) {
 // ══════════════════════════════════════════════════════
 // EMAIL
 // ══════════════════════════════════════════════════════
+// Email notifications are OFF by default — WhatsApp is the only channel.
+// Set EMAIL_ENABLED=true in .env to turn task emails back on.
+const EMAIL_ENABLED = (process.env.EMAIL_ENABLED || 'false').toLowerCase() === 'true';
+
 const mailTransporter = nodemailer.createTransport({
   service: 'gmail',
   auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
 });
 
 async function sendMail(to, subject, html) {
+  if (!EMAIL_ENABLED) return;               // email disabled — WhatsApp only
   if (!to || !process.env.SMTP_USER) return;
   try {
     await mailTransporter.sendMail({
@@ -746,6 +751,7 @@ async function runDelegationReminders() {
 
 let _lastReminderRunDate = '';
 function reminderScheduler() {
+  if (!EMAIL_ENABLED) { console.log('  Email reminders disabled (EMAIL_ENABLED=false) — WhatsApp only'); return; }
   setInterval(async () => {
     try {
       const now = new Date();
