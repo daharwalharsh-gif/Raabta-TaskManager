@@ -1241,13 +1241,33 @@ app.get('/api/tasks', requireAuth, async (req, res) => {
 app.get('/api/my-checklist-reminders', requireAuth, async (req, res) => {
   try {
     const uid = String(req.session.userId);
+    const role = req.session.role;
     const todayStr = today();
     const cutoff = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const all = await db.findAll('Checklist_Tasks');
+    const [all, users] = await Promise.all([db.findAll('Checklist_Tasks'), db.findAll('Users')]);
+    const userMap = {};
+    for (const u of users) userMap[String(u.id)] = u;
+
+    // Whose checklists to include: admin/pc → everyone, hod → own dept, user → own only.
+    let allowed = null; // null = all
+    if (role === 'hod') {
+      const dept = userMap[uid]?.department || '';
+      allowed = new Set(users.filter(u => u.department === dept).map(u => String(u.id)));
+    } else if (role !== 'admin' && role !== 'pc') {
+      allowed = new Set([uid]);
+    }
+
     const tasks = all
-      .filter(t => String(t.assigned_to) === uid && (t.status === 'pending' || !t.status)
-        && t.due_date && t.due_date <= cutoff)
-      .map(t => ({ id: parseInt(t.id), description: t.description, due_date: t.due_date, priority: t.priority || 'low' }))
+      .filter(t => (t.status === 'pending' || !t.status) && t.due_date && t.due_date <= cutoff
+        && (allowed === null || allowed.has(String(t.assigned_to))))
+      .map(t => ({
+        id: parseInt(t.id),
+        description: t.description,
+        due_date: t.due_date,
+        priority: t.priority || 'low',
+        assignedToName: userMap[String(t.assigned_to)]?.name || '',
+        mine: String(t.assigned_to) === uid
+      }))
       .sort((a, b) => (a.due_date || '').localeCompare(b.due_date || ''));
     res.json({ tasks, today: todayStr });
   } catch (err) { res.status(500).json({ error: err.message }); }
