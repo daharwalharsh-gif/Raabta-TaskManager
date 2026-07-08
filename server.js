@@ -1235,6 +1235,24 @@ app.get('/api/tasks', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Logged-in user's own PENDING checklist tasks due within the next 2 days
+// (drives the dashboard notification bell — "2 din pehle" advance reminder).
+// Includes overdue + today + next 2 days.
+app.get('/api/my-checklist-reminders', requireAuth, async (req, res) => {
+  try {
+    const uid = String(req.session.userId);
+    const todayStr = today();
+    const cutoff = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const all = await db.findAll('Checklist_Tasks');
+    const tasks = all
+      .filter(t => String(t.assigned_to) === uid && (t.status === 'pending' || !t.status)
+        && t.due_date && t.due_date <= cutoff)
+      .map(t => ({ id: parseInt(t.id), description: t.description, due_date: t.due_date, priority: t.priority || 'low' }))
+      .sort((a, b) => (a.due_date || '').localeCompare(b.due_date || ''));
+    res.json({ tasks, today: todayStr });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.post('/api/tasks', requireAuth, async (req, res) => {
   try {
     const { type, desc, assignedTo, approverEmail, date, priority, approval, remarks } = req.body;

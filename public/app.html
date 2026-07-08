@@ -712,7 +712,19 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
 <div class="main" id="mainContent">
   <div class="topbar">
     <div class="topbar-title" id="topbarTitle">Dashboard</div>
-    <div class="topbar-right" id="topbarActions"></div>
+    <div class="topbar-right" id="topbarActions">
+      <div id="notifBellWrap" style="position:relative;display:inline-block;">
+        <button id="notifBell" onclick="toggleNotifDropdown(event)" title="Checklist reminders"
+          style="position:relative;background:none;border:none;cursor:pointer;font-size:22px;line-height:1;padding:6px;">
+          🔔
+          <span id="notifBadge" style="display:none;position:absolute;top:-2px;right:-2px;background:#ef4444;color:#fff;font-size:10px;font-weight:700;min-width:17px;height:17px;line-height:17px;border-radius:9px;padding:0 4px;text-align:center;box-sizing:border-box;">0</span>
+        </button>
+        <div id="notifDropdown" style="display:none;position:absolute;right:0;top:115%;width:320px;max-width:88vw;max-height:70vh;overflow-y:auto;background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.15);z-index:1200;">
+          <div style="padding:12px 14px;border-bottom:1px solid #eef2f7;font-weight:700;color:#1e293b;font-size:14px;">🔔 Checklist Reminders</div>
+          <div id="notifList"></div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- ── DASHBOARD ── -->
@@ -2052,9 +2064,11 @@ async function init() {
     loadDashboard();
     loadApprovalBadge();
     loadTransferBadge();
+    loadChecklistNotifications();
     // Refresh badges every 30 seconds
     setInterval(loadApprovalBadge, 30000);
     setInterval(loadTransferBadge, 30000);
+    setInterval(loadChecklistNotifications, 60000);
   } catch(e) { console.error('Init error:', e); window.location.replace('/'); }
 }
 
@@ -2297,6 +2311,53 @@ async function sendWaReminders(btn) {
   if (btn) { btn.disabled = false; btn.textContent = old; }
   if (r && r.error) { showToast('Failed: ' + r.error, 'error'); return; }
   showToast('✅ Reminders bhejna shuru — sabhi pending users ko background me WhatsApp jaa raha hai (thoda time lega).', 'success');
+}
+
+// ── Checklist notification bell (per-user, tasks due within 2 days) ──
+let _notifOpen = false;
+function toggleNotifDropdown(e) {
+  if (e) e.stopPropagation();
+  _notifOpen = !_notifOpen;
+  const dd = document.getElementById('notifDropdown');
+  if (dd) dd.style.display = _notifOpen ? 'block' : 'none';
+  if (_notifOpen) loadChecklistNotifications();
+}
+document.addEventListener('click', function(e) {
+  const wrap = document.getElementById('notifBellWrap');
+  if (_notifOpen && wrap && !wrap.contains(e.target)) {
+    _notifOpen = false;
+    const dd = document.getElementById('notifDropdown');
+    if (dd) dd.style.display = 'none';
+  }
+});
+
+async function loadChecklistNotifications() {
+  if (!ME || !ME.id) return;
+  try {
+    const res = await api('/api/my-checklist-reminders');
+    const tasks = (res && Array.isArray(res.tasks)) ? res.tasks : [];
+    const todayStr = (res && res.today) || new Date().toISOString().split('T')[0];
+    const badge = document.getElementById('notifBadge');
+    if (badge) {
+      if (tasks.length) { badge.style.display = 'block'; badge.textContent = tasks.length > 99 ? '99+' : tasks.length; }
+      else badge.style.display = 'none';
+    }
+    const list = document.getElementById('notifList');
+    if (list) {
+      list.innerHTML = tasks.length ? tasks.map(t => {
+        const overdue = t.due_date < todayStr;
+        const isToday = t.due_date === todayStr;
+        const tag = overdue
+          ? '<span style="color:#dc2626;font-weight:700">Overdue</span>'
+          : isToday ? '<span style="color:#d97706;font-weight:700">Today</span>'
+          : `Due ${fmtDate(t.due_date)}`;
+        return `<div style="padding:10px 14px;border-bottom:1px solid #f1f5f9;">
+          <div style="font-size:13px;color:#1e293b;font-weight:600;">${t.description || '—'}</div>
+          <div style="font-size:11px;color:#64748b;margin-top:3px;">📋 You have to do this — ${tag}</div>
+        </div>`;
+      }).join('') : `<div style="padding:18px 14px;text-align:center;color:#94a3b8;font-size:13px;">No checklist tasks due 🎉</div>`;
+    }
+  } catch (e) { /* silent */ }
 }
 
 function onDashSearch() {
