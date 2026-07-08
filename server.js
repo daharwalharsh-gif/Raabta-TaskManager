@@ -1265,6 +1265,7 @@ app.get('/api/my-checklist-reminders', requireAuth, async (req, res) => {
         description: t.description,
         due_date: t.due_date,
         priority: t.priority || 'low',
+        frequency: t.frequency || '',
         assignedToName: userMap[String(t.assigned_to)]?.name || '',
         mine: String(t.assigned_to) === uid
       }))
