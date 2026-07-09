@@ -2128,7 +2128,8 @@ async function removeProfileImage() {
 
 function setMinDates() {
   const today = new Date().toISOString().split('T')[0];
-  ['dDate','cDate','hDate'].forEach(id => {
+  // cDate (checklist) intentionally NOT restricted — past-month dates allowed.
+  ['dDate','hDate'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.min = today;
   });
