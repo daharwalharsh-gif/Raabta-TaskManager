@@ -3114,7 +3114,7 @@ async function openChecklist() {
   document.getElementById('cPreview').style.display='none';
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('cDate').value=today;
-  document.getElementById('cDate').min=today;
+  document.getElementById('cDate').removeAttribute('min'); // allow past-month start dates
   const users = await api('/api/users');
   document.getElementById('cDoer').innerHTML='<option value="">Select Employee</option>'+
     users.map(u=>`<option value="${u.id}">${u.name}</option>`).join('');
@@ -3154,6 +3154,7 @@ function getEndDate(startDate, freq, count) {
 function generateDates(startDate, freq, weekOffStr, extraOffStr) {
   const dates = [];
   const d = new Date(startDate+'T00:00:00');
+  const startYear = d.getFullYear();   // generate forward only, within the start year
   const counts = {daily:365, weekly:52, alternative_week:26, monthly:12, quarterly:4, yearly:1};
   const count = counts[freq];
   const weekOff = (weekOffStr||'').split(',').map(s=>parseInt(s.trim())).filter(n=>!isNaN(n));
@@ -3175,6 +3176,7 @@ function generateDates(startDate, freq, weekOffStr, extraOffStr) {
   let added = 0;
   let safety = count * 14;
   while (added < count && safety-- > 0) {
+    if (d.getFullYear() > startYear) break;   // stop at end of start year — no next-year spill
     const day = d.getDay();
     if (freq === 'daily') {
       if (day === 0 || weekOff.includes(day) || isExtraOff(d)) { // day===0 = Sunday, always skip
