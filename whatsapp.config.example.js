@@ -24,7 +24,8 @@ module.exports = {
 
   // ── Baaki settings ──
   countryCode:  (process.env.WHATSAPP_COUNTRY_CODE || '91').replace(/\D/g, ''), // 10-digit number ke aage lagega
-  reminderHour: parseInt(process.env.WHATSAPP_REMINDER_HOUR) || 10,             // daily reminder (24h, server time)
-  timeoutMs:    20000,
+  // Daily reminder times (IST). Add/remove entries to change kab reminder jaye.
+  reminderTimes: [ { h: 10, m: 0 }, { h: 17, m: 30 } ],   // 10:00 AM & 5:30 PM
+  timeoutMs:    60000,
   appUrl:       process.env.APP_URL || ''   // message me "Open:" link ke liye
 };

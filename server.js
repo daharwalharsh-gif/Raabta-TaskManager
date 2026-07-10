@@ -928,25 +928,39 @@ async function runWhatsAppReminders() {
   }
 }
 
-let _lastWaReminderDate = '';
+let _waReminderDay = '';
+const _waFiredSlots = new Set();
 function whatsAppReminderScheduler() {
   if (!WA.enabled) { console.log('  WhatsApp reminders disabled (WHATSAPP_ENABLED=false)'); return; }
   if (!WA.url || !WA.apiKey) {
-    console.log('  WhatsApp NOT configured — add AUMPFY_API_URL and AUMPFY_API_KEY to .env, then restart');
+    console.log('  WhatsApp NOT configured — set url/apiKey in whatsapp.config.js, then restart');
     return;
   }
+  // Reminder times come from config (IST). Default: 10:00 AM & 5:30 PM.
+  const slots = (Array.isArray(WA.reminderTimes) && WA.reminderTimes.length)
+    ? WA.reminderTimes
+    : (WA.reminderHour ? [{ h: WA.reminderHour, m: 0 }] : [{ h: 10, m: 0 }, { h: 17, m: 30 }]);
+  const label = slots.map(s => `${s.h}:${String(s.m || 0).padStart(2, '0')}`).join(' & ');
   setInterval(async () => {
     try {
-      const now = new Date();
-      const todayStr = now.toISOString().split('T')[0];
-      if (now.getHours() >= WA.reminderHour && _lastWaReminderDate !== todayStr) {
-        _lastWaReminderDate = todayStr;
-        await getDB();
-        await runWhatsAppReminders();
+      // Compute time in IST (UTC+5:30) so it fires at the right clock time
+      // regardless of the server's timezone.
+      const ist = new Date(Date.now() + 330 * 60000);
+      const todayStr = ist.toISOString().split('T')[0];
+      if (todayStr !== _waReminderDay) { _waReminderDay = todayStr; _waFiredSlots.clear(); }
+      const nowMin = ist.getUTCHours() * 60 + ist.getUTCMinutes();
+      for (let i = 0; i < slots.length; i++) {
+        const slotMin = slots[i].h * 60 + (slots[i].m || 0);
+        // Fire once within a 30-min window of the slot (avoids double/late firing).
+        if (nowMin >= slotMin && nowMin < slotMin + 30 && !_waFiredSlots.has(i)) {
+          _waFiredSlots.add(i);
+          await getDB();
+          await runWhatsAppReminders();
+        }
       }
     } catch (e) { console.error('  WA scheduler tick error:', e.message); }
   }, 60 * 1000);
-  console.log(`  WhatsApp reminder scheduler started (fires daily at ${WA.reminderHour}:00)`);
+  console.log(`  WhatsApp reminder scheduler started (fires daily at ${label} IST)`);
 }
 
 // ══════════════════════════════════════════════════════
