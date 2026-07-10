@@ -2799,6 +2799,7 @@ function renderTasksTable() {
       <button class="action-btn" style="background:#ecfdf5;color:#1d4ed8;padding:4px 7px;margin-left:3px" onclick="openComments(${t.id},'${tasksType}')" title="Comments">💬</button>
       ${!isCompleted && !isWaiting ? `<button class="action-btn done" style="margin-left:3px" onclick="updateStatus(${t.id},'completed','alltasks','${tasksType}')">Done</button>` : ''}
       ${!isChecklist && !isCompleted && !isWaiting ? `<button class="action-btn revise" style="margin-left:3px" onclick="openReviseModal(${t.id},'${tasksType}')">Revise</button>` : ''}
+      ${isCompleted ? `<button class="action-btn" style="background:#fef3c7;color:#92400e;margin-left:3px" onclick="reopenTask(${t.id},'${tasksType}')" title="Reopen — mark as pending again">↺ Reopen</button>` : ''}
       ${isWaiting ? `<span style="font-size:11px;color:#f59e0b;font-weight:600;margin-left:4px">⏳ Waiting</span>` : ''}
     ` : (ME.role==='pc') ? `
       <button class="action-btn" style="background:#ecfdf5;color:#1d4ed8;padding:4px 7px" onclick="openComments(${t.id},'${tasksType}')" title="Comments">💬</button>
@@ -2897,6 +2898,11 @@ async function updateStatus(id, status, from, type) {
   }
   // Dashboard success: optimistic update is already done — no full reload needed
   loadApprovalBadge();
+}
+
+async function reopenTask(id, type) {
+  if (!confirm('Is task ko wapas Pending kar dein?')) return;
+  await updateStatus(id, 'pending', 'alltasks', type);
 }
 
 async function deleteTask(id, type) {
