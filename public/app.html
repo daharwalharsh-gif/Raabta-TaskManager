@@ -1233,6 +1233,19 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
         </select>
       </div>
     </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Approval Required?</label>
+        <select id="dApproval" onchange="toggleApprover()">
+          <option value="no">No — Direct Assign</option>
+          <option value="yes">Yes — Approve hone par hi doer ko dikhe</option>
+        </select>
+      </div>
+      <div class="form-group" id="dApproverWrap" style="display:none">
+        <label>Approver</label>
+        <select id="dApprover"><option value="">Select Approver</option></select>
+      </div>
+    </div>
     <div class="form-group">
       <label>Description</label>
       <textarea id="dDesc" placeholder="Enter task description…"></textarea>
@@ -3088,7 +3101,15 @@ async function openDelegate() {
   const users = await api('/api/users');
   const opts = users.map(u=>`<option value="${u.id}">${u.name}</option>`).join('');
   document.getElementById('dDoer').innerHTML='<option value="">Select Doer</option>'+opts;
+  document.getElementById('dApproval').value='no';
+  document.getElementById('dApproverWrap').style.display='none';
+  document.getElementById('dApprover').innerHTML='<option value="">Select Approver</option>'+opts;
   document.getElementById('delegateModal').classList.add('open');
+}
+
+function toggleApprover() {
+  document.getElementById('dApproverWrap').style.display =
+    document.getElementById('dApproval').value === 'yes' ? 'block' : 'none';
 }
 
 async function saveDelegate() {
@@ -3099,13 +3120,17 @@ async function saveDelegate() {
   const desc = document.getElementById('dDesc').value.trim();
   const priority = document.getElementById('dPriority').value;
   const remarks = document.getElementById('dRemarks').value.trim();
+  const approval = document.getElementById('dApproval').value;
+  const approverId = document.getElementById('dApprover').value;
   if (!doer) { err.textContent='Please select a doer'; err.style.display='block'; return; }
   if (!date) { err.textContent='Please select a date'; err.style.display='block'; return; }
   if (!desc) { err.textContent='Description is required'; err.style.display='block'; return; }
-  await api('/api/tasks','POST',{type:'delegation',desc,assignedTo:doer,date,priority,approval:'no',remarks});
+  if (approval==='yes' && !approverId) { err.textContent='Please select an approver'; err.style.display='block'; return; }
+  await api('/api/tasks','POST',{type:'delegation',desc,assignedTo:doer,date,priority,approval,approverId,remarks});
   closeModal('delegateModal');
-  showToast('Task delegated successfully!');
+  showToast(approval==='yes' ? '✅ Task approval ke liye bheja gaya — approve hote hi doer ko dikhega!' : 'Task delegated successfully!');
   loadDashboard();
+  loadApprovalBadge();
 }
 
 // ══════════════════════════════════════════════════════
@@ -3667,7 +3692,7 @@ async function loadApprovals() {
                 <td style="font-weight:600">${a.requestedByName}</td>
                 ${isAdminOrPC ? `<td style="color:#64748b;font-size:12px">${a.requestedToName}</td>` : ''}
                 <td>${a.description||'—'}</td>
-                <td><span class="status-badge ${a.action_type}">${a.action_type==='completed'?'✅ Mark Complete':'🔄 Revision'}</span></td>
+                <td><span class="status-badge ${a.action_type}">${a.action_type==='completed'?'✅ Mark Complete':a.action_type==='pending'?'🆕 New Task':'🔄 Revision'}</span></td>
                 <td style="color:#64748b;font-size:12px">${new Date(a.created_at).toLocaleDateString('en-IN')}</td>
                 <td>
                   <button class="action-btn done" onclick="handleApproval(${a.id},'approved')">Approve</button>

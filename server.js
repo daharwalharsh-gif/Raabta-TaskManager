@@ -1214,6 +1214,8 @@ app.get('/api/tasks', requireAuth, async (req, res) => {
       if (isMine) {
         return String(t.assigned_by) === String(uid);
       }
+      // Approval-pending naya task: doer ko tabhi dikhe jab approve ho jaye
+      if (t.status === 'waiting_approval' && !isAdmin && role !== 'pc') return false;
       if (allowedUserIds && !allowedUserIds.includes(String(t.assigned_to))) return false;
       if (!isDeleg && !includeFuture && t.due_date > todayStr) return false;
       return true;
@@ -1290,7 +1292,7 @@ app.get('/api/my-checklist-reminders', requireAuth, async (req, res) => {
 
 app.post('/api/tasks', requireAuth, async (req, res) => {
   try {
-    const { type, desc, assignedTo, approverEmail, date, priority, approval, remarks } = req.body;
+    const { type, desc, assignedTo, approverEmail, approverId, date, priority, approval, remarks } = req.body;
     if (!desc || !date) return res.status(400).json({ error: 'Description and date required' });
     const role = req.session.role;
     const targetUser = (role === 'admin' || role === 'hod' || role === 'user') && assignedTo
@@ -1305,12 +1307,28 @@ app.post('/api/tasks', requireAuth, async (req, res) => {
         const aprUser = allUsers.find(u => u.email && u.email.trim().toLowerCase() === (approverEmail || '').trim().toLowerCase());
         if (aprUser) assignedBy = String(aprUser.id);
       }
-      await db.insert('Delegation_Tasks', {
+      // Approval-required task: approver approve kare tabhi doer ko dikhega,
+      // tab tak status 'waiting_approval' rehta hai (lists/reminders isse skip karti hain).
+      const needsApproval = (approval === 'yes');
+      const created = await db.insert('Delegation_Tasks', {
         description: desc, assigned_to: targetUser, assigned_by: assignedBy,
-        due_date: date, status: 'pending', priority: priority || 'low',
-        approval: approval || 'no', waiting_approval: '0', remarks: remarks || '',
+        due_date: date, status: needsApproval ? 'waiting_approval' : 'pending', priority: priority || 'low',
+        approval: approval || 'no', waiting_approval: needsApproval ? '1' : '0', remarks: remarks || '',
         frequency: '', last_reminder_date: '', created_at: nowStr
       });
+      if (needsApproval) {
+        let approverUid = approverId ? String(parseInt(approverId)) : '';
+        if (!approverUid) {
+          const admins = (await db.findAll('Users')).filter(u => u.role === 'admin');
+          approverUid = admins.length ? String(admins[0].id) : String(req.session.userId);
+        }
+        await db.insert('Task_Approvals', {
+          task_id: created.id, task_type: 'delegation',
+          requested_by: String(req.session.userId), requested_to: approverUid,
+          action_type: 'pending', status: 'pending', note: 'New task approval', created_at: nowStr
+        });
+        return res.json({ success: true, needsApproval: true });
+      }
       // Non-blocking notifications — WhatsApp and email fire INDEPENDENTLY so a
       // slow SMTP send can never delay the WhatsApp (it goes within ~1-2 sec).
       (async () => {
@@ -1637,8 +1655,28 @@ app.put('/api/approvals/:id', requireAuth, async (req, res) => {
     const tabName = getTabName(appr.task_type);
     if (action === 'approved') {
       await db.update(tabName, appr.task_id, { status: appr.action_type, waiting_approval: '0' });
+      // New-task approval (action_type 'pending'): ab jaake doer ko task dikha hai,
+      // isliye WhatsApp bhi ab hi jaata hai (create ke waqt nahi gaya tha).
+      if (appr.action_type === 'pending' && appr.task_type === 'delegation') {
+        (async () => {
+          const task = await db.findOne('Delegation_Tasks', { id: appr.task_id });
+          if (!task) return;
+          const assigner = await db.findOne('Users', { id: String(task.assigned_by) });
+          const waTarget = await getWhatsAppTarget(parseInt(task.assigned_to));
+          if (waTarget) {
+            await sendWhatsApp(waTarget.phone, waDelegationMsg({
+              assigneeName: waTarget.name, assignerName: assigner?.name || 'Admin',
+              desc: task.description, dueDate: task.due_date,
+              priority: task.priority || 'low', approval: task.approval || 'no', remarks: task.remarks || ''
+            }));
+          }
+        })().catch(e => console.error('  WA approve notify error:', e.message));
+      }
     } else {
-      await db.update(tabName, appr.task_id, { waiting_approval: '0' });
+      const upd = { waiting_approval: '0' };
+      // New-task reject: task doer ko kabhi nahi dikhna chahiye
+      if (appr.action_type === 'pending') upd.status = 'rejected';
+      await db.update(tabName, appr.task_id, upd);
     }
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
