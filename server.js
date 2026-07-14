@@ -501,6 +501,11 @@ const MYSQL_SCHEMA = {
     fms_name: "VARCHAR(255) DEFAULT ''", sheet_name: "VARCHAR(255) DEFAULT ''",
     sheet_id: "VARCHAR(255) DEFAULT ''", header_row: "VARCHAR(10) DEFAULT '1'",
     total_steps: "VARCHAR(10) DEFAULT '1'", steps_json: "TEXT", created_at: "VARCHAR(40) DEFAULT ''"
+  },
+  Leave_Requests: {
+    user_id: "VARCHAR(20) DEFAULT ''", from_date: "VARCHAR(40) DEFAULT ''",
+    to_date: "VARCHAR(40) DEFAULT ''", reason: "TEXT",
+    status: "VARCHAR(20) DEFAULT 'pending'", note: "TEXT", created_at: "VARCHAR(40) DEFAULT ''"
   }
 };
 
@@ -1685,6 +1690,61 @@ app.put('/api/approvals/:id', requireAuth, async (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════
+// LEAVE REQUESTS
+// ══════════════════════════════════════════════════════
+// Apply leave — koi bhi logged-in user
+app.post('/api/leaves', requireAuth, async (req, res) => {
+  try {
+    const { from_date, to_date, reason } = req.body || {};
+    if (!from_date || !to_date) return res.status(400).json({ error: 'From aur To dates dono required hain' });
+    if (to_date < from_date) return res.status(400).json({ error: 'To date From date se pehle nahi ho sakti' });
+    const d = await getDB();
+    await ensureLeaveTab(d);
+    const nowStr = new Date().toISOString().replace('T', ' ').split('.')[0];
+    const created = await d.insert('Leave_Requests', {
+      user_id: String(req.session.userId), from_date, to_date,
+      reason: reason || '', status: 'pending', note: '', created_at: nowStr
+    });
+    res.json({ success: true, id: parseInt(created.id) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// List leaves — user ko apni, admin/PC ko sabki
+app.get('/api/leaves', requireAuth, async (req, res) => {
+  try {
+    const d = await getDB();
+    await ensureLeaveTab(d);
+    const role = req.session.role;
+    const isAdminOrPC = role === 'admin' || role === 'pc';
+    const [leaves, users] = await Promise.all([d.findAll('Leave_Requests'), d.findAll('Users')]);
+    const userMap = {};
+    for (const u of users) userMap[String(u.id)] = u;
+    let list = leaves;
+    if (!isAdminOrPC) list = leaves.filter(l => String(l.user_id) === String(req.session.userId));
+    const result = list.map(l => ({
+      ...l, id: parseInt(l.id), user_id: parseInt(l.user_id),
+      userName: userMap[String(l.user_id)]?.name || ''
+    })).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+    res.json(result);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Approve / reject leave — sirf admin/PC
+app.put('/api/leaves/:id', requireAuth, async (req, res) => {
+  try {
+    const role = req.session.role;
+    if (role !== 'admin' && role !== 'pc') return res.status(403).json({ error: 'Not allowed' });
+    const { action, note } = req.body || {};
+    if (action !== 'approved' && action !== 'rejected') return res.status(400).json({ error: 'Invalid action' });
+    const d = await getDB();
+    const leave = await d.findOne('Leave_Requests', { id: req.params.id });
+    if (!leave) return res.status(404).json({ error: 'Leave request not found' });
+    await d.update('Leave_Requests', req.params.id, { status: action, note: note || '' });
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ══════════════════════════════════════════════════════
 // MIS
 // ══════════════════════════════════════════════════════
 app.get('/api/mis', requireAuth, requireAdminOrHod, async (req, res) => {
@@ -2393,6 +2453,30 @@ async function ensureFMSConfigTab(d) {
     }));
     delete d._hdrCache['FMS_Config'];
     delete d._cache['FMS_Config'];
+  }
+}
+
+// Helper: ensure Leave_Requests tab exists in main spreadsheet
+// (MySQL me table schema se auto-ban jaati hai — wahan findAll fail nahi hota)
+async function ensureLeaveTab(d) {
+  try {
+    await d.findAll('Leave_Requests');
+  } catch(e) {
+    // Tab missing — create it with headers
+    try {
+      await withRetry(() => d.sheets.spreadsheets.batchUpdate({
+        spreadsheetId: SHEET_ID,
+        requestBody: { requests: [{ addSheet: { properties: { title: 'Leave_Requests' } } }] }
+      }));
+    } catch(e2) { /* already exists race */ }
+    await withRetry(() => d.sheets.spreadsheets.values.update({
+      spreadsheetId: SHEET_ID,
+      range: 'Leave_Requests!A1:H1',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [['id','user_id','from_date','to_date','reason','status','note','created_at']] }
+    }));
+    delete d._hdrCache['Leave_Requests'];
+    delete d._cache['Leave_Requests'];
   }
 }
 

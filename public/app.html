@@ -691,6 +691,10 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18M3 6h18M3 18h18"/></svg>
       <span class="nav-label-text">FMS Tasks</span>
     </div>
+    <div class="nav-item" id="nav-leave" onclick="navigate('leave',this)">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+      <span class="nav-label-text">Leave</span>
+    </div>
     <div class="nav-divider"></div>
     <div class="nav-item" onclick="navigate('profile',this)">
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
@@ -911,6 +915,40 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       </div>
     </div>
     <div id="tasksContent"></div>
+  </div>
+
+  <!-- ── LEAVE ── -->
+  <div id="page-leave" class="page">
+    <div class="page-header"><h2>Leave</h2></div>
+
+    <!-- Apply form -->
+    <div style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;padding:16px 18px;margin-bottom:16px">
+      <div style="font-size:15px;font-weight:700;color:#1e293b;margin-bottom:12px">🌴 Apply for Leave</div>
+      <div class="alert error" id="leaveErr"></div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>From Date</label>
+          <input type="date" id="lvFrom"/>
+        </div>
+        <div class="form-group">
+          <label>To Date</label>
+          <input type="date" id="lvTo"/>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Reason</label>
+        <textarea id="lvReason" placeholder="Leave ka reason likho…" style="min-height:60px"></textarea>
+      </div>
+      <div style="text-align:right">
+        <button class="btn btn-primary" onclick="applyLeave()">Apply Leave</button>
+      </div>
+    </div>
+
+    <!-- Requests list -->
+    <div style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden">
+      <div id="leaveListTitle" style="padding:14px 18px;border-bottom:1px solid #eef2f7;font-weight:700;color:#1e293b;font-size:14px">My Leave Requests</div>
+      <div id="leaveList"></div>
+    </div>
   </div>
 
   <!-- ── USERS ── -->
@@ -2132,7 +2170,7 @@ function setMinDates() {
 // ══════════════════════════════════════════════════════
 // NAVIGATION
 // ══════════════════════════════════════════════════════
-const pageTitles = {dashboard:'Dashboard',alltasks:'All Tasks',approvals:'Approvals',users:'Users',profile:'Profile',mis:'MIS Report',fms:'FMS Admin','fms-tasks':'FMS Tasks',records:'Employee Records'};
+const pageTitles = {dashboard:'Dashboard',alltasks:'All Tasks',approvals:'Approvals',users:'Users',profile:'Profile',mis:'MIS Report',fms:'FMS Admin','fms-tasks':'FMS Tasks',records:'Employee Records',leave:'Leave'};
 
 function navigate(page, el) {
   window._currentPage = page;
@@ -2151,6 +2189,7 @@ function navigate(page, el) {
   if (page==='approvals') loadApprovals();
   if (page==='fms') loadFMSAdmin();
   if (page==='fms-tasks') loadFMSTasks();
+  if (page==='leave') loadLeaves();
   if (page==='mis') initMISDeptFilter();
   if (page==='records') loadRecords();
   window.scrollTo(0,0);
@@ -3765,6 +3804,75 @@ async function deleteUser(id) {
   const r=await api(`/api/users/${id}`,'DELETE');
   if (r.error) return alert(r.error);
   loadUsers();
+}
+
+// ══════════════════════════════════════════════════════
+// LEAVE
+// ══════════════════════════════════════════════════════
+async function loadLeaves() {
+  const isAdminOrPC = ME.role === 'admin' || ME.role === 'pc';
+  document.getElementById('leaveListTitle').textContent = isAdminOrPC ? 'All Leave Requests' : 'My Leave Requests';
+  const list = document.getElementById('leaveList');
+  list.innerHTML = '<div style="padding:20px;text-align:center;color:#94a3b8;font-size:13px">⏳ Loading...</div>';
+  const leaves = await api('/api/leaves');
+  if (leaves && leaves.error) {
+    list.innerHTML = `<div style="padding:20px;color:#ef4444;font-size:13px">⚠️ ${leaves.error}</div>`;
+    return;
+  }
+  if (!leaves || !leaves.length) {
+    list.innerHTML = '<div style="padding:24px;text-align:center;color:#94a3b8;font-size:13px">Koi leave request nahi hai</div>';
+    return;
+  }
+  const badge = s => s === 'approved' ? '<span class="status-badge completed">Approved</span>'
+    : s === 'rejected' ? '<span class="status-badge pending">Rejected</span>'
+    : '<span class="status-badge revised">Pending</span>';
+  list.innerHTML = `
+    <div class="flat-tasks-table" style="border:none;border-radius:0">
+      <table>
+        <thead><tr>
+          ${isAdminOrPC ? '<th>Employee</th>' : ''}<th>From</th><th>To</th><th>Reason</th><th>Status</th><th>Note</th>${isAdminOrPC ? '<th>Action</th>' : ''}
+        </tr></thead>
+        <tbody>
+          ${leaves.map(l => `<tr>
+            ${isAdminOrPC ? `<td style="font-weight:600">${l.userName || '—'}</td>` : ''}
+            <td style="white-space:nowrap">${fmtDate(l.from_date) || '—'}</td>
+            <td style="white-space:nowrap">${fmtDate(l.to_date) || '—'}</td>
+            <td>${l.reason || '—'}</td>
+            <td>${badge(l.status)}</td>
+            <td style="color:#64748b;font-size:12px">${l.note || '—'}</td>
+            ${isAdminOrPC ? `<td style="white-space:nowrap">${l.status === 'pending'
+              ? `<button class="action-btn done" onclick="handleLeave(${l.id},'approved')">Approve</button>
+                 <button class="action-btn delete" style="margin-left:6px" onclick="handleLeave(${l.id},'rejected')">Reject</button>`
+              : '—'}</td>` : ''}
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+async function applyLeave() {
+  const err = document.getElementById('leaveErr');
+  err.style.display = 'none';
+  const from = document.getElementById('lvFrom').value;
+  const to = document.getElementById('lvTo').value;
+  const reason = document.getElementById('lvReason').value.trim();
+  if (!from || !to) { err.textContent = 'From aur To dates dono select karo'; err.style.display = 'block'; return; }
+  if (to < from) { err.textContent = 'To date From date se pehle nahi ho sakti'; err.style.display = 'block'; return; }
+  const r = await api('/api/leaves', 'POST', { from_date: from, to_date: to, reason });
+  if (r && r.error) { err.textContent = r.error; err.style.display = 'block'; return; }
+  document.getElementById('lvFrom').value = '';
+  document.getElementById('lvTo').value = '';
+  document.getElementById('lvReason').value = '';
+  showToast('🌴 Leave request bhej di gayi!');
+  loadLeaves();
+}
+
+async function handleLeave(id, action) {
+  const note = action === 'rejected' ? (prompt('Reject karne ka reason (optional):') || '') : '';
+  const r = await api(`/api/leaves/${id}`, 'PUT', { action, note });
+  if (r && r.error) { showToast('Failed: ' + r.error, 'error'); return; }
+  showToast(action === 'approved' ? '✅ Leave approved!' : '❌ Leave rejected');
+  loadLeaves();
 }
 
 // ══════════════════════════════════════════════════════
