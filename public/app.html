@@ -759,9 +759,9 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       <div class="dash-topbar-btns" id="dashBtns"></div>
     </div>
     <div class="overview-cards">
-      <div class="ov-card pending" style="cursor:pointer" onclick="openDashStatusPopup('pending')" title="Doer select karke click karo — pending tasks ka popup"><div class="label">Pending</div><div class="number" id="dPending">—</div></div>
-      <div class="ov-card revised" style="cursor:pointer" onclick="openDashStatusPopup('revised')" title="Doer select karke click karo — revised tasks ka popup"><div class="label">Revised</div><div class="number" id="dRevised">—</div></div>
-      <div class="ov-card completed" style="cursor:pointer" onclick="openDashStatusPopup('completed')" title="Doer select karke click karo — completed tasks ka popup"><div class="label">Completed</div><div class="number" id="dCompleted">—</div></div>
+      <div class="ov-card pending" style="cursor:pointer" onclick="openDashStatusPopup('pending')" title="Select a doer first, then click to see their pending tasks"><div class="label">Pending</div><div class="number" id="dPending">—</div></div>
+      <div class="ov-card revised" style="cursor:pointer" onclick="openDashStatusPopup('revised')" title="Select a doer first, then click to see their revised tasks"><div class="label">Revised</div><div class="number" id="dRevised">—</div></div>
+      <div class="ov-card completed" style="cursor:pointer" onclick="openDashStatusPopup('completed')" title="Select a doer first, then click to see their completed tasks"><div class="label">Completed</div><div class="number" id="dCompleted">—</div></div>
     </div>
     <div class="dash-bottom">
       <div class="task-table-card">
@@ -937,7 +937,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       </div>
       <div class="form-group">
         <label>Reason</label>
-        <textarea id="lvReason" placeholder="Leave ka reason likho…" style="min-height:60px"></textarea>
+        <textarea id="lvReason" placeholder="Enter leave reason…" style="min-height:60px"></textarea>
       </div>
       <div style="text-align:right">
         <button class="btn btn-primary" onclick="applyLeave()">Apply Leave</button>
@@ -1182,15 +1182,15 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
           style="padding:8px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;outline:none;min-width:180px;"/></div>
       </div>
       <div style="font-size:12px;color:#94a3b8;margin-top:12px">
-        Har employee ke saamne uska <strong>committed plan</strong> + <strong>commit vs complete</strong> dikhta hai.
-        Numbers Admin, HOD aur PC sabko <strong>bilkul ek jaise</strong> dikhte hain. Kisi employee par click karke
-        uske <strong>pending tasks</strong> (Delegation + Checklist + FMS) dekho.
+        Each employee's <strong>committed plan</strong> + <strong>commit vs complete</strong> is shown here.
+        Numbers look <strong>exactly the same</strong> for Admin, HOD and PC. Click an employee to see
+        their <strong>pending tasks</strong> (Delegation + Checklist + FMS).
       </div>
     </div>
 
     <div id="recordsResults">
       <div class="empty" style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;">
-        Week select karke <strong>Generate</strong> dabayein
+        Select a week and click <strong>Generate</strong>
       </div>
     </div>
   </div>
@@ -1257,7 +1257,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
         <label>Approval Required?</label>
         <select id="dApproval" onchange="toggleApprover()">
           <option value="no">No — Direct Assign</option>
-          <option value="yes">Yes — Approve hone par hi doer ko dikhe</option>
+          <option value="yes">Yes — Visible to doer only after approval</option>
         </select>
       </div>
       <div class="form-group" id="dApproverWrap" style="display:none">
@@ -1464,7 +1464,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label>Header Row <span style="color:#94a3b8;font-weight:400;font-size:11px">(konsi row mein headers hain)</span></label>
+        <label>Header Row <span style="color:#94a3b8;font-weight:400;font-size:11px">(which row contains the headers)</span></label>
         <input type="number" id="fmsHeaderRow" value="1" min="1"/>
       </div>
       <div class="form-group">
@@ -1488,7 +1488,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     <h3 style="margin-bottom:12px">Share Your Sheet</h3>
     <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px;margin-bottom:20px;">
       <p style="font-size:14px;color:#374151;line-height:1.6">
-        Apni FMS Sheet ko is email par share karo taaki data sync ho sake:
+        Share your FMS Sheet with this email so the data can sync:
       </p>
       <div id="fmsShareEmail" style="margin-top:10px;font-size:15px;font-weight:700;color:#10b981;background:#ecfdf5;padding:10px;border-radius:8px;letter-spacing:.3px;word-break:break-all;">
       </div>
@@ -1538,11 +1538,11 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     <div class="form-group">
       <label>New Due Date</label>
       <input type="date" id="reviseDate"/>
-      <div style="font-size:12px;color:#64748b;margin-top:4px">Aaj se pehle ki date select nahi kar sakte</div>
+      <div style="font-size:12px;color:#64748b;margin-top:4px">Past dates cannot be selected</div>
     </div>
     <div class="form-group">
       <label>Reason for Revision</label>
-      <textarea id="reviseReason" placeholder="Revision ki wajah likho..." style="min-height:70px;width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;outline:none;resize:vertical"></textarea>
+      <textarea id="reviseReason" placeholder="Enter reason for revision..." style="min-height:70px;width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;outline:none;resize:vertical"></textarea>
     </div>
     <div class="modal-footer" style="justify-content:space-between">
       <button class="btn btn-outline" onclick="closeModal('reviseDateModal')">Cancel</button>
@@ -1665,7 +1665,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
         </select>
       </div>
       <div class="form-group">
-        <label>Week Off <span style="color:#94a3b8;font-weight:400;font-size:11px">(checklist skip hogi)</span></label>
+        <label>Week Off <span style="color:#94a3b8;font-weight:400;font-size:11px">(checklist will be skipped)</span></label>
         <div id="weekOffWrap" style="display:flex;flex-wrap:wrap;gap:6px;padding:8px;border:1.5px solid #e2e8f0;border-radius:8px;background:#fff;min-height:40px">
           <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:500;cursor:pointer;text-transform:none;letter-spacing:0"><input type="checkbox" class="woff-cb" value="0" style="accent-color:#10b981"/> Sun</label>
           <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:500;cursor:pointer;text-transform:none;letter-spacing:0"><input type="checkbox" class="woff-cb" value="1" style="accent-color:#10b981"/> Mon</label>
@@ -1752,7 +1752,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     <!-- STEP 1: From User (admin/HOD only) -->
     <div id="bdStep1" style="display:none">
       <div class="form-group">
-        <label>Select Doer (kiske tasks delete karni hain)</label>
+        <label>Select Doer (whose tasks to delete)</label>
         <select id="bdFromUser" onchange="onBdFromChange()"
           style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;outline:none;background:#fff">
           <option value="">-- Select user --</option>
@@ -1777,7 +1777,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       <div id="bdTasksList" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;max-height:260px;overflow-y:auto;margin-bottom:14px"></div>
 
       <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:8px 12px;font-size:12px;color:#dc2626;margin-bottom:12px">
-        ⚠️ Delete permanent hai — wapas nahi aayega!
+        ⚠️ Delete is permanent — it cannot be undone!
       </div>
 
       <div style="display:flex;gap:8px;justify-content:flex-end">
@@ -1791,7 +1791,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     <div id="bdYearSection" style="display:none;margin-top:18px;border-top:1.5px dashed #fecaca;padding-top:16px">
       <div style="font-size:13px;font-weight:700;color:#dc2626;margin-bottom:10px">🗓 Delete Checklist Tasks (Bulk)</div>
       <div style="font-size:11px;color:#64748b;margin-bottom:10px;line-height:1.5">
-        ℹ️ Pehle frequency category select karo (daily/weekly/monthly), fhir employee. Sirf <b>pending</b> aur <b>revised</b> tasks delete hongi — completed tasks safe rahengi.
+        ℹ️ First select a frequency category (daily/weekly/monthly), then an employee. Only <b>pending</b> and <b>revised</b> tasks will be deleted — completed tasks stay safe.
       </div>
       <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
         <div style="min-width:160px">
@@ -1832,7 +1832,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     <!-- STEP 1: From User (admin/HOD only) -->
     <div id="transferStep1" style="display:none">
       <div class="form-group">
-        <label id="transferFromLabel">Select Doer (kiske tasks transfer karni hain)</label>
+        <label id="transferFromLabel">Select Doer (whose tasks to transfer)</label>
         <select id="transferFromUser" onchange="onTransferFromChange()"
           style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;outline:none;background:#fff">
           <option value="">-- Select user --</option>
@@ -1866,7 +1866,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       </div>
 
       <div style="background:#faf5ff;border:1px solid #c4b5fd;border-radius:8px;padding:8px 12px;font-size:12px;color:#059669;margin-bottom:12px">
-        ℹ️ Approve hone ke baad task transfer hoga
+        ℹ️ Task will be transferred after approval
       </div>
 
       <div style="display:flex;gap:8px;justify-content:flex-end">
@@ -1902,10 +1902,10 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     <div class="form-group">
       <label style="display:flex;align-items:center;gap:6px">
         Improvement Target (%)
-        <span style="font-size:11px;color:#94a3b8;font-weight:400">— optional, meeting mein set kiya goal</span>
+        <span style="font-size:11px;color:#94a3b8;font-weight:400">— optional, goal set in the meeting</span>
       </label>
       <div style="position:relative">
-        <input type="number" id="planImprovementPct" min="-100" max="100" placeholder="e.g. -30 (matlab -30% tak lana hai)"
+        <input type="number" id="planImprovementPct" min="-100" max="100" placeholder="e.g. -30 (means reduce by 30%)"
           style="width:100%;padding:9px 12px 9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;outline:none;box-sizing:border-box"/>
       </div>
       <div id="planPctPreview" style="margin-top:6px;font-size:12px;color:#64748b;min-height:18px"></div>
@@ -1994,7 +1994,7 @@ function renderDbmTable() {
   if (!filtered.length) {
     document.getElementById('dbmContent').innerHTML =
       `<div class="empty" style="padding:30px;text-align:center;color:#94a3b8">
-        ${_dbmStatusFilter === 'pending' ? 'Aapne abhi koi pending task delegate nahi kiya hai' : 'Aapne delegate kiye task me se koi completed nahi hai'}
+        ${_dbmStatusFilter === 'pending' ? 'You have not delegated any pending tasks yet' : 'None of the tasks you delegated are completed yet'}
       </div>`;
     return;
   }
@@ -2339,13 +2339,13 @@ async function refreshPCEmployeeDropdown() {
 
 // Admin: send WhatsApp reminders now to everyone with pending delegation/checklist tasks
 async function sendWaReminders(btn) {
-  if (!confirm('Sabhi PENDING tasks (delegation + checklist) wale users ko abhi WhatsApp reminder bhejein?')) return;
+  if (!confirm('Send WhatsApp reminders now to all users with PENDING tasks (delegation + checklist)?')) return;
   const old = btn ? btn.textContent : '';
-  if (btn) { btn.disabled = true; btn.textContent = 'Bhej rahe hain…'; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
   const r = await api('/api/admin/run-wa-reminders', 'POST');
   if (btn) { btn.disabled = false; btn.textContent = old; }
   if (r && r.error) { showToast('Failed: ' + r.error, 'error'); return; }
-  showToast('✅ Reminders bhejna shuru — sabhi pending users ko background me WhatsApp jaa raha hai (thoda time lega).', 'success');
+  showToast('✅ Reminders started — WhatsApp is being sent to all pending users in the background (this may take a while).', 'success');
 }
 
 // ── Checklist notification bell (per-user, tasks due within 2 days) ──
@@ -2379,7 +2379,7 @@ function renderFMSNotifDropdown() {
       <div style="font-size:13px;color:#1e293b;font-weight:600;">STEP ${s.step_order} — ${s.step_name}</div>
       <div style="font-size:11px;color:#dc2626;margin-top:3px;font-weight:700;">⏳ ${states[s.id].rows.length} pending row(s)</div>
     </div>`).join('')
-    : `<div style="padding:18px 14px;text-align:center;color:#94a3b8;font-size:13px;">${Object.keys(states).length ? 'Koi FMS pending nahi 🎉' : 'Pehle FMS select karo'}</div>`;
+    : `<div style="padding:18px 14px;text-align:center;color:#94a3b8;font-size:13px;">${Object.keys(states).length ? 'No pending FMS tasks 🎉' : 'Select an FMS first'}</div>`;
 }
 document.addEventListener('click', function(e) {
   const wrap = document.getElementById('notifBellWrap');
@@ -2430,7 +2430,7 @@ async function openDashStatusPopup(status) {
   const empFilter = document.getElementById('dashEmployeeFilter');
   const empVal = empFilter ? empFilter.value : 'all';
   if (!empVal || empVal === 'all') {
-    showToast('Pehle doer ka naam select karo, phir card par click karo', 'error');
+    showToast('Select a doer first, then click the card', 'error');
     return;
   }
   const empName = empFilter.selectedOptions[0]?.textContent || 'Doer';
@@ -2456,7 +2456,7 @@ async function openDashStatusPopup(status) {
         <div style="font-size:11px;color:#64748b;margin-top:2px">Due: ${fmtDate(t.due_date || '') || '—'} &nbsp;•&nbsp; Priority: ${t.priority || 'low'}${t.remarks ? ` &nbsp;•&nbsp; ${t.remarks}` : ''}</div>
       </div>
     </div>`).join('')
-    : `<div style="padding:24px;text-align:center;color:#94a3b8;font-size:13px">${empName} ka koi ${labels[status] || status} task nahi hai 🎉</div>`;
+    : `<div style="padding:24px;text-align:center;color:#94a3b8;font-size:13px">${empName} has no ${labels[status] || status} tasks 🎉</div>`;
 }
 
 function onDashSearch() {
@@ -2893,7 +2893,7 @@ function renderTasksTable() {
       ${!isCompleted && !isClosed && !isWaiting ? `<button class="action-btn done" style="margin-left:3px" onclick="updateStatus(${t.id},'completed','alltasks','${tasksType}')">Done</button>` : ''}
       ${!isChecklist && !isCompleted && !isClosed && !isWaiting ? `<button class="action-btn revise" style="margin-left:3px" onclick="openReviseModal(${t.id},'${tasksType}')">Revise</button>` : ''}
       ${isCompleted || isClosed ? `<button class="action-btn" style="background:#fef3c7;color:#92400e;margin-left:3px" onclick="reopenTask(${t.id},'${tasksType}')" title="Reopen — mark as pending again">↺ Reopen</button>` : ''}
-      ${isCompleted ? `<button class="action-btn" style="background:#e0e7ff;color:#3730a3;margin-left:3px" onclick="closeTask(${t.id},'${tasksType}')" title="Close — task Closed Tasks tab me chala jayega">🔒 Close</button>` : ''}
+      ${isCompleted ? `<button class="action-btn" style="background:#e0e7ff;color:#3730a3;margin-left:3px" onclick="closeTask(${t.id},'${tasksType}')" title="Close — task will move to the Closed Tasks tab">🔒 Close</button>` : ''}
       ${isWaiting ? `<span style="font-size:11px;color:#f59e0b;font-weight:600;margin-left:4px">⏳ Waiting</span>` : ''}
     ` : (ME.role==='pc') ? `
       <button class="action-btn" style="background:#ecfdf5;color:#1d4ed8;padding:4px 7px" onclick="openComments(${t.id},'${tasksType}')" title="Comments">💬</button>
@@ -2995,12 +2995,12 @@ async function updateStatus(id, status, from, type) {
 }
 
 async function reopenTask(id, type) {
-  if (!confirm('Is task ko wapas Pending kar dein?')) return;
+  if (!confirm('Reopen this task as Pending?')) return;
   await updateStatus(id, 'pending', 'alltasks', type);
 }
 
 async function closeTask(id, type) {
-  if (!confirm('Is task ko close karna chahte ho? Ye "Closed Tasks" tab me chala jayega.')) return;
+  if (!confirm('Close this task? It will move to the "Closed Tasks" tab.')) return;
   await updateStatus(id, 'closed', 'alltasks', type);
 }
 
@@ -3214,7 +3214,7 @@ async function saveDelegate() {
   if (approval==='yes' && !approverId) { err.textContent='Please select an approver'; err.style.display='block'; return; }
   await api('/api/tasks','POST',{type:'delegation',desc,assignedTo:doer,date,priority,approval,approverId,remarks});
   closeModal('delegateModal');
-  showToast(approval==='yes' ? '✅ Task approval ke liye bheja gaya — approve hote hi doer ko dikhega!' : 'Task delegated successfully!');
+  showToast(approval==='yes' ? '✅ Task sent for approval — the doer will see it once approved!' : 'Task delegated successfully!');
   loadDashboard();
   loadApprovalBadge();
 }
@@ -3820,7 +3820,7 @@ async function loadLeaves() {
     return;
   }
   if (!leaves || !leaves.length) {
-    list.innerHTML = '<div style="padding:24px;text-align:center;color:#94a3b8;font-size:13px">Koi leave request nahi hai</div>';
+    list.innerHTML = '<div style="padding:24px;text-align:center;color:#94a3b8;font-size:13px">No leave requests yet</div>';
     return;
   }
   const badge = s => s === 'approved' ? '<span class="status-badge completed">Approved</span>'
@@ -3856,19 +3856,19 @@ async function applyLeave() {
   const from = document.getElementById('lvFrom').value;
   const to = document.getElementById('lvTo').value;
   const reason = document.getElementById('lvReason').value.trim();
-  if (!from || !to) { err.textContent = 'From aur To dates dono select karo'; err.style.display = 'block'; return; }
-  if (to < from) { err.textContent = 'To date From date se pehle nahi ho sakti'; err.style.display = 'block'; return; }
+  if (!from || !to) { err.textContent = 'Please select both From and To dates'; err.style.display = 'block'; return; }
+  if (to < from) { err.textContent = 'To date cannot be before From date'; err.style.display = 'block'; return; }
   const r = await api('/api/leaves', 'POST', { from_date: from, to_date: to, reason });
   if (r && r.error) { err.textContent = r.error; err.style.display = 'block'; return; }
   document.getElementById('lvFrom').value = '';
   document.getElementById('lvTo').value = '';
   document.getElementById('lvReason').value = '';
-  showToast('🌴 Leave request bhej di gayi!');
+  showToast('🌴 Leave request submitted!');
   loadLeaves();
 }
 
 async function handleLeave(id, action) {
-  const note = action === 'rejected' ? (prompt('Reject karne ka reason (optional):') || '') : '';
+  const note = action === 'rejected' ? (prompt('Reason for rejection (optional):') || '') : '';
   const r = await api(`/api/leaves/${id}`, 'PUT', { action, note });
   if (r && r.error) { showToast('Failed: ' + r.error, 'error'); return; }
   showToast(action === 'approved' ? '✅ Leave approved!' : '❌ Leave rejected');
@@ -3931,7 +3931,7 @@ async function _apiFetch(url, method, body, _retries) {
     r = await fetch(url, opts);
   } catch(e) {
     console.error('API fetch failed:', url, e);
-    return { error: 'Network error — server se connect nahi ho saka' };
+    return { error: 'Network error — could not connect to the server' };
   }
   if (r.status===401) {
     localStorage.removeItem('authToken');
@@ -3940,7 +3940,7 @@ async function _apiFetch(url, method, body, _retries) {
   }
   // 503 = server cold-starting, auto-retry up to 2 times with 3s delay
   if (r.status===503 && _retries>0) {
-    showToast('Server start ho raha hai, retry ho rahi hai...','warning');
+    showToast('Server is starting, retrying...','warning');
     await new Promise(res=>setTimeout(res,3000));
     return _apiFetch(url,method,body,_retries-1);
   }
@@ -3951,8 +3951,8 @@ async function _apiFetch(url, method, body, _retries) {
     return data;
   } catch(e) {
     console.error('API error:', url, r.status, e);
-    if (r.status === 503) return { error: 'Server abhi available nahi hai (503) — thodi der baad try karein' };
-    if (r.status === 502) return { error: 'Server se connection nahi mila (502) — check karein server chal raha hai' };
+    if (r.status === 503) return { error: 'Server temporarily unavailable (503) — please try again in a moment' };
+    if (r.status === 502) return { error: 'Could not connect to server (502) — please check the server is running' };
     return { error: `HTTP ${r.status}` };
   }
 }
@@ -4202,7 +4202,7 @@ async function generateMIS() {
       populateMISDeptDropdown(misAllData);
       renderAllMIS(misAllData, []);
       if (fmsErrors.length) {
-        showToast(`⚠️ ${fmsErrors.length} FMS sheet abhi load nahi hui — dobara Generate karein`, 'error');
+        showToast(`⚠️ ${fmsErrors.length} FMS sheet(s) failed to load — please click Generate again`, 'error');
       }
 
       // ── Step 2: FMS Overview ko background me append karo ──
@@ -4211,13 +4211,13 @@ async function generateMIS() {
         const placeholder = document.createElement('div');
         placeholder.id = 'fmsOverviewLoading';
         placeholder.style.cssText = 'margin-top:18px;padding:14px;text-align:center;color:#64748b;font-size:12px;background:#fff;border:1px dashed #cbd5e1;border-radius:10px';
-        placeholder.innerHTML = '⏳ Loading FMS Overview… (Google Sheets se data aa raha hai)';
+        placeholder.innerHTML = '⏳ Loading FMS Overview… (fetching data from Google Sheets)';
         container.appendChild(placeholder);
 
         api(`/api/mis/fms?start=${start}&end=${end}`).then(fmsData => {
           const ph = document.getElementById('fmsOverviewLoading');
           if (fmsData && fmsData.error) {
-            if (ph) ph.innerHTML = `⚠️ FMS Overview load nahi ho saka: ${fmsData.error}`;
+            if (ph) ph.innerHTML = `⚠️ FMS Overview could not load: ${fmsData.error}`;
             return;
           }
           misFMSData = Array.isArray(fmsData) ? fmsData : [];
@@ -4225,7 +4225,7 @@ async function generateMIS() {
           renderAllMIS(misAllData, misFMSData);
         }).catch(e => {
           const ph = document.getElementById('fmsOverviewLoading');
-          if (ph) ph.innerHTML = `⚠️ FMS Overview load nahi ho saka: ${e.message || 'unknown error'}`;
+          if (ph) ph.innerHTML = `⚠️ FMS Overview could not load: ${e.message || 'unknown error'}`;
         });
       }
     } catch (e) {
@@ -4727,7 +4727,7 @@ function loadRecords() {
 async function generateRecords() {
   const start = document.getElementById('recStart').value;
   const end   = document.getElementById('recEnd').value;
-  if (!start || !end) { showToast('Week select karein', 'error'); return; }
+  if (!start || !end) { showToast('Please select a week', 'error'); return; }
   const container = document.getElementById('recordsResults');
   container.innerHTML = `<div class="empty" style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;">⏳ Loading records…</div>`;
 
@@ -4753,7 +4753,7 @@ async function generateRecords() {
 function renderRecords(fmsErrors) {
   const container = document.getElementById('recordsResults');
   if (!recordsData.length) {
-    container.innerHTML = `<div class="empty" style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;">Is week ke liye koi record nahi mila.</div>`;
+    container.innerHTML = `<div class="empty" style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;">No records found for this week.</div>`;
     return;
   }
   const dept = (ME.role === 'admin') ? (document.getElementById('recDeptFilter').value || '') : '';
@@ -4764,13 +4764,13 @@ function renderRecords(fmsErrors) {
   if (q)    rows = rows.filter(r => r.name.toLowerCase().includes(q));
 
   if (!rows.length) {
-    container.innerHTML = `<div class="empty" style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;">Filter ke hisaab se koi employee nahi mila.</div>`;
+    container.innerHTML = `<div class="empty" style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;">No employees match the filter.</div>`;
     return;
   }
 
   const fmsWarn = (Array.isArray(fmsErrors) && fmsErrors.length)
     ? `<div style="background:#fffbeb;border:1px solid #fde68a;color:#b45309;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:12px">
-         ⚠️ Kuch FMS sheets abhi read nahi ho payi (${fmsErrors.join(', ')}). FMS counts thode kam ho sakte hain — refresh karke dobara try karein.
+         ⚠️ Some FMS sheets could not be read (${fmsErrors.join(', ')}). FMS counts may be slightly low — please refresh and try again.
        </div>` : '';
 
   const tableRows = rows.map(r => {
@@ -4889,7 +4889,7 @@ async function openRecordDetail(userId) {
     </div>
 
     <div style="font-size:13px;font-weight:700;color:#1e293b;margin-top:16px">⏳ Pending Tasks (${r.pending})</div>
-    ${r.pending === 0 ? '<div class="empty" style="font-size:12px;margin-top:8px">🎉 Koi pending task nahi — sab complete!</div>' : ''}
+    ${r.pending === 0 ? '<div class="empty" style="font-size:12px;margin-top:8px">🎉 No pending tasks — all complete!</div>' : ''}
     ${section('📋 Delegation', '#1d4ed8', b.delegation.pending, delRows)}
     ${section('✅ Checklist', '#16a34a', b.checklist.pending, chlRows)}
     ${section('📊 FMS', '#059669', b.fms.pending, fmsRows)}`;
@@ -5063,7 +5063,7 @@ async function deleteFMSSheet(id) {
 
 // ── Edit FMS ──
 async function openEditFMS() {
-  if (!fmsActiveId) { showToast('Pehle koi FMS select karo', 'error'); return; }
+  if (!fmsActiveId) { showToast('Select an FMS first', 'error'); return; }
 
   // Open modal immediately with loading state
   document.getElementById('fmsEditModal').classList.add('open');
@@ -5131,9 +5131,9 @@ async function openEditFMS() {
       });
       fmsSheetHeaders = (hRes && hRes.headers) ? hRes.headers : [];
       if (fmsSheetHeaders.length) showToast(`✅ ${fmsSheetHeaders.length} columns loaded`);
-      else showToast('⚠️ No headers found — text input mode mein khulega', 'error');
+      else showToast('⚠️ No headers found — will open in text input mode', 'error');
     } catch(e) {
-      showToast('⚠️ Headers load failed — text input mode mein khulega', 'error');
+      showToast('⚠️ Headers load failed — will open in text input mode', 'error');
     }
 
     // Render step boxes
@@ -5496,7 +5496,7 @@ function buildStepBoxHTML(idx) {
               style="accent-color:#10b981;width:12px;height:12px"/>
             ${h.name}
           </label>`).join('')}
-      </div>` : '<span style="color:#94a3b8;font-size:12px">Headers load hone ke baad dikhega</span>'}
+      </div>` : '<span style="color:#94a3b8;font-size:12px">Will appear after headers load</span>'}
     </div>
 
     <!-- Delay Reason Column -->
@@ -5513,7 +5513,7 @@ function buildStepBoxHTML(idx) {
     </div>
 
     <div class="form-group" style="margin:10px 0 0">
-      <label>Doer Name Column <span style="color:#94a3b8;font-weight:400;font-size:11px">(jahan done karne wale ka naam auto-save ho)</span></label>
+      <label>Doer Name Column <span style="color:#94a3b8;font-weight:400;font-size:11px">(where the doer's name is auto-saved)</span></label>
       ${headers.length ? `
       <select class="header-select" onchange="fmsSteps[${idx}].doerNameCol=this.value">
         <option value="">-- None (don't save doer name) --</option>
@@ -5736,7 +5736,7 @@ function toggleFMSDeleteMode() {
 
 function confirmFMSDelete() {
   const checked = [...document.querySelectorAll('.fms-del-check:checked')].map(c=>parseInt(c.dataset.idx));
-  if (!checked.length) { showToast('Koi step select nahi ki','error'); return; }
+  if (!checked.length) { showToast('No step selected','error'); return; }
   checked.sort((a,b)=>b-a).forEach(idx=>fmsSteps.splice(idx,1));
   fmsDeleteMode=false;
   const btn = document.getElementById('editFmsDeleteModeBtn');
@@ -5759,7 +5759,7 @@ function toggleFMSDupMode() {
 
 function confirmFMSDup() {
   const checked = [...document.querySelectorAll('.fms-dup-check:checked')].map(c=>parseInt(c.dataset.idx));
-  if (!checked.length) { showToast('Koi step select nahi ki','error'); return; }
+  if (!checked.length) { showToast('No step selected','error'); return; }
   // Deep copy selected steps and add at end
   checked.forEach(idx => {
     const orig = fmsSteps[idx];
@@ -5788,7 +5788,7 @@ function toggleFMSDeleteModeAdd() {
 
 function confirmFMSDeleteAdd() {
   const checked = [...document.querySelectorAll('.fms-del-check:checked')].map(c=>parseInt(c.dataset.idx));
-  if (!checked.length) { showToast('Koi step select nahi ki','error'); return; }
+  if (!checked.length) { showToast('No step selected','error'); return; }
   checked.sort((a,b)=>b-a).forEach(idx=>fmsSteps.splice(idx,1));
   fmsDeleteMode=false;
   const btn = document.getElementById('fmsAddDeleteModeBtn');
@@ -5856,7 +5856,7 @@ async function saveFMS() {
     });
   });
 
-  if (fmsSteps.some(s=>!s.stepName)) { showToast('Saari steps ka naam dalo','error'); return; }
+  if (fmsSteps.some(s=>!s.stepName)) { showToast('Please enter a name for every step','error'); return; }
 
   const body = {
     fmsName: fmsData.fmsName || fmsData.sheetName,
@@ -6009,7 +6009,7 @@ function showFMSNotifPopups() {
   if (pend.length > show.length) {
     const more = document.createElement('div');
     more.className = 'fms-notif-card';
-    more.innerHTML = `<div style="font-size:13px;color:#64748b;font-weight:600">…aur ${pend.length - show.length} step(s) me pending tasks hain</div>`;
+    more.innerHTML = `<div style="font-size:13px;color:#64748b;font-weight:600">…and ${pend.length - show.length} more step(s) have pending tasks</div>`;
     stack.appendChild(more);
     setTimeout(() => { more.classList.add('out'); setTimeout(() => more.remove(), 350); }, 12500);
   }
@@ -6044,7 +6044,7 @@ function renderFMSStepTable(stepId) {
   const st = (window._fmsStepStates || {})[stepId];
   if (!cont || !st) return;
   if (!st.rows.length) {
-    cont.innerHTML = `<div style="padding:16px;text-align:center;color:#22c55e;font-size:13px;font-weight:600">✅ No pending rows — sab complete!</div>`;
+    cont.innerHTML = `<div style="padding:16px;text-align:center;color:#22c55e;font-size:13px;font-weight:600">✅ No pending rows — all complete!</div>`;
     return;
   }
   cont.innerHTML = `
@@ -6169,7 +6169,7 @@ async function saveFMSDone() {
     const val = el ? el.value.trim() : '';
     if (!val) {
       const label = r.label || r.row_label || r.col_letter || `Field ${i+1}`;
-      errEl.textContent = `"${label}" field bharna zaroori hai!`;
+      errEl.textContent = `"${label}" field is required!`;
       errEl.style.display = 'block';
       saveBtn.textContent = '💾 Save to Sheet';
       saveBtn.disabled = false;
@@ -6327,11 +6327,11 @@ async function _doBulkDelete(tasks) {
   // v16: extra safety — completed tasks ko bulk delete me never include
   tasks = tasks.filter(t => t.status !== 'completed');
   if (!tasks.length) {
-    document.getElementById('bulkDeleteErr').textContent = 'Koi pending task select nahi hui (completed tasks bulk delete me allow nahi hain)';
+    document.getElementById('bulkDeleteErr').textContent = 'No pending tasks selected (completed tasks cannot be bulk deleted)';
     document.getElementById('bulkDeleteErr').style.display = 'block';
     return;
   }
-  if (!confirm(`${tasks.length} task(s) permanently delete karna chahte ho?`)) return;
+  if (!confirm(`Permanently delete ${tasks.length} task(s)?`)) return;
 
   let deleted = 0, skipped = 0;
   for (const t of tasks) {
@@ -6376,11 +6376,11 @@ function onBdYearUserChange() {
 async function openDelete12MonthsConfirm() {
   const freqSel = document.getElementById('bdYearFreq');
   const freq = freqSel.value;
-  if (!freq) { alert('Pehle frequency category select karo (daily / weekly / monthly etc.)!'); freqSel.focus(); return; }
+  if (!freq) { alert('Select a frequency category first (daily / weekly / monthly etc.)!'); freqSel.focus(); return; }
 
   const sel = document.getElementById('bdYearUser');
   const userId = sel.value;
-  if (!userId) { alert('Phir employee select karo!'); return; }
+  if (!userId) { alert('Now select an employee!'); return; }
 
   const userName = sel.options[sel.selectedIndex].text;
   const userEmail = sel.options[sel.selectedIndex]?.dataset?.email || '';
@@ -6392,7 +6392,7 @@ async function openDelete12MonthsConfirm() {
 
   const count = data.count || 0;
   if (count === 0) {
-    alert(`${userName} ke liye is category (${freqLabel}) me koi deletable checklist task nahi mili.\n\nNote: Completed tasks bulk delete me kabhi include nahi hote — wo safe hain.`);
+    alert(`No deletable checklist tasks found for ${userName} in this category (${freqLabel}).\n\nNote: Completed tasks are never included in bulk delete — they are safe.`);
     return;
   }
 
@@ -6402,9 +6402,9 @@ async function openDelete12MonthsConfirm() {
     `Email: ${userEmail}\n` +
     `Category: ${freqLabel}\n\n` +
     `Pending/Revised Tasks to Delete: ${count}\n` +
-    `(Completed tasks SAFE — wo delete nahi hongi)\n\n` +
-    `Ye ${count} tasks permanently delete ho jaayengi — wapas nahi aayengi!\n\n` +
-    `Proceed karna hai?`
+    `(Completed tasks are SAFE — they will not be deleted)\n\n` +
+    `These ${count} tasks will be permanently deleted — this cannot be undone!\n\n` +
+    `Proceed?`
   );
   if (!confirmed) return;
 
@@ -6523,8 +6523,8 @@ async function _doTransfer(tasks) {
   const err = document.getElementById('transferErr');
   err.style.display = 'none';
   const toUserId = document.getElementById('transferToUser').value;
-  if (!toUserId) { err.textContent='Pehle "Transfer To" user select karo'; err.style.display='block'; return; }
-  if (!tasks.length) { err.textContent='Koi task select nahi hui'; err.style.display='block'; return; }
+  if (!toUserId) { err.textContent='Select a "Transfer To" user first'; err.style.display='block'; return; }
+  if (!tasks.length) { err.textContent='No tasks selected'; err.style.display='block'; return; }
   const r = await api('/api/transfers','POST',{
     tasks: tasks.map(t => ({ taskId: t.id, taskType: t.taskType })),
     toUserId: parseInt(toUserId)
@@ -6532,7 +6532,7 @@ async function _doTransfer(tasks) {
   if (r.error) { err.textContent = r.error; err.style.display='block'; return; }
   closeModal('transferModal');
   if (r.count > 0) showToast(`✅ ${r.count} transfer request(s) sent for approval!`);
-  else showToast('⚠️ Sab tasks ki request pehle se pending hai!', 'error');
+  else showToast('⚠️ All selected tasks already have a pending request!', 'error');
   loadTransferBadge();
 }
 
