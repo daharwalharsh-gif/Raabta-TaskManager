@@ -946,6 +946,8 @@ function whatsAppReminderScheduler() {
       // Compute time in IST (UTC+5:30) so it fires at the right clock time
       // regardless of the server's timezone.
       const ist = new Date(Date.now() + 330 * 60000);
+      // Monday (IST) ko reminder nahi jaata — baaki saare din normal
+      if (ist.getUTCDay() === 1) return;
       const todayStr = ist.toISOString().split('T')[0];
       if (todayStr !== _waReminderDay) { _waReminderDay = todayStr; _waFiredSlots.clear(); }
       const nowMin = ist.getUTCHours() * 60 + ist.getUTCMinutes();
@@ -960,7 +962,7 @@ function whatsAppReminderScheduler() {
       }
     } catch (e) { console.error('  WA scheduler tick error:', e.message); }
   }, 60 * 1000);
-  console.log(`  WhatsApp reminder scheduler started (fires daily at ${label} IST)`);
+  console.log(`  WhatsApp reminder scheduler started (fires daily at ${label} IST, Monday skip)`);
 }
 
 // ══════════════════════════════════════════════════════
@@ -1719,7 +1721,8 @@ app.get('/api/mis', requireAuth, requireAdminOrHod, async (req, res) => {
         if (!result[uid]) result[uid] = { userId: parseInt(uid), name: u.name, total: 0, pending: 0, completed: 0, revised: 0, overdue: 0 };
         result[uid].total++;
         if (t.status === 'pending') { result[uid].pending++; if (t.due_date < todayStr) result[uid].overdue++; }
-        if (t.status === 'completed') result[uid].completed++;
+        // 'closed' = complete hone ke baad band kiya gaya task — MIS me completed jaisa count hota hai
+        if (t.status === 'completed' || t.status === 'closed') result[uid].completed++;
         if (type === 'delegation' && t.status === 'revised') result[uid].revised++;
       }
       return Object.values(result).map(r => ({

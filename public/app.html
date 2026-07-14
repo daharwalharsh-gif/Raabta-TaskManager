@@ -179,6 +179,7 @@ tbody tr:last-child td{border-bottom:none;}
 .status-badge.pending{background:#fef2f2;color:#dc2626;}
 .status-badge.completed{background:#f0fdf4;color:#16a34a;}
 .status-badge.revised{background:#fffbeb;color:#d97706;}
+.status-badge.closed{background:#e0e7ff;color:#3730a3;}
 
 .chart-card{background:#fff;border-radius:16px;border:none;padding:18px;box-shadow:0 4px 20px rgba(0,0,0,0.07);}
 .chart-card h3{font-size:14px;font-weight:700;margin-bottom:14px;}
@@ -754,9 +755,9 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       <div class="dash-topbar-btns" id="dashBtns"></div>
     </div>
     <div class="overview-cards">
-      <div class="ov-card pending"><div class="label">Pending</div><div class="number" id="dPending">—</div></div>
-      <div class="ov-card revised"><div class="label">Revised</div><div class="number" id="dRevised">—</div></div>
-      <div class="ov-card completed"><div class="label">Completed</div><div class="number" id="dCompleted">—</div></div>
+      <div class="ov-card pending" style="cursor:pointer" onclick="openDashStatusPopup('pending')" title="Doer select karke click karo — pending tasks ka popup"><div class="label">Pending</div><div class="number" id="dPending">—</div></div>
+      <div class="ov-card revised" style="cursor:pointer" onclick="openDashStatusPopup('revised')" title="Doer select karke click karo — revised tasks ka popup"><div class="label">Revised</div><div class="number" id="dRevised">—</div></div>
+      <div class="ov-card completed" style="cursor:pointer" onclick="openDashStatusPopup('completed')" title="Doer select karke click karo — completed tasks ka popup"><div class="label">Completed</div><div class="number" id="dCompleted">—</div></div>
     </div>
     <div class="dash-bottom">
       <div class="task-table-card">
@@ -906,6 +907,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       <div class="tab-group">
         <div class="tab active" id="statusTabPending" onclick="filterTaskStatus('pending',this)">Pending</div>
         <div class="tab" id="statusTabCompleted" onclick="filterTaskStatus('completed',this)">Completed</div>
+        <div class="tab" id="statusTabClosed" onclick="filterTaskStatus('closed',this)">Closed Tasks</div>
       </div>
     </div>
     <div id="tasksContent"></div>
@@ -1172,6 +1174,17 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
 
 <!-- Phone-style FMS popup notifications (fms-tasks tab) -->
 <div id="fmsNotifStack"></div>
+
+<!-- Dashboard status card popup (doer select karke card click karne par) -->
+<div class="modal-overlay" id="dashStatusModal">
+  <div class="modal">
+    <h3 id="dashStatusModalTitle">Tasks</h3>
+    <div id="dashStatusModalBody" style="max-height:60vh;overflow-y:auto"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('dashStatusModal')">Close</button>
+    </div>
+  </div>
+</div>
 
 <!-- ══════════════════════════════════════
      DELEGATE TASK MODAL (Admin only)
@@ -2373,6 +2386,40 @@ async function loadChecklistNotifications() {
   } catch (e) { /* silent */ }
 }
 
+// Dashboard stat card popup — sirf tab khulta hai jab koi doer select ho
+async function openDashStatusPopup(status) {
+  const empFilter = document.getElementById('dashEmployeeFilter');
+  const empVal = empFilter ? empFilter.value : 'all';
+  if (!empVal || empVal === 'all') {
+    showToast('Pehle doer ka naam select karo, phir card par click karo', 'error');
+    return;
+  }
+  const empName = empFilter.selectedOptions[0]?.textContent || 'Doer';
+  const labels = { pending: 'Pending', revised: 'Revised', completed: 'Completed' };
+  document.getElementById('dashStatusModalTitle').textContent = `${labels[status] || status} Tasks — ${empName}`;
+  document.getElementById('dashStatusModalBody').innerHTML =
+    '<div style="padding:24px;text-align:center;color:#94a3b8;font-size:13px">⏳ Loading...</div>';
+  document.getElementById('dashStatusModal').classList.add('open');
+
+  const [del, chl] = await Promise.all([
+    api(`/api/tasks/user/${empVal}?type=delegation`),
+    api(`/api/tasks/user/${empVal}?type=checklist`)
+  ]);
+  const all = [...((del && del.tasks) || []), ...((chl && chl.tasks) || [])]
+    .filter(t => t.status === status)
+    .sort((a, b) => (a.due_date || '').localeCompare(b.due_date || ''));
+
+  document.getElementById('dashStatusModalBody').innerHTML = all.length ? all.map(t => `
+    <div style="padding:10px 4px;border-bottom:1px solid #f1f5f9;display:flex;gap:10px;align-items:flex-start">
+      <span style="flex-shrink:0;font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;${t.type === 'delegation' ? 'background:#ecfdf5;color:#1d4ed8;border:1px solid #bfdbfe' : 'background:#fef9c3;color:#854d0e;border:1px solid #fde68a'}">${t.type === 'delegation' ? 'Delegation' : 'Checklist'}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:#1e293b">${t.description || '—'}</div>
+        <div style="font-size:11px;color:#64748b;margin-top:2px">Due: ${fmtDate(t.due_date || '') || '—'} &nbsp;•&nbsp; Priority: ${t.priority || 'low'}${t.remarks ? ` &nbsp;•&nbsp; ${t.remarks}` : ''}</div>
+      </div>
+    </div>`).join('')
+    : `<div style="padding:24px;text-align:center;color:#94a3b8;font-size:13px">${empName} ka koi ${labels[status] || status} task nahi hai 🎉</div>`;
+}
+
 function onDashSearch() {
   const el = document.getElementById('dashSearch');
   dashSearchQuery = (el ? el.value : '').trim().toLowerCase();
@@ -2796,6 +2843,7 @@ function renderTasksTable() {
   // Re-build rows only for this page
   const pageRows = pageTasks.map(t => {
     const isCompleted = t.status === 'completed';
+    const isClosed = t.status === 'closed';
     const isWaiting = t.waiting_approval == 1;
     const isChecklist = tasksType === 'checklist';
 
@@ -2803,17 +2851,18 @@ function renderTasksTable() {
       <button class="action-btn edit" style="padding:4px 7px" onclick="openEditTask(${t.id},'${tasksType}')" title="Edit">✏️</button>
       <button class="action-btn delete" style="padding:4px 7px;margin-left:3px" onclick="deleteTask(${t.id},'${tasksType}')" title="Delete">🗑</button>
       <button class="action-btn" style="background:#ecfdf5;color:#1d4ed8;padding:4px 7px;margin-left:3px" onclick="openComments(${t.id},'${tasksType}')" title="Comments">💬</button>
-      ${!isCompleted && !isWaiting ? `<button class="action-btn done" style="margin-left:3px" onclick="updateStatus(${t.id},'completed','alltasks','${tasksType}')">Done</button>` : ''}
-      ${!isChecklist && !isCompleted && !isWaiting ? `<button class="action-btn revise" style="margin-left:3px" onclick="openReviseModal(${t.id},'${tasksType}')">Revise</button>` : ''}
-      ${isCompleted ? `<button class="action-btn" style="background:#fef3c7;color:#92400e;margin-left:3px" onclick="reopenTask(${t.id},'${tasksType}')" title="Reopen — mark as pending again">↺ Reopen</button>` : ''}
+      ${!isCompleted && !isClosed && !isWaiting ? `<button class="action-btn done" style="margin-left:3px" onclick="updateStatus(${t.id},'completed','alltasks','${tasksType}')">Done</button>` : ''}
+      ${!isChecklist && !isCompleted && !isClosed && !isWaiting ? `<button class="action-btn revise" style="margin-left:3px" onclick="openReviseModal(${t.id},'${tasksType}')">Revise</button>` : ''}
+      ${isCompleted || isClosed ? `<button class="action-btn" style="background:#fef3c7;color:#92400e;margin-left:3px" onclick="reopenTask(${t.id},'${tasksType}')" title="Reopen — mark as pending again">↺ Reopen</button>` : ''}
+      ${isCompleted ? `<button class="action-btn" style="background:#e0e7ff;color:#3730a3;margin-left:3px" onclick="closeTask(${t.id},'${tasksType}')" title="Close — task Closed Tasks tab me chala jayega">🔒 Close</button>` : ''}
       ${isWaiting ? `<span style="font-size:11px;color:#f59e0b;font-weight:600;margin-left:4px">⏳ Waiting</span>` : ''}
     ` : (ME.role==='pc') ? `
       <button class="action-btn" style="background:#ecfdf5;color:#1d4ed8;padding:4px 7px" onclick="openComments(${t.id},'${tasksType}')" title="Comments">💬</button>
-      ${isChecklist && !isCompleted && !isWaiting ? `<button class="action-btn done" style="margin-left:3px" onclick="updateStatus(${t.id},'completed','alltasks','${tasksType}')">Done</button>` : ''}
+      ${isChecklist && !isCompleted && !isClosed && !isWaiting ? `<button class="action-btn done" style="margin-left:3px" onclick="updateStatus(${t.id},'completed','alltasks','${tasksType}')">Done</button>` : ''}
       ${isWaiting ? `<span style="font-size:11px;color:#f59e0b;font-weight:600;margin-left:4px">⏳ Waiting</span>` : ''}
     ` : `
       <button class="action-btn" style="background:#ecfdf5;color:#1d4ed8;padding:4px 7px" onclick="openComments(${t.id},'${tasksType}')" title="Comments">💬</button>
-      ${!isCompleted && !isWaiting ? `
+      ${!isCompleted && !isClosed && !isWaiting ? `
         <button class="action-btn done" style="margin-left:3px" onclick="updateStatus(${t.id},'completed','alltasks','${tasksType}')">Done</button>
         ${!isChecklist ? `<button class="action-btn revise" style="margin-left:3px" onclick="openReviseModal(${t.id},'${tasksType}')">Revise</button>` : ''}
       ` : ''}
@@ -2909,6 +2958,11 @@ async function updateStatus(id, status, from, type) {
 async function reopenTask(id, type) {
   if (!confirm('Is task ko wapas Pending kar dein?')) return;
   await updateStatus(id, 'pending', 'alltasks', type);
+}
+
+async function closeTask(id, type) {
+  if (!confirm('Is task ko close karna chahte ho? Ye "Closed Tasks" tab me chala jayega.')) return;
+  await updateStatus(id, 'closed', 'alltasks', type);
 }
 
 async function deleteTask(id, type) {
