@@ -2089,6 +2089,13 @@ async function init() {
       document.getElementById('mob-mis').style.display = 'flex';
     }
     if (ME.role === 'pc') {}
+    if (ME.role === 'user') {
+      // Doer ko bhi MIS dikhta hai — server sirf uski apni report bhejta hai
+      document.getElementById('nav-mis').style.display = 'flex';
+      document.getElementById('mob-mis').style.display = 'flex';
+      const fmsTab = document.getElementById('misTabFMS');
+      if (fmsTab) fmsTab.style.display = 'none';
+    }
     if (ME.role === 'admin' || ME.role === 'hod' || ME.role === 'pc') {
       document.getElementById('nav-records').style.display = 'flex';
     }
@@ -4205,8 +4212,8 @@ async function generateMIS() {
         showToast(`⚠️ ${fmsErrors.length} FMS sheet(s) failed to load — please click Generate again`, 'error');
       }
 
-      // ── Step 2: FMS Overview ko background me append karo ──
-      if (misAllData.length) {
+      // ── Step 2: FMS Overview ko background me append karo (doer ke liye nahi) ──
+      if (misAllData.length && ME.role !== 'user') {
         const container = document.getElementById('misResults');
         const placeholder = document.createElement('div');
         placeholder.id = 'fmsOverviewLoading';

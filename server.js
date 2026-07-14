@@ -1747,11 +1747,13 @@ app.put('/api/leaves/:id', requireAuth, async (req, res) => {
 // ══════════════════════════════════════════════════════
 // MIS
 // ══════════════════════════════════════════════════════
-app.get('/api/mis', requireAuth, requireAdminOrHod, async (req, res) => {
+app.get('/api/mis', requireAuth, async (req, res) => {
   try {
     const { start, end } = req.query;
     if (!start || !end) return res.status(400).json({ error: 'Dates required' });
     const isHod = req.session.role === 'hod';
+    // Doer (normal user) ko sirf apni report dikhti hai
+    const selfOnly = !['admin', 'hod', 'pc'].includes(req.session.role) ? String(req.session.userId) : null;
     const todayStr = today();
 
     const allUsers = await db.findAll('Users');
@@ -1777,6 +1779,7 @@ app.get('/api/mis', requireAuth, requireAdminOrHod, async (req, res) => {
         const u = userMap[String(t.assigned_to)];
         if (!u) continue;
         if (isHod && u.department !== hodDept) continue;
+        if (selfOnly && String(t.assigned_to) !== selfOnly) continue;
         const uid = String(t.assigned_to);
         if (!result[uid]) result[uid] = { userId: parseInt(uid), name: u.name, total: 0, pending: 0, completed: 0, revised: 0, overdue: 0 };
         result[uid].total++;
@@ -1800,10 +1803,14 @@ app.get('/api/mis', requireAuth, requireAdminOrHod, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get('/api/mis/detail', requireAuth, requireAdminOrHod, async (req, res) => {
+app.get('/api/mis/detail', requireAuth, async (req, res) => {
   try {
     const { userId, type, start, end } = req.query;
     if (!userId || !start || !end) return res.status(400).json({ error: 'Missing params' });
+    // Doer sirf apni detail dekh sakta hai
+    if (!['admin', 'hod', 'pc'].includes(req.session.role) && String(userId) !== String(req.session.userId)) {
+      return res.status(403).json({ error: 'Not allowed' });
+    }
     const tabName = type === 'delegation' ? 'Delegation_Tasks' : 'Checklist_Tasks';
     const allUsers = await db.findAll('Users');
     const userMap = {};
@@ -1821,11 +1828,13 @@ app.get('/api/mis/detail', requireAuth, requireAdminOrHod, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get('/api/mis/all', requireAuth, requireAdminOrHod, async (req, res) => {
+app.get('/api/mis/all', requireAuth, async (req, res) => {
   try {
     const { start, end } = req.query;
     if (!start || !end) return res.status(400).json({ error: 'Dates required' });
     const isHod = req.session.role === 'hod';
+    // Doer (normal user) ko sirf apni row dikhti hai
+    const selfOnly = !['admin', 'hod', 'pc'].includes(req.session.role) ? String(req.session.userId) : null;
     const todayStr = today();
 
     const allUsers = await db.findAll('Users');
@@ -1849,6 +1858,7 @@ app.get('/api/mis/all', requireAuth, requireAdminOrHod, async (req, res) => {
       const u = userMap[String(uid)];
       if (!u) return null;
       if (isHod && u.department !== hodDept) return null;
+      if (selfOnly && String(uid) !== selfOnly) return null;
       if (!userStats[uid]) {
         userStats[uid] = {
           userId: parseInt(uid), name: u.name, department: u.department || '',
