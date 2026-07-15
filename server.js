@@ -3104,6 +3104,39 @@ app.post('/api/admin/run-reminders', requireAuth, requireAdmin, async (req, res)
   res.json(r);
 });
 
+// Cron/keep-alive endpoint — Hostinger cron job ise har 10 min hit karta hai.
+// Shared hosting par app idle hone par so jaata hai aur setInterval scheduler
+// nahi chalta; ye request app ko jagati hai. Agar abhi koi reminder slot ki
+// 30-min window chal rahi hai aur us slot ka reminder aaj nahi gaya, to bhejta
+// hai (scheduler ke saath shared _waFiredSlots se dedup — double kabhi nahi).
+app.get('/api/cron/wa-reminders', async (req, res) => {
+  try {
+    if (!WA.enabled || !WA.url || !WA.apiKey) return res.json({ skipped: 'not-configured' });
+    const ist = new Date(Date.now() + 330 * 60000);
+    if (ist.getUTCDay() === 1) return res.json({ skipped: 'monday' });
+    const todayStr = ist.toISOString().split('T')[0];
+    if (todayStr !== _waReminderDay) { _waReminderDay = todayStr; _waFiredSlots.clear(); }
+    const slots = (Array.isArray(WA.reminderTimes) && WA.reminderTimes.length)
+      ? WA.reminderTimes
+      : [{ h: 10, m: 0 }, { h: 17, m: 30 }];
+    const nowMin = ist.getUTCHours() * 60 + ist.getUTCMinutes();
+    let idx = -1;
+    for (let i = 0; i < slots.length; i++) {
+      const sm = slots[i].h * 60 + (slots[i].m || 0);
+      if (nowMin >= sm && nowMin < sm + 30) { idx = i; break; }
+    }
+    if (idx === -1) return res.json({ skipped: 'outside-slot-window', keptAlive: true });
+    if (_waFiredSlots.has(idx)) return res.json({ skipped: 'already-sent-today', slot: idx });
+    _waFiredSlots.add(idx);
+    // Background me bhejo — Aumpfy slow hai (~50s/msg), request ko mat latkao
+    getDB()
+      .then(() => runWhatsAppReminders())
+      .then(r => console.log('  WA reminders (cron):', JSON.stringify(r)))
+      .catch(e => console.error('  WA reminders (cron) error:', e.message));
+    res.json({ started: true, slot: idx });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // Manually trigger the WhatsApp reminder pass. Runs in the background (the
 // Aumpfy API is slow — ~50s/msg), so respond immediately instead of hanging.
 app.post('/api/admin/run-wa-reminders', requireAuth, requireAdmin, async (req, res) => {
