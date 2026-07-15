@@ -2432,15 +2432,22 @@ async function loadChecklistNotifications() {
   } catch (e) { /* silent */ }
 }
 
-// Dashboard stat card popup — sirf tab khulta hai jab koi doer select ho
+// Dashboard stat card popup — admin/HOD: pehle doer select karo; doer: apna hi data khulta hai
 async function openDashStatusPopup(status) {
-  const empFilter = document.getElementById('dashEmployeeFilter');
-  const empVal = empFilter ? empFilter.value : 'all';
-  if (!empVal || empVal === 'all') {
-    showToast('Select a doer first, then click the card', 'error');
-    return;
+  let empVal, empName;
+  if (ME.role === 'user') {
+    // Doer khud hi doer hai — seedha apne tasks ka popup
+    empVal = ME.id;
+    empName = ME.name;
+  } else {
+    const empFilter = document.getElementById('dashEmployeeFilter');
+    empVal = empFilter ? empFilter.value : 'all';
+    if (!empVal || empVal === 'all') {
+      showToast('Select a doer first, then click the card', 'error');
+      return;
+    }
+    empName = empFilter.selectedOptions[0]?.textContent || 'Doer';
   }
-  const empName = empFilter.selectedOptions[0]?.textContent || 'Doer';
   const labels = { pending: 'Pending', revised: 'Revised', completed: 'Completed' };
   document.getElementById('dashStatusModalTitle').textContent = `${labels[status] || status} Tasks — ${empName}`;
   document.getElementById('dashStatusModalBody').innerHTML =
