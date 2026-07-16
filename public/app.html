@@ -3929,18 +3929,14 @@ let _crmTab = 'uncompleted';
 async function loadCRM() {
   const cont = document.getElementById('crmContent');
   cont.innerHTML = '<div class="empty" style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;">⏳ Loading…</div>';
-  const [del, chl] = await Promise.all([
-    api('/api/tasks?type=delegation'),
-    api('/api/tasks?type=checklist&includeFuture=1')
-  ]);
-  const flat = [];
-  const pick = (data, type) => {
-    if (data && data.grouped) data.grouped.forEach(g => (g.tasks || []).forEach(t => flat.push({ ...t, taskType: type })));
-    else if (data && data.tasks) data.tasks.forEach(t => flat.push({ ...t, taskType: type }));
-  };
-  pick(del, 'delegation'); pick(chl, 'checklist');
-  // Uncompleted = pending ya revised (completed/closed/waiting-approval nahi)
-  _crmTasks = flat.filter(t => t.status === 'pending' || t.status === 'revised');
+  // Dedicated CRM endpoint — SABHI doers ke pending/revised tasks deta hai
+  // (chahe login pc@raabtajewels.com ho jiska role normal user hai)
+  const data = await api('/api/crm/tasks');
+  if (data && data.error) {
+    cont.innerHTML = `<div class="empty" style="background:#fff;border-radius:12px;border:1px solid #fecaca;color:#dc2626">⚠️ ${data.error}</div>`;
+    return;
+  }
+  _crmTasks = (data && data.tasks) || [];
 
   // Doer filter populate (selection preserve karo)
   const sel = document.getElementById('crmDoerFilter');

@@ -1258,6 +1258,39 @@ app.get('/api/tasks', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// CRM data — SABHI doers ke pending/revised tasks (delegation + checklist).
+// Sirf admin ya pc@raabtajewels.com ke liye (CRM tab wahi dekhte hain) —
+// pc account ka role 'user' ho tab bhi yahan sabka data milta hai.
+app.get('/api/crm/tasks', requireAuth, async (req, res) => {
+  try {
+    let allowed = req.session.role === 'admin';
+    if (!allowed) {
+      const me = await db.findOne('Users', { id: String(req.session.userId) });
+      allowed = ((me?.email || '').trim().toLowerCase() === 'pc@raabtajewels.com');
+    }
+    if (!allowed) return res.status(403).json({ error: 'Not allowed' });
+
+    const [del, chl, users] = await Promise.all([
+      db.findAll('Delegation_Tasks'), db.findAll('Checklist_Tasks'), db.findAll('Users')
+    ]);
+    const userMap = {};
+    for (const u of users) userMap[String(u.id)] = u;
+    const shape = (t, taskType) => ({
+      id: parseInt(t.id), taskType,
+      description: t.description, status: t.status,
+      priority: t.priority || 'low', due_date: t.due_date || '',
+      assignedToName: userMap[String(t.assigned_to)]?.name || '',
+      assignedByName: userMap[String(t.assigned_by)]?.name || ''
+    });
+    const isOpen = t => t.status === 'pending' || t.status === 'revised';
+    const tasks = [
+      ...del.filter(isOpen).map(t => shape(t, 'delegation')),
+      ...chl.filter(isOpen).map(t => shape(t, 'checklist'))
+    ];
+    res.json({ tasks });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // Logged-in user's own PENDING checklist tasks due within the next 2 days
 // (drives the dashboard notification bell — "2 din pehle" advance reminder).
 // Includes overdue + today + next 2 days.
