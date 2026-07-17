@@ -1347,28 +1347,20 @@ app.post('/api/tasks', requireAuth, async (req, res) => {
         const aprUser = allUsers.find(u => u.email && u.email.trim().toLowerCase() === (approverEmail || '').trim().toLowerCase());
         if (aprUser) assignedBy = String(aprUser.id);
       }
-      // Approval-required task: approver approve kare tabhi doer ko dikhega,
-      // tab tak status 'waiting_approval' rehta hai (lists/reminders isse skip karti hain).
-      const needsApproval = (approval === 'yes');
-      const created = await db.insert('Delegation_Tasks', {
+      // Approval task: doer ko task TURANT dikhta hai (normal pending). Approval
+      // COMPLETION par lagta hai — doer Done kare to request approver ke paas
+      // jaati hai (PUT /status ka existing needsApproval flow), approve hone par
+      // hi task Completed hota hai. Chosen approver assigned_by me store hota hai
+      // kyunki completion-approval request usi (assigned_by) ke paas jaati hai.
+      if (approval === 'yes' && approverId) {
+        assignedBy = String(parseInt(approverId));
+      }
+      await db.insert('Delegation_Tasks', {
         description: desc, assigned_to: targetUser, assigned_by: assignedBy,
-        due_date: date, status: needsApproval ? 'waiting_approval' : 'pending', priority: priority || 'low',
-        approval: approval || 'no', waiting_approval: needsApproval ? '1' : '0', remarks: remarks || '',
+        due_date: date, status: 'pending', priority: priority || 'low',
+        approval: approval || 'no', waiting_approval: '0', remarks: remarks || '',
         frequency: '', last_reminder_date: '', created_at: nowStr
       });
-      if (needsApproval) {
-        let approverUid = approverId ? String(parseInt(approverId)) : '';
-        if (!approverUid) {
-          const admins = (await db.findAll('Users')).filter(u => u.role === 'admin');
-          approverUid = admins.length ? String(admins[0].id) : String(req.session.userId);
-        }
-        await db.insert('Task_Approvals', {
-          task_id: created.id, task_type: 'delegation',
-          requested_by: String(req.session.userId), requested_to: approverUid,
-          action_type: 'pending', status: 'pending', note: 'New task approval', created_at: nowStr
-        });
-        return res.json({ success: true, needsApproval: true });
-      }
       // Non-blocking notifications — WhatsApp and email fire INDEPENDENTLY so a
       // slow SMTP send can never delay the WhatsApp (it goes within ~1-2 sec).
       (async () => {

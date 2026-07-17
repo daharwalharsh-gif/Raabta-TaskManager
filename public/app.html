@@ -1287,7 +1287,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
         <label>Approval Required?</label>
         <select id="dApproval" onchange="toggleApprover()">
           <option value="no">No — Direct Assign</option>
-          <option value="yes">Yes — Visible to doer only after approval</option>
+          <option value="yes">Yes — Completion needs approver's approval</option>
         </select>
       </div>
       <div class="form-group" id="dApproverWrap" style="display:none">
@@ -3273,7 +3273,7 @@ async function saveDelegate() {
   if (approval==='yes' && !approverId) { err.textContent='Please select an approver'; err.style.display='block'; return; }
   await api('/api/tasks','POST',{type:'delegation',desc,assignedTo:doer,date,priority,approval,approverId,remarks});
   closeModal('delegateModal');
-  showToast(approval==='yes' ? '✅ Task sent for approval — the doer will see it once approved!' : 'Task delegated successfully!');
+  showToast(approval==='yes' ? '✅ Task delegated! When the doer marks it Done, it will go to the approver for approval.' : 'Task delegated successfully!');
   loadDashboard();
   loadApprovalBadge();
 }
