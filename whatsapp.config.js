@@ -20,7 +20,8 @@ module.exports = {
   // ── Baaki settings ──
   countryCode:  '91',
   // Daily reminder times (IST). Add/remove entries to change kab reminder jaye.
-  reminderTimes: [ { h: 10, m: 0 }, { h: 17, m: 0 } ],   // 10:00 AM & 5:00 PM
+  // Office hours rule: reminders sirf 11:00 AM – 7:00 PM IST me jaate hain
+  reminderTimes: [ { h: 11, m: 0 }, { h: 17, m: 0 } ],   // 11:00 AM & 5:00 PM
   timeoutMs:    60000,   // Aumpfy real-number send can take ~50s to respond
   appUrl:       process.env.APP_URL || ''
 };

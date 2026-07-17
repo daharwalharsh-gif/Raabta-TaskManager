@@ -895,6 +895,14 @@ function waReminderMsg(name, tasks, todayStr) {
 // ── Daily WhatsApp reminder pass (delegation + checklist, one message per user) ──
 async function runWhatsAppReminders() {
   if (!WA.enabled) return { skipped: 'disabled' };
+  // OFFICE HOURS GUARD (hard rule): reminders SIRF 11:00 AM – 7:00 PM IST me
+  // jaate hain — scheduler, cron ya manual button, kahin se bhi trigger ho,
+  // is window ke bahar kabhi nahi bhejta.
+  const istHour = new Date(Date.now() + 330 * 60000).getUTCHours();
+  if (istHour < 11 || istHour >= 19) {
+    console.log('  WhatsApp reminders skipped — outside office hours (11:00-19:00 IST)');
+    return { skipped: 'outside-office-hours' };
+  }
   try {
     const todayStr = new Date().toISOString().split('T')[0];
     const cutoff = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
@@ -941,10 +949,10 @@ function whatsAppReminderScheduler() {
     console.log('  WhatsApp NOT configured — set url/apiKey in whatsapp.config.js, then restart');
     return;
   }
-  // Reminder times come from config (IST). Default: 10:00 AM & 5:30 PM.
+  // Reminder times come from config (IST). Default: 11:00 AM & 5:00 PM (office hours).
   const slots = (Array.isArray(WA.reminderTimes) && WA.reminderTimes.length)
     ? WA.reminderTimes
-    : (WA.reminderHour ? [{ h: WA.reminderHour, m: 0 }] : [{ h: 10, m: 0 }, { h: 17, m: 30 }]);
+    : (WA.reminderHour ? [{ h: WA.reminderHour, m: 0 }] : [{ h: 11, m: 0 }, { h: 17, m: 0 }]);
   const label = slots.map(s => `${s.h}:${String(s.m || 0).padStart(2, '0')}`).join(' & ');
   setInterval(async () => {
     try {
@@ -1123,8 +1131,9 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
         if (t.status === 'pending') pending++;
         else if (t.status === 'revised') revised++;
         else if (t.status === 'completed') completed++;
-        // Dashboard table: only show tasks due today or overdue (not future)
-        if (t.status === 'pending' && (!t.due_date || t.due_date <= todayStr)) {
+        // Dashboard table: only show tasks due today or overdue (not future).
+        // Revised tasks bhi dikhte hain — doer ko unpar kaam karna hota hai.
+        if ((t.status === 'pending' || t.status === 'revised') && (!t.due_date || t.due_date <= todayStr)) {
           delegationPending.push({
             id: parseInt(t.id), type: 'delegation',
             description: t.description, status: t.status,
@@ -1894,6 +1903,13 @@ app.get('/api/mis/all', requireAuth, async (req, res) => {
       return userStats[uid];
     };
 
+    // ── MIS SCORING POLICY (transfer / reopen / close) ──
+    // Transfer: task ka assigned_to naye doer par chala jaata hai, isliye task
+    //   sirf NAYE doer ke score me ginta hai — purane doer par koi asar nahi.
+    // Reopen: completed → pending wapas, doer ke score me phir pending ginta
+    //   hai (overdue ho to overdue bhi) jab tak dobara complete na ho.
+    // Close: 'closed' = complete karke band kiya gaya task — completed jaisa
+    //   POSITIVE ginta hai, doer ka score isse kabhi nahi girta.
     const delTasks = await db.findAll('Delegation_Tasks');
     for (const t of delTasks) {
       if (!t.due_date || t.due_date < start || t.due_date > end) continue;
@@ -1902,7 +1918,7 @@ app.get('/api/mis/all', requireAuth, async (req, res) => {
       const d = e.delegation;
       d.total++;
       if (t.status === 'pending') { d.pending++; if (t.due_date < todayStr) d.overdue++; }
-      if (t.status === 'completed') d.completed++;
+      if (t.status === 'completed' || t.status === 'closed') d.completed++;
       if (t.status === 'revised') d.revised++;
       d.score = d.total > 0 ? Math.max(-100, Math.round((0 - (d.pending / d.total) * 100 - (d.overdue / d.total) * 50 - (d.revised / d.total) * 25) * 10) / 10) : 0;
     }
@@ -1915,7 +1931,7 @@ app.get('/api/mis/all', requireAuth, async (req, res) => {
       const c = e.checklist;
       c.total++;
       if (t.status === 'pending') { c.pending++; if (t.due_date < todayStr) c.overdue++; }
-      if (t.status === 'completed') c.completed++;
+      if (t.status === 'completed' || t.status === 'closed') c.completed++;
       c.score = c.total > 0 ? Math.max(-100, Math.round((0 - (c.pending / c.total) * 100 - (c.overdue / c.total) * 50) * 10) / 10) : 0;
     }
 
@@ -3143,7 +3159,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
     if (todayStr !== _waReminderDay) { _waReminderDay = todayStr; _waFiredSlots.clear(); }
     const slots = (Array.isArray(WA.reminderTimes) && WA.reminderTimes.length)
       ? WA.reminderTimes
-      : [{ h: 10, m: 0 }, { h: 17, m: 30 }];
+      : [{ h: 11, m: 0 }, { h: 17, m: 0 }];
     const nowMin = ist.getUTCHours() * 60 + ist.getUTCMinutes();
     let idx = -1;
     for (let i = 0; i < slots.length; i++) {
