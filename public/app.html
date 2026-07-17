@@ -2483,9 +2483,11 @@ async function loadChecklistNotifications() {
   } catch (e) { /* silent */ }
 }
 
-// Dashboard stat card popup — admin/HOD: pehle doer select karo; doer: apna hi data khulta hai
+// Dashboard stat card popup — admin/HOD: pehle doer select karo (sirf Revised
+// card bina doer ke bhi khulta hai — sab doers ke revised tasks); doer: apna hi data
 let _dashStatusTasks = [];
 let _dashStatusTab = 'delegation';
+let _dashStatusShowDoer = false;
 async function openDashStatusPopup(status) {
   let empVal, empName;
   if (ME.role === 'user') {
@@ -2496,22 +2498,44 @@ async function openDashStatusPopup(status) {
     const empFilter = document.getElementById('dashEmployeeFilter');
     empVal = empFilter ? empFilter.value : 'all';
     if (!empVal || empVal === 'all') {
-      showToast('Select a doer first, then click the card', 'error');
-      return;
+      if (status !== 'revised') {
+        showToast('Select a doer first, then click the card', 'error');
+        return;
+      }
+      // Revised card bina doer ke — sab doers ke revised tasks dikhao
+      empVal = 'all';
+      empName = 'All Doers';
+    } else {
+      empName = empFilter.selectedOptions[0]?.textContent || 'Doer';
     }
-    empName = empFilter.selectedOptions[0]?.textContent || 'Doer';
   }
+  _dashStatusShowDoer = (empVal === 'all');
   const labels = { pending: 'Pending', revised: 'Revised', completed: 'Completed' };
   document.getElementById('dashStatusModalTitle').textContent = `${labels[status] || status} Tasks — ${empName}`;
   document.getElementById('dashStatusModalBody').innerHTML =
     '<div style="padding:24px;text-align:center;color:#94a3b8;font-size:13px">⏳ Loading...</div>';
   document.getElementById('dashStatusModal').classList.add('open');
 
-  const [del, chl] = await Promise.all([
-    api(`/api/tasks/user/${empVal}?type=delegation`),
-    api(`/api/tasks/user/${empVal}?type=checklist`)
-  ]);
-  _dashStatusTasks = [...((del && del.tasks) || []), ...((chl && chl.tasks) || [])]
+  let fetched = [];
+  if (empVal === 'all') {
+    // Sab doers ke tasks (admin/HOD ko grouped milta hai)
+    const [del, chl] = await Promise.all([
+      api('/api/tasks?type=delegation'),
+      api('/api/tasks?type=checklist&includeFuture=1')
+    ]);
+    const pick = (d) => {
+      if (d && d.grouped) d.grouped.forEach(g => (g.tasks || []).forEach(t => fetched.push(t)));
+      else if (d && d.tasks) fetched.push(...d.tasks);
+    };
+    pick(del); pick(chl);
+  } else {
+    const [del, chl] = await Promise.all([
+      api(`/api/tasks/user/${empVal}?type=delegation`),
+      api(`/api/tasks/user/${empVal}?type=checklist`)
+    ]);
+    fetched = [...((del && del.tasks) || []), ...((chl && chl.tasks) || [])];
+  }
+  _dashStatusTasks = fetched
     .filter(t => t.status === status)
     .sort((a, b) => (a.due_date || '').localeCompare(b.due_date || ''));
 
@@ -2529,7 +2553,7 @@ function switchDashStatusTab(tab) {
   document.getElementById('dashStatusModalBody').innerHTML = list.length ? list.map(t => `
     <div style="padding:10px 4px;border-bottom:1px solid #f1f5f9">
       <div style="font-size:13px;font-weight:600;color:#1e293b">${t.description || '—'}</div>
-      <div style="font-size:11px;color:#64748b;margin-top:2px">Due: ${fmtDate(t.due_date || '') || '—'} &nbsp;•&nbsp; Priority: ${t.priority || 'low'}${t.remarks ? ` &nbsp;•&nbsp; ${t.remarks}` : ''}</div>
+      <div style="font-size:11px;color:#64748b;margin-top:2px">${_dashStatusShowDoer && t.assignedToName ? `Doer: <b>${t.assignedToName}</b> &nbsp;•&nbsp; ` : ''}Due: ${fmtDate(t.due_date || '') || '—'} &nbsp;•&nbsp; Priority: ${t.priority || 'low'}${t.remarks ? ` &nbsp;•&nbsp; ${t.remarks}` : ''}</div>
     </div>`).join('')
     : `<div style="padding:24px;text-align:center;color:#94a3b8;font-size:13px">No ${tab} tasks 🎉</div>`;
 }
