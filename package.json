@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "build": "node -e \"require('fs').mkdirSync('build',{recursive:true});require('fs').writeFileSync('build/index.html','<meta http-equiv=refresh content=0;url=/ >')\"",
+    "build": "node -e \"require('fs').mkdirSync('build',{recursive:true})\"",
     "postinstall": "echo '✅ Dependencies installed for Raabta Task Manager'"
   },
   "dependencies": {
