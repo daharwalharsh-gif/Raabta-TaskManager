@@ -24,6 +24,10 @@ module.exports = {
 
   // ── Baaki settings ──
   countryCode:  (process.env.WHATSAPP_COUNTRY_CODE || '91').replace(/\D/g, ''), // 10-digit number ke aage lagega
+  // Task assign karte waqt turant WhatsApp bheje? false = assign-time message
+  // band (daily reminders phir bhi jaate hain).
+  notifyOnAssign: false,
+
   // Daily reminder times (IST). Add/remove entries to change kab reminder jaye.
   // Office hours rule: reminders sirf 11:00 AM – 7:00 PM IST me jaate hain.
   reminderTimes: [ { h: 11, m: 0 }, { h: 17, m: 0 } ],   // 11:00 AM & 5:00 PM

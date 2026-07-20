@@ -20,6 +20,11 @@ module.exports = {
   // ── Baaki settings ──
   countryCode:  '91',
   // Daily reminder times (IST). Add/remove entries to change kab reminder jaye.
+  // Task assign karte waqt turant WhatsApp bheje? false = koi assign-time
+  // message nahi jaata (delegation, checklist, bulk — kisi ka bhi).
+  // Daily reminders is se alag hain, wo chalte rehte hain.
+  notifyOnAssign: false,
+
   // Office hours rule: reminders sirf 11:00 AM – 7:00 PM IST me jaate hain
   reminderTimes: [ { h: 11, m: 0 }, { h: 17, m: 0 } ],   // 11:00 AM & 5:00 PM
   timeoutMs:    60000,   // Aumpfy real-number send can take ~50s to respond

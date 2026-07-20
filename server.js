@@ -1376,7 +1376,8 @@ app.post('/api/tasks', requireAuth, async (req, res) => {
         const assigner = await db.findOne('Users', { id: assignedBy });
         const assignerName = assigner?.name || 'Admin';
         // WhatsApp — fire immediately, don't wait for email
-        getWhatsAppTarget(parseInt(targetUser)).then(waTarget => {
+        // (WA.notifyOnAssign false ho to assign-time message bilkul nahi jaata)
+        if (WA.notifyOnAssign) getWhatsAppTarget(parseInt(targetUser)).then(waTarget => {
           if (!waTarget) return;
           return sendWhatsApp(waTarget.phone, waDelegationMsg({
             assigneeName: waTarget.name, assignerName,
@@ -1404,8 +1405,8 @@ app.post('/api/tasks', requireAuth, async (req, res) => {
         due_date: date, status: 'pending', priority: priority || 'low',
         remarks: remarks || '', frequency: '', created_at: nowStr
       });
-      // Non-blocking WhatsApp to the assignee
-      (async () => {
+      // Non-blocking WhatsApp to the assignee (assign-time — WA.notifyOnAssign se control)
+      if (WA.notifyOnAssign) (async () => {
         const waTarget = await getWhatsAppTarget(parseInt(targetUser));
         if (waTarget) {
           await sendWhatsApp(waTarget.phone, waChecklistMsg({
@@ -1433,7 +1434,8 @@ app.post('/api/tasks/bulk-checklist', requireAuth, requireAdmin, async (req, res
     }));
     await db.batchInsert('Checklist_Tasks', rows);
     // Non-blocking WhatsApp — one summary message to the assignee
-    (async () => {
+    // (assign-time — WA.notifyOnAssign false ho to skip)
+    if (WA.notifyOnAssign) (async () => {
       const waTarget = await getWhatsAppTarget(parseInt(assignedTo));
       if (!waTarget) return;
       const sorted = [...dates].sort();
@@ -1698,7 +1700,7 @@ app.put('/api/approvals/:id', requireAuth, async (req, res) => {
       await db.update(tabName, appr.task_id, { status: appr.action_type, waiting_approval: '0' });
       // New-task approval (action_type 'pending'): ab jaake doer ko task dikha hai,
       // isliye WhatsApp bhi ab hi jaata hai (create ke waqt nahi gaya tha).
-      if (appr.action_type === 'pending' && appr.task_type === 'delegation') {
+      if (WA.notifyOnAssign && appr.action_type === 'pending' && appr.task_type === 'delegation') {
         (async () => {
           const task = await db.findOne('Delegation_Tasks', { id: appr.task_id });
           if (!task) return;
