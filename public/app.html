@@ -918,7 +918,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
           style="color:#dc2626;border-color:#fecaca;display:none">🗑 Bulk Delete</button>
         <button class="btn btn-outline" id="deleteAllChecklistBtn" onclick="deleteAllChecklist()"
           style="color:#fff;background:#dc2626;border-color:#dc2626;display:none"
-          title="Sab users ke saare checklist tasks permanently delete (completed sameet)">⚠️ Delete ALL Checklist</button>
+          title="Sab users ke COMPLETED checklist tasks permanently delete (pending safe)">🗑 Delete Completed Checklist</button>
       </div>
     </div>
     <!-- Status filter tabs -->
@@ -3079,8 +3079,9 @@ function tasksTab(type, el) {
 async function deleteAllChecklist() {
   if (!confirm(
     `⚠️ WARNING — PERMANENT DELETE\n\n` +
-    `This will delete ALL checklist tasks of ALL users — including COMPLETED ones.\n` +
-    `Delegation tasks will NOT be touched.\n\n` +
+    `This will delete all COMPLETED checklist tasks of all users.\n\n` +
+    `• Pending / revised checklist tasks will NOT be deleted\n` +
+    `• Delegation tasks will NOT be touched\n\n` +
     `This cannot be undone. Continue?`
   )) return;
   const typed = prompt('To confirm, type exactly:  DELETE');
@@ -3090,11 +3091,14 @@ async function deleteAllChecklist() {
   }
   const btn = document.getElementById('deleteAllChecklistBtn');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Deleting…'; }
-  const r = await api('/api/tasks/checklist-delete-all', 'POST', { confirm: 'DELETE ALL CHECKLIST' });
-  if (btn) { btn.disabled = false; btn.textContent = '⚠️ Delete ALL Checklist'; }
+  const r = await api('/api/tasks/checklist-delete-all', 'POST', {
+    confirm: 'DELETE ALL CHECKLIST', scope: 'completed'
+  });
+  if (btn) { btn.disabled = false; btn.textContent = '🗑 Delete Completed Checklist'; }
   if (r && r.error) { showToast('Failed: ' + r.error, 'error'); return; }
-  showToast(`✅ Deleted ${r.deleted} checklist task(s) — you can add fresh ones now`);
+  showToast(`✅ Deleted ${r.deleted} completed checklist task(s)`);
   loadAllTasks();
+  loadDashboard();
 }
 
 function toggleBlock(header) { header.nextElementSibling.classList.toggle('open'); }

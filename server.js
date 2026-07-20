@@ -1613,20 +1613,24 @@ app.post('/api/tasks/checklist-year-delete', requireAuth, requireAdmin, async (r
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// DANGER: SAARE users ke SAARE checklist tasks permanently delete karta hai —
-// completed sameet (fresh start ke liye). Admin-only + body me confirm token
-// "DELETE ALL CHECKLIST" zaroori, taaki galti se kabhi trigger na ho.
-// Delegation tasks ko haath nahi lagata.
+// DANGER: checklist tasks permanently delete karta hai (sab users ke).
+// scope='completed' (default) → sirf completed/closed wale; pending safe.
+// scope='all' → saare checklist tasks.
+// Admin-only + confirm token zaroori. Delegation tasks ko kabhi haath nahi lagata.
 app.post('/api/tasks/checklist-delete-all', requireAuth, requireAdmin, async (req, res) => {
   try {
     if ((req.body?.confirm || '') !== 'DELETE ALL CHECKLIST') {
       return res.status(400).json({ error: 'Confirmation token missing' });
     }
+    const scope = (req.body?.scope === 'all') ? 'all' : 'completed';
     const all = await db.findAll('Checklist_Tasks');
-    const ids = all.map(t => t.id);
+    const target = (scope === 'all')
+      ? all
+      : all.filter(t => t.status === 'completed' || t.status === 'closed');
+    const ids = target.map(t => t.id);
     if (ids.length) await db.batchDeleteByIds('Checklist_Tasks', ids);
-    console.log(`  ⚠️  ALL checklist tasks deleted by user ${req.session.userId}: ${ids.length} rows`);
-    res.json({ success: true, deleted: ids.length });
+    console.log(`  ⚠️  Checklist delete (scope=${scope}) by user ${req.session.userId}: ${ids.length} rows`);
+    res.json({ success: true, deleted: ids.length, scope });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
