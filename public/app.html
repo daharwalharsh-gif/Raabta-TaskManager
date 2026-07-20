@@ -916,6 +916,9 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
         <button class="btn btn-primary" id="tasksAssignBtn" onclick="openDelegate()" style="display:none">+ Assign Task</button>
         <button class="btn btn-outline" id="bulkDeleteBtn" onclick="openBulkDeleteModal()"
           style="color:#dc2626;border-color:#fecaca;display:none">🗑 Bulk Delete</button>
+        <button class="btn btn-outline" id="deleteAllChecklistBtn" onclick="deleteAllChecklist()"
+          style="color:#fff;background:#dc2626;border-color:#dc2626;display:none"
+          title="Sab users ke saare checklist tasks permanently delete (completed sameet)">⚠️ Delete ALL Checklist</button>
       </div>
     </div>
     <!-- Status filter tabs -->
@@ -2880,6 +2883,10 @@ async function loadAllTasks() {
   const dbmBtn = document.getElementById('delegateByMeBtn');
   if (dbmBtn) dbmBtn.style.display = (isAdmin || isHod || isUser) ? '' : 'none';
 
+  // Delete ALL Checklist — sirf admin ko, sirf Checklist tab par
+  const delAllBtn = document.getElementById('deleteAllChecklistBtn');
+  if (delAllBtn) delAllBtn.style.display = (isAdmin && tasksType === 'checklist') ? '' : 'none';
+
   // PC desktop: show user filter + date range
   const filtersDiv = document.getElementById('tasksUserDateFilters');
   if (filtersDiv) {
@@ -3059,6 +3066,29 @@ function tasksTab(type, el) {
   tasksType = type;
   document.querySelectorAll('#tasksTypeTabGroup .tab').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
+  loadAllTasks();
+}
+
+// DANGER: sab users ke saare checklist tasks permanently delete (completed sameet).
+// Do-step confirmation — pehla confirm, phir DELETE type karna zaroori.
+async function deleteAllChecklist() {
+  if (!confirm(
+    `⚠️ WARNING — PERMANENT DELETE\n\n` +
+    `This will delete ALL checklist tasks of ALL users — including COMPLETED ones.\n` +
+    `Delegation tasks will NOT be touched.\n\n` +
+    `This cannot be undone. Continue?`
+  )) return;
+  const typed = prompt('To confirm, type exactly:  DELETE');
+  if ((typed || '').trim().toUpperCase() !== 'DELETE') {
+    showToast('Cancelled — nothing was deleted', 'error');
+    return;
+  }
+  const btn = document.getElementById('deleteAllChecklistBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Deleting…'; }
+  const r = await api('/api/tasks/checklist-delete-all', 'POST', { confirm: 'DELETE ALL CHECKLIST' });
+  if (btn) { btn.disabled = false; btn.textContent = '⚠️ Delete ALL Checklist'; }
+  if (r && r.error) { showToast('Failed: ' + r.error, 'error'); return; }
+  showToast(`✅ Deleted ${r.deleted} checklist task(s) — you can add fresh ones now`);
   loadAllTasks();
 }
 

@@ -1613,6 +1613,23 @@ app.post('/api/tasks/checklist-year-delete', requireAuth, requireAdmin, async (r
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// DANGER: SAARE users ke SAARE checklist tasks permanently delete karta hai —
+// completed sameet (fresh start ke liye). Admin-only + body me confirm token
+// "DELETE ALL CHECKLIST" zaroori, taaki galti se kabhi trigger na ho.
+// Delegation tasks ko haath nahi lagata.
+app.post('/api/tasks/checklist-delete-all', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    if ((req.body?.confirm || '') !== 'DELETE ALL CHECKLIST') {
+      return res.status(400).json({ error: 'Confirmation token missing' });
+    }
+    const all = await db.findAll('Checklist_Tasks');
+    const ids = all.map(t => t.id);
+    if (ids.length) await db.batchDeleteByIds('Checklist_Tasks', ids);
+    console.log(`  ⚠️  ALL checklist tasks deleted by user ${req.session.userId}: ${ids.length} rows`);
+    res.json({ success: true, deleted: ids.length });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ── General /:id routes AFTER all specific routes ──
 
 app.delete('/api/tasks/:id', requireAuth, requireAdmin, async (req, res) => {
