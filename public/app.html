@@ -1812,9 +1812,14 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     <!-- STEP 2: Date -->
     <div id="bdStep2" style="display:none">
       <div class="form-group">
-        <label>Date Select Karo</label>
+        <label>Select Date</label>
         <input type="date" id="bdDate" onchange="onBdDateChange()"
           style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;outline:none"/>
+        <label style="display:flex;align-items:center;gap:7px;margin-top:8px;font-size:13px;color:#dc2626;font-weight:600;cursor:pointer">
+          <input type="checkbox" id="bdAllDates" onchange="onBdAllDatesToggle()"
+            style="width:15px;height:15px;accent-color:#dc2626;cursor:pointer"/>
+          All dates (date select karne ki zaroorat nahi)
+        </label>
       </div>
     </div>
 
@@ -6493,6 +6498,7 @@ async function openBulkDeleteModal() {
       : allUsers.filter(u => u.department === ME.department);
     document.getElementById('bdFromUser').innerHTML =
       '<option value="">-- Select user --</option>' +
+      '<option value="all">👥 All Employees (sabke tasks)</option>' +
       eligible.map(u=>`<option value="${u.id}">${u.name} — ${u.email} (${u.department||u.role})</option>`).join('');
     document.getElementById('bdStep1').style.display = 'block';
 
@@ -6523,21 +6529,42 @@ async function openBulkDeleteModal() {
 async function onBdFromChange() {
   const val = document.getElementById('bdFromUser').value;
   if (!val) return;
-  _bdFromUserId = parseInt(val);
+  // 'all' = sab employees ke tasks (koi ek doer select karne ki zaroorat nahi)
+  _bdFromUserId = (val === 'all') ? 'all' : parseInt(val);
   document.getElementById('bdStep2').style.display = 'block';
   document.getElementById('bdDate').value = '';
+  const allCb = document.getElementById('bdAllDates');
+  if (allCb) allCb.checked = false;
+  document.getElementById('bdDate').disabled = false;
   document.getElementById('bdStep3').style.display = 'none';
 }
 
+// "All dates" checkbox — date input disable karke seedha list load karta hai
+function onBdAllDatesToggle() {
+  const checked = document.getElementById('bdAllDates').checked;
+  const dateEl = document.getElementById('bdDate');
+  dateEl.disabled = checked;
+  if (checked) {
+    dateEl.value = '';
+    onBdDateChange();
+  } else {
+    document.getElementById('bdStep3').style.display = 'none';
+    document.getElementById('bdCancelBtn').style.display = 'block';
+  }
+}
+
 async function onBdDateChange() {
+  const allDates = document.getElementById('bdAllDates')?.checked;
   const date = document.getElementById('bdDate').value;
-  if (!date || !_bdFromUserId) return;
+  if ((!date && !allDates) || !_bdFromUserId) return;
+  const allUsers = (_bdFromUserId === 'all');
 
   document.getElementById('bulkDeleteErr').style.display = 'none';
   document.getElementById('bdTasksList').innerHTML = '<div style="padding:10px;color:#94a3b8;font-size:13px">Loading...</div>';
   document.getElementById('bdStep3').style.display = 'block';
   document.getElementById('bdCancelBtn').style.display = 'none';
-  document.getElementById('bdDateLabel').textContent = date;
+  document.getElementById('bdDateLabel').textContent =
+    (allDates ? 'All dates' : date) + (allUsers ? ' • All Employees' : '');
 
   // v16: includeFuture=1 so upcoming checklist tasks bhi dikhe (jaise daily/weekly)
   const [delData, chlData] = await Promise.all([
@@ -6548,10 +6575,15 @@ async function onBdDateChange() {
   const allTasks = [];
   const pick = (data, type) => {
     const list = data.grouped
-      ? (data.grouped.find(g => g.userId === _bdFromUserId)?.tasks || [])
+      ? (allUsers
+          ? data.grouped.flatMap(g => g.tasks || [])           // sab employees
+          : (data.grouped.find(g => g.userId === _bdFromUserId)?.tasks || []))
       : (data.tasks || []);
     // v16: completed tasks ko bulk-delete me NEVER show — wo delete nahi honge
-    list.forEach(t => { if (t.due_date === date && t.status !== 'completed') allTasks.push({...t, taskType: type}); });
+    list.forEach(t => {
+      const dateOk = allDates || t.due_date === date;          // "All dates" par filter skip
+      if (dateOk && t.status !== 'completed') allTasks.push({...t, taskType: type});
+    });
   };
   pick(delData, 'delegation');
   pick(chlData, 'checklist');
@@ -6559,7 +6591,7 @@ async function onBdDateChange() {
 
   if (!allTasks.length) {
     document.getElementById('bdTasksList').innerHTML =
-      '<div style="padding:12px;color:#94a3b8;font-size:13px;text-align:center">No deletable tasks on this date (completed tasks excluded)</div>';
+      `<div style="padding:12px;color:#94a3b8;font-size:13px;text-align:center">No deletable tasks ${allDates ? 'found' : 'on this date'} (completed tasks excluded)</div>`;
     return;
   }
 
@@ -6570,7 +6602,7 @@ async function onBdDateChange() {
     return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid #f1f5f9">
       <input type="checkbox" class="bd-cb" data-idx="${i}" checked
         style="width:15px;height:15px;accent-color:#dc2626;cursor:pointer;flex-shrink:0"/>
-      <span style="font-size:13px;flex:1">${t.description||'—'}</span>
+      <span style="font-size:13px;flex:1">${t.description||'—'}${allUsers && t.assignedToName ? ` <span style="font-size:10px;color:#64748b">(${t.assignedToName})</span>` : ''}${allDates && t.due_date ? ` <span style="font-size:10px;color:#94a3b8">${fmtDate(t.due_date)}</span>` : ''}</span>
       ${freqBadge}
       <span style="font-size:11px;background:${t.status==='pending'?'#fef2f2':'#fef9c3'};color:${t.status==='pending'?'#dc2626':'#854d0e'};padding:2px 7px;border-radius:8px;font-weight:600">${t.status}</span>
       <span style="font-size:11px;background:#ecfdf5;color:#1d4ed8;padding:2px 7px;border-radius:8px;font-weight:600">${t.taskType}</span>
