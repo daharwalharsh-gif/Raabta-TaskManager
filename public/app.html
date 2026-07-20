@@ -2217,8 +2217,9 @@ async function removeProfileImage() {
 
 function setMinDates() {
   const today = new Date().toISOString().split('T')[0];
-  // cDate (checklist) intentionally NOT restricted — past-month dates allowed.
-  ['dDate','hDate'].forEach(id => {
+  // cDate (checklist) aur dDate (delegation) NOT restricted — backdated tasks allowed.
+  // Sirf hDate (holiday) future-only rehta hai.
+  ['hDate'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.min = today;
   });
@@ -3282,7 +3283,8 @@ async function openDelegate() {
   document.getElementById('dPriority').value='low';
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('dDate').value=today;
-  document.getElementById('dDate').min=today;
+  // Purani date bhi select ho sake (backdated task) — min hata diya
+  document.getElementById('dDate').removeAttribute('min');
   const users = await api('/api/users');
   const opts = users.map(u=>`<option value="${u.id}">${u.name}</option>`).join('');
   document.getElementById('dDoer').innerHTML='<option value="">Select Doer</option>'+opts;
