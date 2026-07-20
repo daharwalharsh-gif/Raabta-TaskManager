@@ -1130,7 +1130,7 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
         if (!taskFilter(t)) continue;
         if (t.status === 'pending') pending++;
         else if (t.status === 'revised') revised++;
-        else if (t.status === 'completed') completed++;
+        else if (t.status === 'completed' || t.status === 'closed') completed++;
         // Dashboard table: only show tasks due today or overdue (not future).
         // Revised tasks bhi dikhte hain — doer ko unpar kaam karna hota hai.
         if ((t.status === 'pending' || t.status === 'revised') && (!t.due_date || t.due_date <= todayStr)) {
@@ -1155,7 +1155,7 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
         if (!taskFilter(t)) continue;
         if (t.status === 'pending') pending++;
         else if (t.status === 'revised') revised++;
-        else if (t.status === 'completed') completed++;
+        else if (t.status === 'completed' || t.status === 'closed') completed++;
         // Dashboard table: only show tasks due today or overdue (not future)
         if (t.status === 'pending' && (!t.due_date || t.due_date <= todayStr)) {
           checklistPending.push({
