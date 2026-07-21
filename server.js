@@ -927,7 +927,7 @@ async function _waMarkSlotDone(marker) {
   } catch (e) { /* marker na likh paye to bhi pass chalta rahe */ }
 }
 
-async function runWhatsAppReminders() {
+async function runWhatsAppReminders(slotKey) {
   if (!WA.enabled) return { skipped: 'disabled' };
   // OFFICE HOURS GUARD (hard rule): reminders SIRF 11:00 AM – 7:00 PM IST me
   // jaate hain — scheduler, cron ya manual button, kahin se bhi trigger ho,
@@ -947,7 +947,10 @@ async function runWhatsAppReminders() {
   _waPassInFlight = true;
   try {
     // Slot marker: din + ghanta (11 baje ka pass aur 17 baje ka pass alag)
-    const marker = `wa_pass_${ist.toISOString().split('T')[0]}_${istHour}`;
+    // Marker SLOT ke naam se banta hai (current hour se nahi) — warna 17:00 ka
+    // pass agar catch-up me 18:10 pe chale to alag marker banta aur duplicate
+    // messages ja sakte the.
+    const marker = `wa_pass_${ist.toISOString().split('T')[0]}_${slotKey || istHour}`;
     if (await _waSlotDone(marker)) {
       console.log(`  WhatsApp reminders already sent for ${marker} — skipped`);
       return { skipped: 'already-sent-today' };
@@ -1019,10 +1022,11 @@ async function checkAndFireDueSlots() {
     const slotMin = s.h * 60 + (s.m || 0);
     if (nowMin >= slotMin && nowMin < slotMin + WA_CATCHUP_MIN) {
       await getDB();
-      await runWhatsAppReminders();   // DB marker khud dekhta hai ki bhej chuke ya nahi
-      return;
+      // slotKey = slot ka apna ghanta, taaki late catch-up par bhi wahi marker bane
+      return await runWhatsAppReminders(String(s.h));
     }
   }
+  return { skipped: 'outside-slot-window' };
 }
 
 // Har request par slot check — par minute me ek baar se zyada nahi.
@@ -3316,31 +3320,29 @@ app.post('/api/admin/run-reminders', requireAuth, requireAdmin, async (req, res)
 // nahi chalta; ye request app ko jagati hai. Agar abhi koi reminder slot ki
 // 30-min window chal rahi hai aur us slot ka reminder aaj nahi gaya, to bhejta
 // hai (scheduler ke saath shared _waFiredSlots se dedup — double kabhi nahi).
+// Wahi catch-up logic jo scheduler aur request-hook use karte hain, taaki
+// teeno raste ek jaise chalein. Status bhi wapas bhejta hai (diagnose ke liye).
 app.get('/api/cron/wa-reminders', async (req, res) => {
   try {
     if (!WA.enabled || !WA.url || !WA.apiKey) return res.json({ skipped: 'not-configured' });
     const ist = new Date(Date.now() + 330 * 60000);
-    if (ist.getUTCDay() === 1) return res.json({ skipped: 'monday' });
-    const todayStr = ist.toISOString().split('T')[0];
-    if (todayStr !== _waReminderDay) { _waReminderDay = todayStr; _waFiredSlots.clear(); }
-    const slots = (Array.isArray(WA.reminderTimes) && WA.reminderTimes.length)
-      ? WA.reminderTimes
-      : [{ h: 11, m: 0 }, { h: 17, m: 0 }];
-    const nowMin = ist.getUTCHours() * 60 + ist.getUTCMinutes();
-    let idx = -1;
-    for (let i = 0; i < slots.length; i++) {
-      const sm = slots[i].h * 60 + (slots[i].m || 0);
-      if (nowMin >= sm && nowMin < sm + 30) { idx = i; break; }
-    }
-    if (idx === -1) return res.json({ skipped: 'outside-slot-window', keptAlive: true });
-    if (_waFiredSlots.has(idx)) return res.json({ skipped: 'already-sent-today', slot: idx });
-    _waFiredSlots.add(idx);
-    // Background me bhejo — Aumpfy slow hai (~50s/msg), request ko mat latkao
-    getDB()
-      .then(() => runWhatsAppReminders())
+    const istTime = ist.toISOString().replace('T', ' ').slice(0, 16) + ' IST';
+    if (ist.getUTCDay() === 1) return res.json({ skipped: 'monday', now: istTime });
+    // Background me chalao — Aumpfy slow hai (~50s/msg), request ko mat latkao
+    checkAndFireDueSlots()
       .then(r => console.log('  WA reminders (cron):', JSON.stringify(r)))
       .catch(e => console.error('  WA reminders (cron) error:', e.message));
-    res.json({ started: true, slot: idx });
+    const nowMin = ist.getUTCHours() * 60 + ist.getUTCMinutes();
+    const slot = waSlots().find(s => {
+      const sm = s.h * 60 + (s.m || 0);
+      return nowMin >= sm && nowMin < sm + WA_CATCHUP_MIN;
+    });
+    res.json({
+      now: istTime,
+      slot: slot ? `${slot.h}:00` : null,
+      status: slot ? 'slot-window-me-hai (pass check chal raha)' : 'outside-slot-window',
+      keptAlive: true
+    });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
