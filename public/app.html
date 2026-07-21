@@ -4020,6 +4020,7 @@ async function handleLeave(id, action) {
 // ══════════════════════════════════════════════════════
 let _crmTasks = [];
 let _crmTab = 'upcoming';
+let _crmExpanded = new Set();   // kaunse doer groups khule hain
 
 async function loadCRM() {
   const cont = document.getElementById('crmContent');
@@ -4087,31 +4088,77 @@ function renderCRM() {
     cont.innerHTML = `<div class="empty" style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;">${_crmTab === 'overdue' ? 'No overdue tasks 🎉' : 'No upcoming tasks 🎉'}</div>`;
     return;
   }
+
+  // ── Doer-wise grouping (All Tasks page jaisa) ──
+  const groups = {};
+  rows.forEach(t => {
+    const name = t.assignedToName || '—';
+    (groups[name] = groups[name] || []).push(t);
+  });
+  const names = Object.keys(groups).sort((a, b) => a.localeCompare(b));
+  window._crmGroupNames = names;   // index se toggle karne ke liye (quotes safe)
+
+  const taskRow = t => {
+    const k = crmDateKey(t.due_date);
+    const overdue = k && k < todayStr;
+    const isToday = k === todayStr;
+    const todayTag = isToday ? ' <span style="font-size:9px;font-weight:700;padding:1px 7px;border-radius:8px;background:#fffbeb;color:#d97706;border:1px solid #fde68a">Today</span>' : '';
+    return `<tr>
+      <td><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;${t.taskType === 'delegation' ? 'background:#ecfdf5;color:#1d4ed8;border:1px solid #bfdbfe' : 'background:#fef9c3;color:#854d0e;border:1px solid #fde68a'}">${t.taskType === 'delegation' ? 'Delegation' : 'Checklist'}</span></td>
+      <td>${t.description || '—'}</td>
+      <td style="color:#64748b">${t.assignedByName || '—'}</td>
+      <td style="white-space:nowrap;${overdue ? 'color:#dc2626;font-weight:700' : ''}">${fmtDate(t.due_date || '') || '—'}${overdue ? ' ⚠️' : ''}${todayTag}</td>
+      <td>${t.priority || 'low'}</td>
+      <td><span class="status-badge ${t.status}">${t.status === 'revised' ? 'Revision Requested' : t.status.charAt(0).toUpperCase() + t.status.slice(1)}</span></td>
+    </tr>`;
+  };
+
   cont.innerHTML = `
-    <div class="flat-tasks-table">
-      <table>
-        <thead><tr>
-          <th>Type</th><th>Description</th><th>Doer</th><th>Assigned By</th><th>Due Date</th><th>Priority</th><th>Status</th>
-        </tr></thead>
-        <tbody>
-          ${rows.map(t => {
-            const k = crmDateKey(t.due_date);
-            const overdue = k && k < todayStr;
-            const isToday = k === todayStr;
-            const todayTag = isToday ? ' <span style="font-size:9px;font-weight:700;padding:1px 7px;border-radius:8px;background:#fffbeb;color:#d97706;border:1px solid #fde68a">Today</span>' : '';
-            return `<tr>
-              <td><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;${t.taskType === 'delegation' ? 'background:#ecfdf5;color:#1d4ed8;border:1px solid #bfdbfe' : 'background:#fef9c3;color:#854d0e;border:1px solid #fde68a'}">${t.taskType === 'delegation' ? 'Delegation' : 'Checklist'}</span></td>
-              <td>${t.description || '—'}</td>
-              <td style="font-weight:600">${t.assignedToName || '—'}</td>
-              <td style="color:#64748b">${t.assignedByName || '—'}</td>
-              <td style="white-space:nowrap;${overdue ? 'color:#dc2626;font-weight:700' : ''}">${fmtDate(t.due_date || '') || '—'}${overdue ? ' ⚠️' : ''}${todayTag}</td>
-              <td>${t.priority || 'low'}</td>
-              <td><span class="status-badge ${t.status}">${t.status === 'revised' ? 'Revision Requested' : t.status.charAt(0).toUpperCase() + t.status.slice(1)}</span></td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table>
-    </div>`;
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+      <div style="font-size:13px;color:#64748b;font-weight:600">${names.length} doer(s) · ${rows.length} task(s)</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-outline btn-sm" onclick="crmExpandAll(true)">Expand all</button>
+        <button class="btn btn-outline btn-sm" onclick="crmExpandAll(false)">Collapse all</button>
+      </div>
+    </div>
+    ${names.map((name, i) => {
+      const list = groups[name];
+      const overdueCount = list.filter(t => { const k = crmDateKey(t.due_date); return k && k < todayStr; }).length;
+      const open = _crmExpanded.has(name);
+      return `
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:10px;overflow:hidden">
+        <div onclick="toggleCrmGroup(${i})" style="padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;background:#f8fafc;flex-wrap:wrap">
+          <div style="font-size:14px;font-weight:700;color:#1e293b">
+            <span style="color:#64748b">${open ? '▼' : '▶'}</span> ${name}
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe">${list.length} total</span>
+            ${overdueCount ? `<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca">${overdueCount} overdue</span>` : ''}
+          </div>
+        </div>
+        ${open ? `
+        <div class="flat-tasks-table" style="border:none;border-radius:0">
+          <table>
+            <thead><tr>
+              <th>Type</th><th>Description</th><th>Assigned By</th><th>Due Date</th><th>Priority</th><th>Status</th>
+            </tr></thead>
+            <tbody>${list.map(taskRow).join('')}</tbody>
+          </table>
+        </div>` : ''}
+      </div>`;
+    }).join('')}`;
+}
+
+function toggleCrmGroup(idx) {
+  const name = (window._crmGroupNames || [])[idx];
+  if (name === undefined) return;
+  if (_crmExpanded.has(name)) _crmExpanded.delete(name); else _crmExpanded.add(name);
+  renderCRM();
+}
+
+function crmExpandAll(expand) {
+  _crmExpanded = new Set(expand ? (window._crmGroupNames || []) : []);
+  renderCRM();
 }
 
 // ══════════════════════════════════════════════════════
