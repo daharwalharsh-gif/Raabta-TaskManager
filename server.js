@@ -927,7 +927,7 @@ async function _waMarkSlotDone(marker) {
   } catch (e) { /* marker na likh paye to bhi pass chalta rahe */ }
 }
 
-async function runWhatsAppReminders(slotKey) {
+async function runWhatsAppReminders(slotKey, force) {
   if (!WA.enabled) return { skipped: 'disabled' };
   // OFFICE HOURS GUARD (hard rule): reminders SIRF 11:00 AM – 7:00 PM IST me
   // jaate hain — scheduler, cron ya manual button, kahin se bhi trigger ho,
@@ -951,7 +951,7 @@ async function runWhatsAppReminders(slotKey) {
     // pass agar catch-up me 18:10 pe chale to alag marker banta aur duplicate
     // messages ja sakte the.
     const marker = `wa_pass_${ist.toISOString().split('T')[0]}_${slotKey || istHour}`;
-    if (await _waSlotDone(marker)) {
+    if (!force && await _waSlotDone(marker)) {
       console.log(`  WhatsApp reminders already sent for ${marker} — skipped`);
       return { skipped: 'already-sent-today' };
     }
@@ -3348,8 +3348,10 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
 
 // Manually trigger the WhatsApp reminder pass. Runs in the background (the
 // Aumpfy API is slow — ~50s/msg), so respond immediately instead of hanging.
+// Admin ka manual button — force=true, yaani "aaj bhej chuke" wala marker
+// ignore karke bhejta hai (deliberate action hai, isliye).
 app.post('/api/admin/run-wa-reminders', requireAuth, requireAdmin, async (req, res) => {
-  runWhatsAppReminders()
+  runWhatsAppReminders(null, true)
     .then(r => console.log('  WA reminders (manual):', JSON.stringify(r)))
     .catch(e => console.error('  WA reminders (manual) error:', e.message));
   res.json({ started: true });
