@@ -43,5 +43,3 @@ desktop.ini
 
 .vercel
 
-# WhatsApp live API credentials — NEVER commit (env vars use karo)
-whatsapp.config.js
