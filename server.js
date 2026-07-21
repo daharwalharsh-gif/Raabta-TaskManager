@@ -15,6 +15,9 @@ const SHEET_ID = process.env.SHEET_ID || '1SlUOgq1QN70tbIdlNat_XEY4JYGHG3JQyyh3N
 app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// Har request par reminder slot check (minute me ek baar) — app so kar uthe to
+// bhi missed reminder chala jaata hai, bina kisi bahri cron ke.
+app.use((req, res, next) => waRequestHook(req, res, next));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ══════════════════════════════════════════════════════
@@ -991,39 +994,59 @@ async function runWhatsAppReminders() {
 
 let _waReminderDay = '';
 const _waFiredSlots = new Set();
+// Config se slots (IST). Default: 11:00 AM & 5:00 PM.
+function waSlots() {
+  return (Array.isArray(WA.reminderTimes) && WA.reminderTimes.length)
+    ? WA.reminderTimes
+    : (WA.reminderHour ? [{ h: WA.reminderHour, m: 0 }] : [{ h: 11, m: 0 }, { h: 17, m: 0 }]);
+}
+
+// Slot ke baad 2 ghante tak "catch-up" allowed hai. Shared hosting par app
+// idle hone par so jaati hai — theek 11:00 baje koi tick miss ho jaye to bhi
+// jagte hi (kisi bhi request par) reminder chala jaata hai. DB marker duplicate
+// rokta hai, isliye late-but-sent safe hai.
+const WA_CATCHUP_MIN = 120;
+
+// Kya abhi koi slot due hai? Due ho to reminder pass chala do.
+// Interval se bhi call hota hai aur har HTTP request par bhi (throttled).
+async function checkAndFireDueSlots() {
+  if (!WA.enabled || !WA.url || !WA.apiKey) return;
+  const ist = new Date(Date.now() + 330 * 60000);
+  if (ist.getUTCDay() === 1) return;                      // Monday skip
+  const nowMin = ist.getUTCHours() * 60 + ist.getUTCMinutes();
+  const slots = waSlots();
+  for (const s of slots) {
+    const slotMin = s.h * 60 + (s.m || 0);
+    if (nowMin >= slotMin && nowMin < slotMin + WA_CATCHUP_MIN) {
+      await getDB();
+      await runWhatsAppReminders();   // DB marker khud dekhta hai ki bhej chuke ya nahi
+      return;
+    }
+  }
+}
+
+// Har request par slot check — par minute me ek baar se zyada nahi.
+let _waLastCheck = 0;
+function waRequestHook(req, res, next) {
+  const now = Date.now();
+  if (now - _waLastCheck > 60000) {
+    _waLastCheck = now;
+    checkAndFireDueSlots().catch(e => console.error('  WA request-hook error:', e.message));
+  }
+  next();
+}
+
 function whatsAppReminderScheduler() {
   if (!WA.enabled) { console.log('  WhatsApp reminders disabled (WHATSAPP_ENABLED=false)'); return; }
   if (!WA.url || !WA.apiKey) {
-    console.log('  WhatsApp NOT configured — set url/apiKey in whatsapp.config.js, then restart');
+    console.log('  WhatsApp NOT configured — AUMPFY_API_URL / AUMPFY_API_KEY set karo, phir restart');
     return;
   }
-  // Reminder times come from config (IST). Default: 11:00 AM & 5:00 PM (office hours).
-  const slots = (Array.isArray(WA.reminderTimes) && WA.reminderTimes.length)
-    ? WA.reminderTimes
-    : (WA.reminderHour ? [{ h: WA.reminderHour, m: 0 }] : [{ h: 11, m: 0 }, { h: 17, m: 0 }]);
-  const label = slots.map(s => `${s.h}:${String(s.m || 0).padStart(2, '0')}`).join(' & ');
-  setInterval(async () => {
-    try {
-      // Compute time in IST (UTC+5:30) so it fires at the right clock time
-      // regardless of the server's timezone.
-      const ist = new Date(Date.now() + 330 * 60000);
-      // Monday (IST) ko reminder nahi jaata — baaki saare din normal
-      if (ist.getUTCDay() === 1) return;
-      const todayStr = ist.toISOString().split('T')[0];
-      if (todayStr !== _waReminderDay) { _waReminderDay = todayStr; _waFiredSlots.clear(); }
-      const nowMin = ist.getUTCHours() * 60 + ist.getUTCMinutes();
-      for (let i = 0; i < slots.length; i++) {
-        const slotMin = slots[i].h * 60 + (slots[i].m || 0);
-        // Fire once within a 30-min window of the slot (avoids double/late firing).
-        if (nowMin >= slotMin && nowMin < slotMin + 30 && !_waFiredSlots.has(i)) {
-          _waFiredSlots.add(i);
-          await getDB();
-          await runWhatsAppReminders();
-        }
-      }
-    } catch (e) { console.error('  WA scheduler tick error:', e.message); }
+  const label = waSlots().map(s => `${s.h}:${String(s.m || 0).padStart(2, '0')}`).join(' & ');
+  setInterval(() => {
+    checkAndFireDueSlots().catch(e => console.error('  WA scheduler tick error:', e.message));
   }, 60 * 1000);
-  console.log(`  WhatsApp reminder scheduler started (fires daily at ${label} IST, Monday skip)`);
+  console.log(`  WhatsApp reminder scheduler started (daily ${label} IST, Monday skip, ${WA_CATCHUP_MIN}min catch-up)`);
 }
 
 // ══════════════════════════════════════════════════════
