@@ -506,6 +506,12 @@ const MYSQL_SCHEMA = {
     user_id: "VARCHAR(20) DEFAULT ''", from_date: "VARCHAR(40) DEFAULT ''",
     to_date: "VARCHAR(40) DEFAULT ''", reason: "TEXT",
     status: "VARCHAR(20) DEFAULT 'pending'", note: "TEXT", created_at: "VARCHAR(40) DEFAULT ''"
+  },
+  // Chhoti key-value table — abhi WhatsApp reminder ke "aaj is slot ka pass ho
+  // chuka" marker ke liye. App restart hone par bhi yaad rehta hai, isliye
+  // logon ko duplicate reminder nahi jaate.
+  App_State: {
+    key_name: "VARCHAR(120) DEFAULT ''", value: "TEXT", updated_at: "VARCHAR(40) DEFAULT ''"
   }
 };
 
@@ -893,17 +899,56 @@ function waReminderMsg(name, tasks, todayStr) {
 }
 
 // ── Daily WhatsApp reminder pass (delegation + checklist, one message per user) ──
+// ── Reminder pass ke do safety guards ──
+// 1) In-flight lock: ek pass chal raha ho to doosra shuru nahi hota (varna app
+//    par double load padta tha aur 504 aata tha).
+// 2) DB marker: "aaj is slot ka pass ho chuka" DB me likha jaata hai, isliye
+//    app restart hone par bhi logon ko duplicate reminder nahi jaate.
+let _waPassInFlight = false;
+
+async function _waSlotDone(marker) {
+  try {
+    const d = await getDB();
+    const rows = await d.findWhere('App_State', { key_name: marker });
+    return !!(rows && rows.length);
+  } catch (e) { return false; }   // table na ho to purana behaviour
+}
+async function _waMarkSlotDone(marker) {
+  try {
+    const d = await getDB();
+    await d.insert('App_State', {
+      key_name: marker, value: 'sent',
+      updated_at: new Date().toISOString().replace('T', ' ').split('.')[0]
+    });
+  } catch (e) { /* marker na likh paye to bhi pass chalta rahe */ }
+}
+
 async function runWhatsAppReminders() {
   if (!WA.enabled) return { skipped: 'disabled' };
   // OFFICE HOURS GUARD (hard rule): reminders SIRF 11:00 AM – 7:00 PM IST me
   // jaate hain — scheduler, cron ya manual button, kahin se bhi trigger ho,
   // is window ke bahar kabhi nahi bhejta.
-  const istHour = new Date(Date.now() + 330 * 60000).getUTCHours();
+  const ist = new Date(Date.now() + 330 * 60000);
+  const istHour = ist.getUTCHours();
   if (istHour < 11 || istHour >= 19) {
     console.log('  WhatsApp reminders skipped — outside office hours (11:00-19:00 IST)');
     return { skipped: 'outside-office-hours' };
   }
+  if (_waPassInFlight) {
+    console.log('  WhatsApp reminder pass already running — skipped');
+    return { skipped: 'already-running' };
+  }
+  // Lock ko kisi bhi await se PEHLE set karo — warna do concurrent calls dono
+  // check paas kar jaate hain aur sabko double message chala jaata hai.
+  _waPassInFlight = true;
   try {
+    // Slot marker: din + ghanta (11 baje ka pass aur 17 baje ka pass alag)
+    const marker = `wa_pass_${ist.toISOString().split('T')[0]}_${istHour}`;
+    if (await _waSlotDone(marker)) {
+      console.log(`  WhatsApp reminders already sent for ${marker} — skipped`);
+      return { skipped: 'already-sent-today' };
+    }
+    await _waMarkSlotDone(marker);
     const todayStr = new Date().toISOString().split('T')[0];
     const cutoff = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
@@ -938,6 +983,8 @@ async function runWhatsAppReminders() {
   } catch (err) {
     console.error('  runWhatsAppReminders error:', err.message);
     return { error: err.message };
+  } finally {
+    _waPassInFlight = false;   // pass khatam/fail — lock hamesha chhoot jaaye
   }
 }
 
