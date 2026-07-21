@@ -1681,6 +1681,21 @@ app.post('/api/tasks/checklist-delete-all', requireAuth, requireAdmin, async (re
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Checklist tasks ka "Assigned By" ek user se doosre par shift karta hai.
+// Sirf assigned_by badalta hai — doer, date, status, description sab waise hi.
+app.post('/api/tasks/checklist-reassign-assigner', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const from = String(req.body?.fromUserId || '');
+    const to = String(req.body?.toUserId || '');
+    if (!from || !to) return res.status(400).json({ error: 'fromUserId aur toUserId dono chahiye' });
+    const all = await db.findAll('Checklist_Tasks');
+    const target = all.filter(t => String(t.assigned_by) === from);
+    for (const t of target) await db.update('Checklist_Tasks', t.id, { assigned_by: to });
+    console.log(`  Checklist assigned_by ${from} -> ${to}: ${target.length} tasks updated`);
+    res.json({ success: true, updated: target.length });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ── General /:id routes AFTER all specific routes ──
 
 app.delete('/api/tasks/:id', requireAuth, requireAdmin, async (req, res) => {

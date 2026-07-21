@@ -919,6 +919,9 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
         <button class="btn btn-outline" id="deleteAllChecklistBtn" onclick="deleteAllChecklist()"
           style="color:#fff;background:#dc2626;border-color:#dc2626;display:none"
           title="Sab users ke COMPLETED checklist tasks permanently delete (pending safe)">🗑 Delete Completed Checklist</button>
+        <button class="btn btn-outline" id="reassignHarshBtn" onclick="reassignChecklistAssigner()"
+          style="color:#4338ca;border-color:#c7d2fe;display:none"
+          title="Jin checklist tasks me Assigned By 'Harsh' hai, unhe 'Rahul Sir' kar do">🔁 Harsh → Rahul Sir</button>
       </div>
     </div>
     <!-- Status filter tabs -->
@@ -2891,6 +2894,8 @@ async function loadAllTasks() {
   // Delete ALL Checklist — sirf admin ko, sirf Checklist tab par
   const delAllBtn = document.getElementById('deleteAllChecklistBtn');
   if (delAllBtn) delAllBtn.style.display = (isAdmin && tasksType === 'checklist') ? '' : 'none';
+  const reBtn = document.getElementById('reassignHarshBtn');
+  if (reBtn) reBtn.style.display = (isAdmin && tasksType === 'checklist') ? '' : 'none';
 
   // PC desktop: show user filter + date range
   const filtersDiv = document.getElementById('tasksUserDateFilters');
@@ -3097,6 +3102,24 @@ async function deleteAllChecklist() {
   if (btn) { btn.disabled = false; btn.textContent = '🗑 Delete Completed Checklist'; }
   if (r && r.error) { showToast('Failed: ' + r.error, 'error'); return; }
   showToast(`✅ Deleted ${r.deleted} completed checklist task(s)`);
+  loadAllTasks();
+  loadDashboard();
+}
+
+// Checklist tasks me "Assigned By: Harsh" ko "Rahul Sir" kar deta hai.
+// Sirf assigned_by badalta hai — doer, date, status, description sab same.
+async function reassignChecklistAssigner() {
+  const users = await api('/api/users');
+  const find = n => (users || []).find(u => (u.name || '').trim().toLowerCase() === n);
+  const from = find('harsh'), to = find('rahul sir');
+  if (!from || !to) { showToast('Harsh ya Rahul Sir user nahi mila', 'error'); return; }
+  if (!confirm(`Checklist tasks me "Assigned By: ${from.name}" ko "${to.name}" kar dein?\n\nSirf Assigned By badlega — doer, date aur status waise hi rahenge.`)) return;
+  const btn = document.getElementById('reassignHarshBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Updating…'; }
+  const r = await api('/api/tasks/checklist-reassign-assigner', 'POST', { fromUserId: from.id, toUserId: to.id });
+  if (btn) { btn.disabled = false; btn.textContent = '🔁 Harsh → Rahul Sir'; }
+  if (r && r.error) { showToast('Failed: ' + r.error, 'error'); return; }
+  showToast(`✅ ${r.updated} checklist task(s) ab "${to.name}" ke naam se hain`);
   loadAllTasks();
   loadDashboard();
 }
