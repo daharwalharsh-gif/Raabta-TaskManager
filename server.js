@@ -3337,10 +3337,18 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
       const sm = s.h * 60 + (s.m || 0);
       return nowMin >= sm && nowMin < sm + WA_CATCHUP_MIN;
     });
+    // Config diagnose (key masked — poori key kabhi expose nahi hoti)
+    const k = String(WA.apiKey || '');
     res.json({
       now: istTime,
       slot: slot ? `${slot.h}:00` : null,
       status: slot ? 'slot-window-me-hai (pass check chal raha)' : 'outside-slot-window',
+      config: {
+        trigger: String(WA.url || '').split('/').pop(),
+        keyMasked: k ? `${k.slice(0, 8)}…${k.slice(-4)} (${k.length} chars)` : 'NOT SET',
+        notifyOnAssign: !!WA.notifyOnAssign,
+        reminderTimes: waSlots().map(s => `${s.h}:${String(s.m || 0).padStart(2, '0')}`).join(' & ')
+      },
       keptAlive: true
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
