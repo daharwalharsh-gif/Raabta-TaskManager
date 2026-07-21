@@ -909,6 +909,7 @@ let _waPassInFlight = false;
 async function _waSlotDone(marker) {
   try {
     const d = await getDB();
+    await ensureAppStateTab(d);
     const rows = await d.findWhere('App_State', { key_name: marker });
     return !!(rows && rows.length);
   } catch (e) { return false; }   // table na ho to purana behaviour
@@ -1695,6 +1696,40 @@ app.post('/api/tasks/checklist-reassign-assigner', requireAuth, requireAdmin, as
     res.json({ success: true, updated: target.length });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
+// ══════════════════════════════════════════════════════
+// ONE-TIME MIGRATIONS — startup par chalti hain, App_State marker se sirf
+// EK BAAR. Dobara deploy/restart hone par apne aap skip ho jaati hain.
+// ══════════════════════════════════════════════════════
+async function runOneTimeMigrations() {
+  // Checklist tasks ka "Assigned By: Harsh" -> "Rahul Sir"
+  const MARKER = 'migration_checklist_harsh_to_rahul_v1';
+  try {
+    const d = await getDB();
+    await ensureAppStateTab(d);
+    const already = await d.findWhere('App_State', { key_name: MARKER });
+    if (already && already.length) return;   // pehle ho chuki
+
+    const users = await d.findAll('Users');
+    const byName = n => users.find(u => (u.name || '').trim().toLowerCase() === n);
+    const from = byName('harsh'), to = byName('rahul sir');
+    if (!from || !to) {
+      console.log('  Migration skipped — Harsh/Rahul Sir user nahi mila');
+      return;
+    }
+    const all = await d.findAll('Checklist_Tasks');
+    const target = all.filter(t => String(t.assigned_by) === String(from.id));
+    for (const t of target) await d.update('Checklist_Tasks', t.id, { assigned_by: String(to.id) });
+
+    await d.insert('App_State', {
+      key_name: MARKER, value: `updated ${target.length}`,
+      updated_at: new Date().toISOString().replace('T', ' ').split('.')[0]
+    });
+    console.log(`  ✅ Migration: ${target.length} checklist task(s) ka Assigned By "${from.name}" -> "${to.name}"`);
+  } catch (e) {
+    console.error('  Migration error (agli baar retry hogi):', e.message);
+  }
+}
 
 // ── General /:id routes AFTER all specific routes ──
 
@@ -2616,6 +2651,29 @@ async function ensureLeaveTab(d) {
   }
 }
 
+// Helper: App_State tab ensure karo (MySQL me schema se auto ban jaati hai;
+// Google Sheets me pehli baar khud banani padti hai)
+async function ensureAppStateTab(d) {
+  try {
+    await d.findAll('App_State');
+  } catch (e) {
+    try {
+      await withRetry(() => d.sheets.spreadsheets.batchUpdate({
+        spreadsheetId: SHEET_ID,
+        requestBody: { requests: [{ addSheet: { properties: { title: 'App_State' } } }] }
+      }));
+    } catch (e2) { /* already exists race */ }
+    await withRetry(() => d.sheets.spreadsheets.values.update({
+      spreadsheetId: SHEET_ID,
+      range: 'App_State!A1:D1',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [['id', 'key_name', 'value', 'updated_at']] }
+    }));
+    delete d._hdrCache['App_State'];
+    delete d._cache['App_State'];
+  }
+}
+
 // Parse FMS row from sheet
 function parseFMSRow(row) {
   let steps = [];
@@ -3327,7 +3385,9 @@ async function seedAdminIfNeeded() {
 (async () => {
   try {
     // Start background DB connection
-    getDB().catch(err => console.error('  Background DB connection failed (will retry on demand):', err.message));
+    getDB()
+      .then(() => runOneTimeMigrations())
+      .catch(err => console.error('  Background DB connection failed (will retry on demand):', err.message));
 
     // SMTP verify (non-blocking)
     if (process.env.SMTP_USER && process.env.SMTP_PASS) {
