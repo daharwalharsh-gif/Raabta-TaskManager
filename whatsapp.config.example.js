@@ -1,20 +1,31 @@
 // ══════════════════════════════════════════════════════
 // WhatsApp API config (Aumpfy) — TEMPLATE / EXAMPLE
 // ══════════════════════════════════════════════════════
-// Is file ko copy karke  whatsapp.config.js  banao aur usme apni asli values
-// daalo. whatsapp.config.js gitignored hai — aapki API key GitHub par kabhi
-// nahi jayegi.
+// ⚠️  API key kabhi bhi code me mat likho aur git me mat daalo — repo public
+//     hai, aur uski koi bhi copy aapke WhatsApp se message bhejne lagegi.
 //
-// Jab bhi aapki API change ho: sirf whatsapp.config.js me url / apiKey / format
-// badlo aur app RESTART kar do. Kisi aur file ko haath lagane ki zaroorat nahi.
+// SAHI TARIKA (production): Hostinger hPanel → Environment variables me
+//     AUMPFY_API_URL  aur  AUMPFY_API_KEY  set karo. Ye file wahin se padhti hai.
+//
+// Local dev me chaho to  whatsapp.config.js  bana lo (wo gitignored hai).
+// API change ho to sirf env var badlo aur app restart karo.
 // ══════════════════════════════════════════════════════
-module.exports = {
-  // WhatsApp alerts ON/OFF
-  enabled: (process.env.WHATSAPP_ENABLED || 'true').toLowerCase() !== 'false',
+const _url = process.env.AUMPFY_API_URL || '';
+const _key = process.env.AUMPFY_API_KEY || '';
+// Credentials set hi na hon to WhatsApp band rakho — placeholder se failed
+// send karke logs bharne ka koi fayda nahi.
+const _configured = _url.startsWith('http') && _key.startsWith('sl_');
+if (!_configured) {
+  console.log('  WhatsApp NOT configured — AUMPFY_API_URL / AUMPFY_API_KEY env vars set karo');
+}
 
-  // ── Aumpfy trigger (apne Aumpfy dashboard se) ──
-  url:    process.env.AUMPFY_API_URL || 'https://api.aumpfy.com/api/apis/trigger/your-trigger-slug',
-  apiKey: process.env.AUMPFY_API_KEY || 'sl_your_api_key_here',
+module.exports = {
+  // WhatsApp alerts ON/OFF (credentials na hon to apne aap OFF)
+  enabled: _configured && (process.env.WHATSAPP_ENABLED || 'true').toLowerCase() !== 'false',
+
+  // ── Aumpfy trigger (sirf env se — hardcode mat karo) ──
+  url:    _url,
+  apiKey: _key,
 
   // ── Trigger jo body maangta hai uska shape ──
   // Naya trigger alag fields maange to SIRF ye 3 lines badlo.
