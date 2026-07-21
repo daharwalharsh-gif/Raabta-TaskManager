@@ -2874,6 +2874,7 @@ let allTasksData = [];
 let taskStatusFilter = 'pending';
 
 let allTasksPage = 1;
+let _dueSort = '';   // '' | 'desc' (latest pehle) | 'asc' (purani pehle)
 const ALL_TASKS_PAGE_SIZE = 50;
 
 async function loadAllTasks() {
@@ -2993,6 +2994,14 @@ function renderTasksTable() {
     return;
   }
 
+  // Due Date sort (serial-number dates bhi sahi compare hon isliye normDate)
+  if (_dueSort) {
+    tasks = [...tasks].sort((a, b) => {
+      const x = normDate(a.due_date || ''), y = normDate(b.due_date || '');
+      return _dueSort === 'desc' ? y.localeCompare(x) : x.localeCompare(y);
+    });
+  }
+
   const totalPages = Math.ceil(tasks.length / ALL_TASKS_PAGE_SIZE);
   const pageTasks = tasks.slice((allTasksPage-1)*ALL_TASKS_PAGE_SIZE, allTasksPage*ALL_TASKS_PAGE_SIZE);
 
@@ -3061,7 +3070,7 @@ function renderTasksTable() {
             <th>Doer</th>
             <th>Assignee</th>
             <th title="Date jab task delegate hua tha">Assigned On</th>
-            <th>Due Date</th>
+            <th onclick="toggleDueDateSort()" style="cursor:pointer;user-select:none" title="Click karo — latest date pehle / purani pehle">Due Date ${_dueSort === 'desc' ? '▼' : _dueSort === 'asc' ? '▲' : '⇅'}</th>
             <th>Remarks</th>
             <th>Status</th>
           </tr></thead>
@@ -3070,6 +3079,14 @@ function renderTasksTable() {
       </div>
       ${paginationHtml}
     </div>`;
+}
+
+// Due Date column sort — pehli click: latest date pehle, doosri: purani pehle,
+// teesri: sort hata do (jaisa aaya waisa)
+function toggleDueDateSort() {
+  _dueSort = _dueSort === 'desc' ? 'asc' : (_dueSort === 'asc' ? '' : 'desc');
+  allTasksPage = 1;
+  renderTasksTable();
 }
 
 function tasksTab(type, el) {
@@ -4325,10 +4342,25 @@ function showToast(msg,type='success') {
 // ══════════════════════════════════════════════════════
 // ── DATE FORMAT HELPER ──────────────────────────────
 // Converts YYYY-MM-DD → DD-MM-YYYY for display only
+// Kuch rows me due_date Excel/Sheets ka serial number (jaise 46219) hai —
+// usse asli date (YYYY-MM-DD) me badal deta hai. Baaki values waise hi.
+function normDate(d) {
+  if (d === null || d === undefined) return '';
+  const s = String(d).trim();
+  if (/^\d{5}$/.test(s)) {                       // Excel serial (~1970-2070)
+    const n = parseInt(s, 10);
+    if (n > 20000 && n < 60000) {
+      return new Date(Date.UTC(1899, 11, 30) + n * 86400000).toISOString().split('T')[0];
+    }
+  }
+  return s;
+}
+
 function fmtDate(d) {
   if (!d) return '';
-  const parts = d.split('-');
-  if (parts.length !== 3) return d;
+  const s = normDate(d);
+  const parts = s.split('-');
+  if (parts.length !== 3) return s;
   return `${parts[2]}-${parts[1]}-${parts[0]}`;
 }
 // ── SET WEEK PLAN ───────────────────────────────────
