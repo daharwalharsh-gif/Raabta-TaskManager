@@ -3342,12 +3342,21 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
       const sm = s.h * 60 + (s.m || 0);
       return nowMin >= sm && nowMin < sm + WA_CATCHUP_MIN;
     });
+    // Aaj us slot ka pass ho chuka ya nahi — diagnose ke liye
+    let sentToday = null;
+    if (slot) {
+      const mk = `wa_pass_${ist.toISOString().split('T')[0]}_${slot.h}${String(slot.m || 0).padStart(2, '0')}`;
+      sentToday = await _waSlotDone(mk);
+    }
     // Config diagnose (key masked — poori key kabhi expose nahi hoti)
     const k = String(WA.apiKey || '');
     res.json({
       now: istTime,
-      slot: slot ? `${slot.h}:00` : null,
-      status: slot ? 'slot-window-me-hai (pass check chal raha)' : 'outside-slot-window',
+      slot: slot ? `${slot.h}:${String(slot.m || 0).padStart(2, '0')}` : null,
+      sentToday,
+      status: slot
+        ? (sentToday ? 'is slot ka reminder aaj ja chuka hai' : 'slot-window-me-hai (pass chal raha)')
+        : 'outside-slot-window',
       config: {
         trigger: String(WA.url || '').split('/').pop(),
         keyMasked: k ? `${k.slice(0, 8)}…${k.slice(-4)} (${k.length} chars)` : 'NOT SET',
