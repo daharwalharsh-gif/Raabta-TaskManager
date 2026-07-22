@@ -26,7 +26,7 @@ module.exports = {
   notifyOnAssign: true,
 
   // Office hours rule: reminders sirf 11:00 AM – 7:00 PM IST me jaate hain
-  reminderTimes: [ { h: 11, m: 0 }, { h: 17, m: 0 } ],   // 11:00 AM & 5:00 PM
+  reminderTimes: [ { h: 10, m: 40 }, { h: 17, m: 0 } ],   // 10:40 AM & 5:00 PM
   timeoutMs:    60000,   // Aumpfy real-number send can take ~50s to respond
   appUrl:       process.env.APP_URL || ''
 };
