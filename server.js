@@ -1013,7 +1013,7 @@ function waSlots() {
 // idle hone par so jaati hai — theek 11:00 baje koi tick miss ho jaye to bhi
 // jagte hi (kisi bhi request par) reminder chala jaata hai. DB marker duplicate
 // rokta hai, isliye late-but-sent safe hai.
-const WA_CATCHUP_MIN = 120;
+const WA_CATCHUP_MIN = 120;   // (legacy) — ab catch-up slot-time se 7 PM tak hai
 
 // Kya abhi koi slot due hai? Due ho to reminder pass chala do.
 // Interval se bhi call hota hai aur har HTTP request par bhi (throttled).
@@ -1022,12 +1022,16 @@ async function checkAndFireDueSlots() {
   const ist = new Date(Date.now() + 330 * 60000);
   if (ist.getUTCDay() === 1) return;                      // Monday skip
   const nowMin = ist.getUTCHours() * 60 + ist.getUTCMinutes();
-  const slots = waSlots();
-  for (const s of slots) {
+  const OFFICE_END = 19 * 60;   // 7:00 PM IST — catch-up isi tak
+  // Slot due hai agar uska time nikal chuka hai aur abhi office hours ke andar
+  // hain. Window slot-time se 7 PM tak — isliye app din me kabhi bhi khule (ya
+  // koi request aaye) to us din ka missed reminder tab bhi chala jaata hai.
+  // DB marker duplicate rokta hai (ek slot ek din me ek hi baar).
+  const slots = [...waSlots()].sort((a, b) => (b.h * 60 + (b.m || 0)) - (a.h * 60 + (a.m || 0)));
+  for (const s of slots) {   // baad wale slot ko pehle dekho (recent slot priority)
     const slotMin = s.h * 60 + (s.m || 0);
-    if (nowMin >= slotMin && nowMin < slotMin + WA_CATCHUP_MIN) {
+    if (nowMin >= slotMin && nowMin < OFFICE_END) {
       await getDB();
-      // slotKey = slot ka apna ghanta, taaki late catch-up par bhi wahi marker bane
       // slotKey me ghanta+minute dono, taaki 10:40 jaise slots ka marker sahi bane
       return await runWhatsAppReminders(`${s.h}${String(s.m || 0).padStart(2, '0')}`);
     }
@@ -1056,7 +1060,7 @@ function whatsAppReminderScheduler() {
   setInterval(() => {
     checkAndFireDueSlots().catch(e => console.error('  WA scheduler tick error:', e.message));
   }, 60 * 1000);
-  console.log(`  WhatsApp reminder scheduler started (daily ${label} IST, Monday skip, ${WA_CATCHUP_MIN}min catch-up)`);
+  console.log(`  WhatsApp reminder scheduler started (daily ${label} IST, Monday skip, catch-up till 7PM)`);
 }
 
 // ══════════════════════════════════════════════════════
@@ -3372,9 +3376,9 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
       .then(r => console.log('  WA reminders (cron):', JSON.stringify(r)))
       .catch(e => console.error('  WA reminders (cron) error:', e.message));
     const nowMin = ist.getUTCHours() * 60 + ist.getUTCMinutes();
-    const slot = waSlots().find(s => {
+    const slot = [...waSlots()].sort((a, b) => (b.h * 60 + (b.m || 0)) - (a.h * 60 + (a.m || 0))).find(s => {
       const sm = s.h * 60 + (s.m || 0);
-      return nowMin >= sm && nowMin < sm + WA_CATCHUP_MIN;
+      return nowMin >= sm && nowMin < 19 * 60;   // slot-time se 7 PM tak
     });
     // Aaj us slot ka pass ho chuka ya nahi — diagnose ke liye
     let sentToday = null;
