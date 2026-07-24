@@ -4276,6 +4276,7 @@ async function handleLeave(id, action) {
 let _crmTasks = [];
 let _crmTab = 'upcoming';
 let _crmExpanded = new Set();   // kaunse doer groups khule hain
+let _crmGroupType = {};         // har doer group ka active sub-tab: 'delegation'|'checklist'
 
 async function loadCRM() {
   const cont = document.getElementById('crmContent');
@@ -4359,7 +4360,6 @@ function renderCRM() {
     const isToday = k === todayStr;
     const todayTag = isToday ? ' <span style="font-size:9px;font-weight:700;padding:1px 7px;border-radius:8px;background:#fffbeb;color:#d97706;border:1px solid #fde68a">Today</span>' : '';
     return `<tr>
-      <td><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;${t.taskType === 'delegation' ? 'background:#ecfdf5;color:#1d4ed8;border:1px solid #bfdbfe' : 'background:#fef9c3;color:#854d0e;border:1px solid #fde68a'}">${t.taskType === 'delegation' ? 'Delegation' : 'Checklist'}</span></td>
       <td>${t.description || '—'}</td>
       <td style="color:#64748b">${t.assignedByName || '—'}</td>
       <td style="white-space:nowrap;${overdue ? 'color:#dc2626;font-weight:700' : ''}">${fmtDate(t.due_date || '') || '—'}${overdue ? ' ⚠️' : ''}${todayTag}</td>
@@ -4391,17 +4391,36 @@ function renderCRM() {
             ${overdueCount ? `<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca">${overdueCount} overdue</span>` : ''}
           </div>
         </div>
-        ${open ? `
-        <div class="flat-tasks-table" style="border:none;border-radius:0">
-          <table>
-            <thead><tr>
-              <th>Type</th><th>Description</th><th>Assigned By</th><th>Due Date</th><th>Priority</th><th>Status</th>
-            </tr></thead>
-            <tbody>${list.map(taskRow).join('')}</tbody>
-          </table>
-        </div>` : ''}
+        ${open ? (() => {
+          const del = list.filter(t => t.taskType === 'delegation');
+          const chl = list.filter(t => t.taskType === 'checklist');
+          // Active sub-tab — default delegation (agar delegation khaali ho aur
+          // checklist me ho to checklist), warna jo user ne chuna
+          let active = _crmGroupType[name];
+          if (!active) active = del.length ? 'delegation' : (chl.length ? 'checklist' : 'delegation');
+          const shown = active === 'checklist' ? chl : del;
+          const tab = (type, label, n) => `<div onclick="event.stopPropagation();setCrmGroupType(${i},'${type}')" style="cursor:pointer;padding:6px 14px;font-size:12px;font-weight:600;border-radius:8px 8px 0 0;border:1px solid #e2e8f0;border-bottom:none;${active===type?'background:#fff;color:#4338ca':'background:#f1f5f9;color:#64748b'}">${label} (${n})</div>`;
+          return `
+          <div style="padding:10px 12px 0;display:flex;gap:4px">${tab('delegation','Delegation',del.length)}${tab('checklist','Checklist',chl.length)}</div>
+          <div class="flat-tasks-table" style="border:none;border-radius:0">
+            ${shown.length ? `<table>
+              <thead><tr>
+                <th>Description</th><th>Assigned By</th><th>Due Date</th><th>Priority</th><th>Status</th>
+              </tr></thead>
+              <tbody>${shown.map(taskRow).join('')}</tbody>
+            </table>` : `<div style="padding:16px;text-align:center;color:#94a3b8;font-size:13px">No ${active} tasks</div>`}
+          </div>`;
+        })() : ''}
       </div>`;
     }).join('')}`;
+}
+
+// PC group ka Delegation/Checklist sub-tab switch
+function setCrmGroupType(idx, type) {
+  const name = (window._crmGroupNames || [])[idx];
+  if (name === undefined) return;
+  _crmGroupType[name] = type;
+  renderCRM();
 }
 
 function toggleCrmGroup(idx) {
