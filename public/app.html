@@ -180,6 +180,7 @@ tbody tr:last-child td{border-bottom:none;}
 .status-badge.completed{background:#f0fdf4;color:#16a34a;}
 .status-badge.revised{background:#fffbeb;color:#d97706;}
 .status-badge.closed{background:#e0e7ff;color:#3730a3;}
+.status-badge.report{background:#fff7ed;color:#c2410c;}
 
 .chart-card{background:#fff;border-radius:16px;border:none;padding:18px;box-shadow:0 4px 20px rgba(0,0,0,0.07);}
 .chart-card h3{font-size:14px;font-weight:700;margin-bottom:14px;}
@@ -931,7 +932,9 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
         <div class="tab" id="statusTabRevised" onclick="filterTaskStatus('revised',this)">Revised</div>
         <div class="tab" id="statusTabCompleted" onclick="filterTaskStatus('completed',this)">Completed</div>
         <div class="tab" id="statusTabClosed" onclick="filterTaskStatus('closed',this)">Closed Tasks</div>
+        <div class="tab" id="statusTabReport" onclick="filterTaskStatus('report',this)" style="position:relative">Report <span id="reportTabCount" style="display:none;font-size:10px;background:#f59e0b;color:#fff;border-radius:9px;padding:1px 6px;margin-left:2px">0</span></div>
       </div>
+      <button id="groupByDoerBtn" class="btn btn-outline btn-sm" onclick="toggleTasksGroup()" style="margin-left:auto">👥 Group by Doer: OFF</button>
     </div>
     <div id="tasksContent"></div>
   </div>
@@ -1261,6 +1264,40 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
 
 <!-- Phone-style FMS popup notifications (fms-tasks tab) -->
 <div id="fmsNotifStack"></div>
+
+<!-- Report submit modal (doer delegation task Done kare — image/PDF attach) -->
+<div class="modal-overlay" id="reportModal">
+  <div class="modal">
+    <h3>✅ Submit Report</h3>
+    <div class="alert error" id="reportErr"></div>
+    <div style="font-size:13px;color:#64748b;margin-bottom:12px">Task complete kiya? Proof ke liye image aur/ya PDF attach karo (optional), phir submit karo. Ye admin ke Report tab me review ke liye jayega.</div>
+    <div class="form-group">
+      <label>Image (optional) <span style="color:#94a3b8;font-weight:400;font-size:11px">— max 3 MB</span></label>
+      <input type="file" id="reportImage" accept="image/*" style="font-size:13px"/>
+    </div>
+    <div class="form-group">
+      <label>PDF (optional) <span style="color:#94a3b8;font-weight:400;font-size:11px">— max 3 MB</span></label>
+      <input type="file" id="reportPdf" accept="application/pdf" style="font-size:13px"/>
+    </div>
+    <div class="form-group">
+      <label>Note (optional)</label>
+      <textarea id="reportNote" placeholder="Koi remark…" style="min-height:50px"></textarea>
+    </div>
+    <div class="modal-footer" style="justify-content:space-between">
+      <button class="btn btn-outline" onclick="closeModal('reportModal')">Cancel</button>
+      <button class="btn btn-primary" id="reportSubmitBtn" onclick="submitReport()">Submit</button>
+    </div>
+  </div>
+</div>
+
+<!-- View attachments modal -->
+<div class="modal-overlay" id="viewReportModal">
+  <div class="modal" style="max-width:640px">
+    <h3>📎 Report Attachments</h3>
+    <div id="viewReportBody" style="max-height:70vh;overflow-y:auto"></div>
+    <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('viewReportModal')">Close</button></div>
+  </div>
+</div>
 
 <!-- Dashboard status card popup (doer select karke card click karne par) -->
 <div class="modal-overlay" id="dashStatusModal">
@@ -2859,13 +2896,20 @@ function renderDashTable(tasks, type) {
       <td>
         ${t.waiting_approval==1 ? `
           <span style="font-size:11px;color:#f59e0b;font-weight:600">⏳ Waiting Approval</span>
-          ${(!isPC || t.type==='checklist') ? `<button class="action-btn done" style="margin-left:3px" onclick="updateStatus(${t.id},'completed','dashboard','${t.type}')">Done</button>` : ''}
+          ${(!isPC || t.type==='checklist') ? `<button class="action-btn done" style="margin-left:3px" onclick="dashDone(${t.id},'${t.type}')">Done</button>` : ''}
         ` : `
-          ${(!isPC || t.type==='checklist') ? `<button class="action-btn done" onclick="updateStatus(${t.id},'completed','dashboard','${t.type}')">Done</button>` : ''}
+          ${(!isPC || t.type==='checklist') ? `<button class="action-btn done" onclick="dashDone(${t.id},'${t.type}')">Done</button>` : ''}
           ${(!isPC && t.type!=='checklist') ? `<button class="action-btn revise" style="margin-left:3px" onclick="openReviseModal(${t.id},'${t.type}')">Revise</button>` : ''}
         `}
       </td>
     </tr>`).join('');
+}
+
+// Dashboard Done: doer (plain user) ka delegation task report modal se jaye;
+// admin/hod/checklist seedha complete.
+function dashDone(id, type) {
+  if (type === 'delegation' && ME.role === 'user') openReportModal(id);
+  else updateStatus(id, 'completed', 'dashboard', type);
 }
 
 // ══════════════════════════════════════════════════════
@@ -2876,6 +2920,9 @@ let taskStatusFilter = 'pending';
 
 let allTasksPage = 1;
 let _dueSort = '';   // '' | 'desc' (latest pehle) | 'asc' (purani pehle)
+let _tasksGroupBy = false;          // All Tasks doer-wise grouping ON/OFF
+let _tasksExpanded = new Set();     // kaunse doer groups khule hain
+let _reportTaskId = null;           // report modal ka current task
 const ALL_TASKS_PAGE_SIZE = 50;
 
 async function loadAllTasks() {
@@ -2898,6 +2945,13 @@ async function loadAllTasks() {
   if (delAllBtn) delAllBtn.style.display = (isAdmin && tasksType === 'checklist') ? '' : 'none';
   const reBtn = document.getElementById('reassignHarshBtn');
   if (reBtn) reBtn.style.display = (isAdmin && tasksType === 'checklist') ? '' : 'none';
+
+  // Report tab (doer ke bheje reports review) — admin/HOD ko, sirf Delegation par
+  const repTab = document.getElementById('statusTabReport');
+  if (repTab) repTab.style.display = ((isAdmin || isHod) && tasksType === 'delegation') ? '' : 'none';
+  // Group by Doer — jinko multiple doers dikhte hain (admin/HOD/PC)
+  const grpBtn = document.getElementById('groupByDoerBtn');
+  if (grpBtn) grpBtn.style.display = (isAdmin || isHod || isPC) ? '' : 'none';
 
   // PC desktop: show user filter + date range
   const filtersDiv = document.getElementById('tasksUserDateFilters');
@@ -2964,6 +3018,61 @@ function filterTaskStatus(status, el) {
   renderTasksTable();
 }
 
+// Ek task ki <tr> — action buttons role + status ke hisaab se
+function renderTaskRow(t, isAdmin) {
+  const isCompleted = t.status === 'completed';
+  const isClosed = t.status === 'closed';
+  const isReport = t.status === 'report';
+  const isWaiting = t.waiting_approval == 1;
+  const isChecklist = tasksType === 'checklist';
+  const attBtn = t.hasAttachments
+    ? `<button class="action-btn" style="background:#fff7ed;color:#c2410c;margin-left:3px" onclick="viewReportAttachments(${t.id})" title="Attachments dekho">📎 View</button>` : '';
+
+  const actionBtns = isAdmin ? `
+      <button class="action-btn edit" style="padding:4px 7px" onclick="openEditTask(${t.id},'${tasksType}')" title="Edit">✏️</button>
+      <button class="action-btn delete" style="padding:4px 7px;margin-left:3px" onclick="deleteTask(${t.id},'${tasksType}')" title="Delete">🗑</button>
+      <button class="action-btn" style="background:#ecfdf5;color:#1d4ed8;padding:4px 7px;margin-left:3px" onclick="openComments(${t.id},'${tasksType}')" title="Comments">💬</button>
+      ${isReport ? `${attBtn}
+        <button class="action-btn done" style="margin-left:3px" onclick="updateStatus(${t.id},'completed','alltasks','${tasksType}')" title="Report approve — Completed me daal do">✅ Complete</button>
+        <button class="action-btn" style="background:#fef2f2;color:#dc2626;margin-left:3px" onclick="reportBackToPending(${t.id})" title="Wapas Pending — doer dobara kare">↩ Pending</button>` : ''}
+      ${!isCompleted && !isClosed && !isReport && !isWaiting ? `<button class="action-btn done" style="margin-left:3px" onclick="updateStatus(${t.id},'completed','alltasks','${tasksType}')">Done</button>` : ''}
+      ${!isChecklist && !isCompleted && !isClosed && !isReport && !isWaiting ? `<button class="action-btn revise" style="margin-left:3px" onclick="openReviseModal(${t.id},'${tasksType}')">Revise</button>` : ''}
+      ${isCompleted || isClosed ? `<button class="action-btn" style="background:#fef3c7;color:#92400e;margin-left:3px" onclick="reopenTask(${t.id},'${tasksType}')" title="Reopen — mark as pending again">↺ Reopen</button>` : ''}
+      ${isCompleted ? `<button class="action-btn" style="background:#e0e7ff;color:#3730a3;margin-left:3px" onclick="closeTask(${t.id},'${tasksType}')" title="Close — task will move to the Closed Tasks tab">🔒 Close</button>${attBtn}` : ''}
+      ${isWaiting ? `<span style="font-size:11px;color:#f59e0b;font-weight:600;margin-left:4px">⏳ Waiting</span>` : ''}
+    ` : (ME.role==='pc') ? `
+      <button class="action-btn" style="background:#ecfdf5;color:#1d4ed8;padding:4px 7px" onclick="openComments(${t.id},'${tasksType}')" title="Comments">💬</button>
+      ${isChecklist && !isCompleted && !isClosed && !isWaiting ? `<button class="action-btn done" style="margin-left:3px" onclick="updateStatus(${t.id},'completed','alltasks','${tasksType}')">Done</button>` : ''}
+      ${isWaiting ? `<span style="font-size:11px;color:#f59e0b;font-weight:600;margin-left:4px">⏳ Waiting</span>` : ''}
+    ` : `
+      <button class="action-btn" style="background:#ecfdf5;color:#1d4ed8;padding:4px 7px" onclick="openComments(${t.id},'${tasksType}')" title="Comments">💬</button>
+      ${isReport ? `${attBtn}<span style="font-size:11px;color:#c2410c;font-weight:600;margin-left:4px">📤 Report bheja</span>` : ''}
+      ${!isCompleted && !isClosed && !isReport && !isWaiting ? `
+        ${isChecklist
+          ? `<button class="action-btn done" style="margin-left:3px" onclick="updateStatus(${t.id},'completed','alltasks','${tasksType}')">Done</button>`
+          : `<button class="action-btn done" style="margin-left:3px" onclick="openReportModal(${t.id})" title="Done — image/PDF ke saath report bhejo">Done</button>
+             <button class="action-btn revise" style="margin-left:3px" onclick="openReviseModal(${t.id},'${tasksType}')">Revise</button>`}
+      ` : ''}
+      ${isWaiting ? `
+        <button class="action-btn done" style="margin-left:3px" onclick="updateStatus(${t.id},'completed','alltasks','${tasksType}')">Done</button>
+        <span style="font-size:11px;color:#f59e0b;font-weight:600;margin-left:4px">⏳ Waiting</span>` : ''}
+    `;
+
+  const statusLabel = t.status==='revised' ? 'Revision Requested'
+    : t.status==='report' ? 'Report'
+    : t.status.charAt(0).toUpperCase()+t.status.slice(1);
+  return `<tr>
+      <td style="white-space:nowrap">${actionBtns}</td>
+      <td>${t.description||''}${t.report_note ? ` <span style="font-size:10px;color:#c2410c">📝 ${t.report_note}</span>` : ''}</td>
+      <td>${t.assignedToName||''}</td>
+      <td>${t.assignedByName||''}</td>
+      <td style="white-space:nowrap;font-size:12px;color:#64748b">${fmtDate(t.assigned_on||'')||'—'}</td>
+      <td style="white-space:nowrap">${fmtDate(t.due_date||'')||''}</td>
+      <td style="color:#64748b">${t.remarks||'—'}</td>
+      <td><span class="status-badge ${t.status}">${statusLabel}</span></td>
+    </tr>`;
+}
+
 function renderTasksTable() {
   const isAdmin = ME.role==='admin' || ME.role==='hod'; // HOD gets admin-like view
   // PC gets view-only — see ME.role==='pc' branch in actionBtns below
@@ -2972,6 +3081,11 @@ function renderTasksTable() {
   const dateFrom = document.getElementById('tasksDateFrom')?.value || '';
   const dateTo = document.getElementById('tasksDateTo')?.value || '';
   const container = document.getElementById('tasksContent');
+
+  // Report tab count badge (delegation Report tasks)
+  const repCount = allTasksData.filter(t => t.status === 'report').length;
+  const repBadge = document.getElementById('reportTabCount');
+  if (repBadge) { repBadge.textContent = repCount; repBadge.style.display = repCount ? 'inline-block' : 'none'; }
 
   let tasks = allTasksData.filter(t => {
     const matchStatus = taskStatusFilter === 'all' || t.status === taskStatusFilter;
@@ -3003,51 +3117,46 @@ function renderTasksTable() {
     });
   }
 
+  const theadHtml = `<thead><tr>
+            <th>Action</th><th>Desc</th><th>Doer</th><th>Assignee</th>
+            <th title="Date jab task delegate hua tha">Assigned On</th>
+            <th onclick="toggleDueDateSort()" style="cursor:pointer;user-select:none" title="Click karo — latest date pehle / purani pehle">Due Date ${_dueSort === 'desc' ? '▼' : _dueSort === 'asc' ? '▲' : '⇅'}</th>
+            <th>Remarks</th><th>Status</th>
+          </tr></thead>`;
+
+  // ── Group by Doer mode (pagination band, sab dikhta hai collapsible groups me) ──
+  if (_tasksGroupBy) {
+    const groups = {};
+    tasks.forEach(t => { const n = t.assignedToName || '—'; (groups[n] = groups[n] || []).push(t); });
+    const names = Object.keys(groups).sort((a, b) => a.localeCompare(b));
+    window._tasksGroupNames = names;
+    container.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+        <div style="font-size:13px;color:#64748b;font-weight:600">${names.length} doer(s) · ${tasks.length} task(s)</div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-outline btn-sm" onclick="tasksExpandAll(true)">Expand all</button>
+          <button class="btn btn-outline btn-sm" onclick="tasksExpandAll(false)">Collapse all</button>
+        </div>
+      </div>
+      ${names.map((name, i) => {
+        const list = groups[name];
+        const open = _tasksExpanded.has(name);
+        return `<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:10px;overflow:hidden">
+          <div onclick="toggleTasksDoerGroup(${i})" style="padding:12px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;background:#f8fafc">
+            <div style="font-size:14px;font-weight:700;color:#1e293b"><span style="color:#64748b">${open ? '▼' : '▶'}</span> ${name}</div>
+            <span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe">${list.length} total</span>
+          </div>
+          ${open ? `<div class="flat-tasks-table" style="border:none;border-radius:0"><div style="overflow-x:auto"><table style="min-width:760px">${theadHtml}<tbody>${list.map(t => renderTaskRow(t, isAdmin)).join('')}</tbody></table></div></div>` : ''}
+        </div>`;
+      }).join('')}`;
+    return;
+  }
+
   const totalPages = Math.ceil(tasks.length / ALL_TASKS_PAGE_SIZE);
   const pageTasks = tasks.slice((allTasksPage-1)*ALL_TASKS_PAGE_SIZE, allTasksPage*ALL_TASKS_PAGE_SIZE);
 
   // Re-build rows only for this page
-  const pageRows = pageTasks.map(t => {
-    const isCompleted = t.status === 'completed';
-    const isClosed = t.status === 'closed';
-    const isWaiting = t.waiting_approval == 1;
-    const isChecklist = tasksType === 'checklist';
-
-    const actionBtns = isAdmin ? `
-      <button class="action-btn edit" style="padding:4px 7px" onclick="openEditTask(${t.id},'${tasksType}')" title="Edit">✏️</button>
-      <button class="action-btn delete" style="padding:4px 7px;margin-left:3px" onclick="deleteTask(${t.id},'${tasksType}')" title="Delete">🗑</button>
-      <button class="action-btn" style="background:#ecfdf5;color:#1d4ed8;padding:4px 7px;margin-left:3px" onclick="openComments(${t.id},'${tasksType}')" title="Comments">💬</button>
-      ${!isCompleted && !isClosed && !isWaiting ? `<button class="action-btn done" style="margin-left:3px" onclick="updateStatus(${t.id},'completed','alltasks','${tasksType}')">Done</button>` : ''}
-      ${!isChecklist && !isCompleted && !isClosed && !isWaiting ? `<button class="action-btn revise" style="margin-left:3px" onclick="openReviseModal(${t.id},'${tasksType}')">Revise</button>` : ''}
-      ${isCompleted || isClosed ? `<button class="action-btn" style="background:#fef3c7;color:#92400e;margin-left:3px" onclick="reopenTask(${t.id},'${tasksType}')" title="Reopen — mark as pending again">↺ Reopen</button>` : ''}
-      ${isCompleted ? `<button class="action-btn" style="background:#e0e7ff;color:#3730a3;margin-left:3px" onclick="closeTask(${t.id},'${tasksType}')" title="Close — task will move to the Closed Tasks tab">🔒 Close</button>` : ''}
-      ${isWaiting ? `<span style="font-size:11px;color:#f59e0b;font-weight:600;margin-left:4px">⏳ Waiting</span>` : ''}
-    ` : (ME.role==='pc') ? `
-      <button class="action-btn" style="background:#ecfdf5;color:#1d4ed8;padding:4px 7px" onclick="openComments(${t.id},'${tasksType}')" title="Comments">💬</button>
-      ${isChecklist && !isCompleted && !isClosed && !isWaiting ? `<button class="action-btn done" style="margin-left:3px" onclick="updateStatus(${t.id},'completed','alltasks','${tasksType}')">Done</button>` : ''}
-      ${isWaiting ? `<span style="font-size:11px;color:#f59e0b;font-weight:600;margin-left:4px">⏳ Waiting</span>` : ''}
-    ` : `
-      <button class="action-btn" style="background:#ecfdf5;color:#1d4ed8;padding:4px 7px" onclick="openComments(${t.id},'${tasksType}')" title="Comments">💬</button>
-      ${!isCompleted && !isClosed && !isWaiting ? `
-        <button class="action-btn done" style="margin-left:3px" onclick="updateStatus(${t.id},'completed','alltasks','${tasksType}')">Done</button>
-        ${!isChecklist ? `<button class="action-btn revise" style="margin-left:3px" onclick="openReviseModal(${t.id},'${tasksType}')">Revise</button>` : ''}
-      ` : ''}
-      ${isWaiting ? `
-        <button class="action-btn done" style="margin-left:3px" onclick="updateStatus(${t.id},'completed','alltasks','${tasksType}')">Done</button>
-        <span style="font-size:11px;color:#f59e0b;font-weight:600;margin-left:4px">⏳ Waiting</span>` : ''}
-    `;
-    return `<tr>
-      <td style="white-space:nowrap">${actionBtns}</td>
-      <td>${t.description||''}</td>
-      <td>${t.assignedToName||''}</td>
-      <td>${isAdmin ? (t.assignedByName||'') : (t.assignedByName||'')}</td>
-      <td style="white-space:nowrap;font-size:12px;color:#64748b">${fmtDate(t.assigned_on||'')||'—'}</td>
-      <td style="white-space:nowrap">${fmtDate(t.due_date||'')||''}</td>
-      <td style="color:#64748b">${t.remarks||'—'}</td>
-      <td><span class="status-badge ${t.status}">${t.status==='revised'?'Revision Requested':t.status.charAt(0).toUpperCase()+t.status.slice(1)}</span></td>
-    </tr>`;
-  }).join('');
-
+  const pageRows = pageTasks.map(t => renderTaskRow(t, isAdmin)).join('');
   const paginationHtml = totalPages > 1 ? `
     <div style="display:flex;align-items:center;justify-content:center;gap:10px;padding:12px;border-top:1px solid #f1f5f9;font-size:13px;color:#64748b">
       <button onclick="if(allTasksPage>1){allTasksPage--;renderTasksTable();}" 
@@ -3088,6 +3197,98 @@ function toggleDueDateSort() {
   _dueSort = _dueSort === 'desc' ? 'asc' : (_dueSort === 'asc' ? '' : 'desc');
   allTasksPage = 1;
   renderTasksTable();
+}
+
+// ── All Tasks doer-wise grouping ──
+function toggleTasksGroup() {
+  _tasksGroupBy = !_tasksGroupBy;
+  const btn = document.getElementById('groupByDoerBtn');
+  if (btn) btn.textContent = `👥 Group by Doer: ${_tasksGroupBy ? 'ON' : 'OFF'}`;
+  allTasksPage = 1;
+  renderTasksTable();
+}
+function toggleTasksDoerGroup(idx) {
+  const name = (window._tasksGroupNames || [])[idx];
+  if (name === undefined) return;
+  if (_tasksExpanded.has(name)) _tasksExpanded.delete(name); else _tasksExpanded.add(name);
+  renderTasksTable();
+}
+function tasksExpandAll(expand) {
+  _tasksExpanded = new Set(expand ? (window._tasksGroupNames || []) : []);
+  renderTasksTable();
+}
+
+// ── REPORT: doer delegation Done kare → image/PDF attach → status 'report' ──
+function openReportModal(id) {
+  _reportTaskId = id;
+  document.getElementById('reportErr').style.display = 'none';
+  document.getElementById('reportImage').value = '';
+  document.getElementById('reportPdf').value = '';
+  document.getElementById('reportNote').value = '';
+  document.getElementById('reportModal').classList.add('open');
+}
+
+function _fileToBase64(file, maxMB) {
+  return new Promise((resolve, reject) => {
+    if (!file) return resolve('');
+    if (file.size > maxMB * 1024 * 1024) return reject(new Error(`File ${maxMB} MB se badi hai: ${file.name}`));
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);   // data:...;base64,...
+    r.onerror = () => reject(new Error('File read nahi hui'));
+    r.readAsDataURL(file);
+  });
+}
+
+async function submitReport() {
+  const err = document.getElementById('reportErr');
+  err.style.display = 'none';
+  const btn = document.getElementById('reportSubmitBtn');
+  btn.disabled = true; btn.textContent = '⏳ Uploading…';
+  try {
+    const img = document.getElementById('reportImage').files[0];
+    const pdf = document.getElementById('reportPdf').files[0];
+    const note = document.getElementById('reportNote').value.trim();
+    const attachments = {};
+    const imgData = await _fileToBase64(img, 3);
+    const pdfData = await _fileToBase64(pdf, 3);
+    if (imgData) attachments.image = imgData;
+    if (pdfData) { attachments.pdf = pdfData; attachments.pdfName = pdf.name; }
+    const r = await api(`/api/tasks/${_reportTaskId}/status`, 'PUT', {
+      status: 'report', type: 'delegation',
+      attachments: JSON.stringify(attachments), reportNote: note
+    });
+    if (r && r.error) throw new Error(r.error);
+    closeModal('reportModal');
+    showToast('✅ Report bhej diya — admin review karega');
+    loadAllTasks();
+    loadDashboard();
+  } catch (e) {
+    err.textContent = e.message; err.style.display = 'block';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Submit';
+  }
+}
+
+// Admin: report ko wapas pending (doer dobara kare)
+async function reportBackToPending(id) {
+  if (!confirm('Ye task wapas Pending kar dein? Doer ko dobara karna hoga.')) return;
+  await updateStatus(id, 'pending', 'alltasks', 'delegation');
+}
+
+// Attachments dekho (image inline + PDF naye tab me)
+async function viewReportAttachments(id) {
+  const body = document.getElementById('viewReportBody');
+  body.innerHTML = '<div style="padding:20px;text-align:center;color:#94a3b8">⏳ Loading…</div>';
+  document.getElementById('viewReportModal').classList.add('open');
+  const r = await api(`/api/tasks/${id}/attachments`);
+  if (r && r.error) { body.innerHTML = `<div style="padding:16px;color:#dc2626">⚠️ ${r.error}</div>`; return; }
+  const att = (r && r.attachments) || {};
+  let html = '';
+  if (r.note) html += `<div style="padding:8px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;font-size:13px;color:#c2410c;margin-bottom:12px">📝 ${r.note}</div>`;
+  if (att.image) html += `<div style="margin-bottom:14px"><div style="font-size:12px;font-weight:600;color:#64748b;margin-bottom:6px">Image</div><img src="${att.image}" style="max-width:100%;border-radius:8px;border:1px solid #e2e8f0"/></div>`;
+  if (att.pdf) html += `<div style="margin-bottom:8px"><div style="font-size:12px;font-weight:600;color:#64748b;margin-bottom:6px">PDF</div><a href="${att.pdf}" target="_blank" download="${att.pdfName || 'report.pdf'}" class="btn btn-outline btn-sm" style="color:#dc2626;border-color:#fecaca">📄 ${att.pdfName || 'Open PDF'}</a></div>`;
+  if (!html) html = '<div style="padding:16px;text-align:center;color:#94a3b8">Koi attachment nahi</div>';
+  body.innerHTML = html;
 }
 
 function tasksTab(type, el) {

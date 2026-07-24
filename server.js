@@ -13,8 +13,8 @@ const JWT_SECRET = process.env.SESSION_SECRET || 'taskmanager_secret_2026';
 const SHEET_ID = process.env.SHEET_ID || '1SlUOgq1QN70tbIdlNat_XEY4JYGHG3JQyyh3NBG_lYQ';
 
 app.use(cookieParser());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '20mb' }));   // report attachments (image+pdf base64)
+app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 // Har request par reminder slot check (minute me ek baar) — app so kar uthe to
 // bhi missed reminder chala jaata hai, bina kisi bahri cron ke.
 app.use((req, res, next) => waRequestHook(req, res, next));
@@ -470,7 +470,8 @@ const MYSQL_SCHEMA = {
     due_date: "VARCHAR(40) DEFAULT ''", status: "VARCHAR(20) DEFAULT 'pending'",
     priority: "VARCHAR(20) DEFAULT 'low'", approval: "VARCHAR(10) DEFAULT 'no'",
     waiting_approval: "VARCHAR(5) DEFAULT '0'", remarks: "TEXT", frequency: "VARCHAR(20) DEFAULT ''",
-    last_reminder_date: "VARCHAR(40) DEFAULT ''", created_at: "VARCHAR(40) DEFAULT ''"
+    last_reminder_date: "VARCHAR(40) DEFAULT ''", created_at: "VARCHAR(40) DEFAULT ''",
+    attachments: "LONGTEXT", report_note: "TEXT"
   },
   Checklist_Tasks: {
     description: "TEXT", assigned_to: "VARCHAR(20) DEFAULT ''", assigned_by: "VARCHAR(20) DEFAULT ''",
@@ -1329,6 +1330,10 @@ app.get('/api/tasks', requireAuth, async (req, res) => {
       due_date: t.due_date || '',
       assigned_on: t.created_at ? t.created_at.split('T')[0].split(' ')[0] : '',
       frequency: t.frequency || '',
+      // Attachments ki actual base64 list me NAHI bhejte (bahut bhaari) — sirf
+      // flag ki file hai ya nahi. Actual file /attachments endpoint se aati hai.
+      hasAttachments: isDeleg ? !!(t.attachments && String(t.attachments).length > 5) : false,
+      report_note: isDeleg ? (t.report_note || '') : '',
       assignedToName: userMap[String(t.assigned_to)]?.name || '',
       assignedByName: userMap[String(t.assigned_by)]?.name || ''
     })).sort((a, b) => (a.due_date || '').localeCompare(b.due_date || ''));
@@ -1544,6 +1549,17 @@ app.put('/api/tasks/:id/status', requireAuth, async (req, res) => {
 
     const waitingApproval = parseInt(task.waiting_approval) || 0;
 
+    // REPORT flow: doer delegation task "Done" kare to seedha completed nahi,
+    // balki 'report' status me jaata hai (image/PDF attachment ke saath) —
+    // admin Report tab me review karke Complete ya wapas Pending karta hai.
+    if (status === 'report') {
+      const upd = { status: 'report', waiting_approval: '0' };
+      if (typeof req.body.attachments === 'string') upd.attachments = req.body.attachments;
+      if (typeof req.body.reportNote === 'string') upd.report_note = req.body.reportNote;
+      await db.update(tabName, req.params.id, upd);
+      return res.json({ success: true });
+    }
+
     if (status === 'completed' && waitingApproval) {
       // Cancel pending approvals
       const pendingApprovals = await db.findWhere('Task_Approvals', { task_id: req.params.id, task_type: type, status: 'pending' });
@@ -1575,6 +1591,22 @@ app.put('/api/tasks/:id/status', requireAuth, async (req, res) => {
     if (newDate && status === 'revised') upd.due_date = newDate;
     await db.update(tabName, req.params.id, upd);
     res.json({ success: true, needsApproval: false });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Ek delegation task ke attachments (image/pdf base64) — on-demand, kyunki
+// bahut bhaari hote hain. Admin/HOD/PC ya wahi doer dekh sakta hai.
+app.get('/api/tasks/:id/attachments', requireAuth, async (req, res) => {
+  try {
+    const task = await db.findOne('Delegation_Tasks', { id: req.params.id });
+    if (!task) return res.status(404).json({ error: 'Task not found' });
+    const role = req.session.role;
+    const allowed = role === 'admin' || role === 'hod' || role === 'pc'
+      || String(task.assigned_to) === String(req.session.userId);
+    if (!allowed) return res.status(403).json({ error: 'Not allowed' });
+    let att = {};
+    try { att = JSON.parse(task.attachments || '{}'); } catch (e) { att = {}; }
+    res.json({ attachments: att, note: task.report_note || '' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
