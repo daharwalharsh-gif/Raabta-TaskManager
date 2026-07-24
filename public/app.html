@@ -3034,8 +3034,8 @@ function renderTaskRow(t, isAdmin) {
       <button class="action-btn delete" style="padding:4px 7px;margin-left:3px" onclick="deleteTask(${t.id},'${tasksType}')" title="Delete">🗑</button>
       <button class="action-btn" style="background:#ecfdf5;color:#1d4ed8;padding:4px 7px;margin-left:3px" onclick="openComments(${t.id},'${tasksType}')" title="Comments">💬</button>
       ${isReport ? `${attBtn}
-        <button class="action-btn done" style="margin-left:3px" onclick="updateStatus(${t.id},'completed','alltasks','${tasksType}')" title="Report approve — Completed me daal do">✅ Complete</button>
-        <button class="action-btn" style="background:#fef2f2;color:#dc2626;margin-left:3px" onclick="reportBackToPending(${t.id})" title="Wapas Pending — doer dobara kare">↩ Pending</button>` : ''}
+        <button class="action-btn done" style="margin-left:3px" onclick="reportClose(${t.id})" title="Close — Completed me daal do">✅ Close</button>
+        <button class="action-btn" style="background:#fef3c7;color:#92400e;margin-left:3px" onclick="reportReopen(${t.id})" title="Reopen — wapas Pending, doer dobara kare">🔓 Reopen</button>` : ''}
       ${!isCompleted && !isClosed && !isReport && !isWaiting ? (isChecklist
         ? `<button class="action-btn done" style="margin-left:3px" onclick="updateStatus(${t.id},'completed','alltasks','${tasksType}')">Done</button>`
         : `<button class="action-btn done" style="margin-left:3px" onclick="openReportModal(${t.id})" title="Complete — image/PDF proof ke saath">Done</button>`) : ''}
@@ -3228,13 +3228,10 @@ function openReportModal(id) {
   document.getElementById('reportImage').value = '';
   document.getElementById('reportPdf').value = '';
   document.getElementById('reportNote').value = '';
-  // Admin/HOD ka Done = seedha Complete; doer ka = report (admin review)
-  const isReviewer = ME.role === 'admin' || ME.role === 'hod';
-  document.getElementById('reportModalTitle').textContent = isReviewer ? '✅ Complete Task' : '📤 Submit Report';
-  document.getElementById('reportModalHint').textContent = isReviewer
-    ? 'Task complete karo — proof ke liye image/PDF attach kar sakte ho (optional).'
-    : 'Task complete kiya? Proof attach karke bhejo — admin Report tab me review karega.';
-  document.getElementById('reportSubmitBtn').textContent = isReviewer ? '✓ Mark Complete' : '📤 Submit Report';
+  // Delegation Done → Report tab (image/PDF proof ke saath)
+  document.getElementById('reportModalTitle').textContent = '📤 Submit Report';
+  document.getElementById('reportModalHint').textContent = 'Task complete kiya? Proof ke liye image/PDF attach karo (optional). Ye Report tab me jayega jahan admin Reopen ya Close karega.';
+  document.getElementById('reportSubmitBtn').textContent = '📤 Submit Report';
   document.getElementById('reportModal').classList.add('open');
 }
 
@@ -3263,15 +3260,15 @@ async function submitReport() {
     const pdfData = await _fileToBase64(pdf, 3);
     if (imgData) attachments.image = imgData;
     if (pdfData) { attachments.pdf = pdfData; attachments.pdfName = pdf.name; }
-    // Admin/HOD → seedha completed; doer → report (admin review ke liye)
-    const isReviewer = ME.role === 'admin' || ME.role === 'hod';
+    // Delegation Done hamesha Report tab me jaata hai — wahan admin Reopen
+    // (→Pending) ya Close (→Completed) karta hai.
     const r = await api(`/api/tasks/${_reportTaskId}/status`, 'PUT', {
-      status: isReviewer ? 'completed' : 'report', type: 'delegation',
+      status: 'report', type: 'delegation',
       attachments: JSON.stringify(attachments), reportNote: note
     });
     if (r && r.error) throw new Error(r.error);
     closeModal('reportModal');
-    showToast(isReviewer ? '✅ Task completed!' : '📤 Report bhej diya — admin review karega');
+    showToast('📤 Report bhej diya — Report tab me chala gaya');
     loadAllTasks();
     loadDashboard();
   } catch (e) {
@@ -3281,10 +3278,14 @@ async function submitReport() {
   }
 }
 
-// Admin: report ko wapas pending (doer dobara kare)
-async function reportBackToPending(id) {
-  if (!confirm('Ye task wapas Pending kar dein? Doer ko dobara karna hoga.')) return;
+// Report tab: Reopen → wapas Pending (doer dobara kare); Close → Completed
+async function reportReopen(id) {
+  if (!confirm('Reopen? Task wapas Pending me jayega, doer ko dobara karna hoga.')) return;
   await updateStatus(id, 'pending', 'alltasks', 'delegation');
+}
+async function reportClose(id) {
+  if (!confirm('Close karein? Task Completed me chala jayega.')) return;
+  await updateStatus(id, 'completed', 'alltasks', 'delegation');
 }
 
 // Attachments dekho (image inline + PDF naye tab me)
