@@ -1549,14 +1549,16 @@ app.put('/api/tasks/:id/status', requireAuth, async (req, res) => {
 
     const waitingApproval = parseInt(task.waiting_approval) || 0;
 
+    // Proof/attachments (image/PDF base64 + note) — kisi bhi complete/report ke
+    // saath aa sakte hain, isliye har upd me merge karte hain.
+    const attUpd = {};
+    if (typeof req.body.attachments === 'string') attUpd.attachments = req.body.attachments;
+    if (typeof req.body.reportNote === 'string') attUpd.report_note = req.body.reportNote;
+
     // REPORT flow: doer delegation task "Done" kare to seedha completed nahi,
-    // balki 'report' status me jaata hai (image/PDF attachment ke saath) —
-    // admin Report tab me review karke Complete ya wapas Pending karta hai.
+    // balki 'report' status me jaata hai — admin Report tab me review karta hai.
     if (status === 'report') {
-      const upd = { status: 'report', waiting_approval: '0' };
-      if (typeof req.body.attachments === 'string') upd.attachments = req.body.attachments;
-      if (typeof req.body.reportNote === 'string') upd.report_note = req.body.reportNote;
-      await db.update(tabName, req.params.id, upd);
+      await db.update(tabName, req.params.id, { status: 'report', waiting_approval: '0', ...attUpd });
       return res.json({ success: true });
     }
 
@@ -1564,7 +1566,7 @@ app.put('/api/tasks/:id/status', requireAuth, async (req, res) => {
       // Cancel pending approvals
       const pendingApprovals = await db.findWhere('Task_Approvals', { task_id: req.params.id, task_type: type, status: 'pending' });
       for (const a of pendingApprovals) await deleteRow('Task_Approvals', a.id);
-      const upd = { status: 'completed' };
+      const upd = { status: 'completed', ...attUpd };
       if (type === 'delegation') upd.waiting_approval = '0';
       await db.update(tabName, req.params.id, upd);
       return res.json({ success: true, needsApproval: false });
@@ -1586,7 +1588,7 @@ app.put('/api/tasks/:id/status', requireAuth, async (req, res) => {
       return res.json({ success: true, needsApproval: true });
     }
 
-    const upd = { status };
+    const upd = { status, ...attUpd };
     if (type === 'delegation') upd.waiting_approval = '0';
     if (newDate && status === 'revised') upd.due_date = newDate;
     await db.update(tabName, req.params.id, upd);

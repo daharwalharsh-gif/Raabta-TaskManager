@@ -1265,12 +1265,16 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
 <!-- Phone-style FMS popup notifications (fms-tasks tab) -->
 <div id="fmsNotifStack"></div>
 
-<!-- Report submit modal (doer delegation task Done kare — image/PDF attach) -->
+<!-- Delegation Done modal — image/PDF proof (doer report / admin complete) -->
 <div class="modal-overlay" id="reportModal">
   <div class="modal">
-    <h3>✅ Submit Report</h3>
+    <h3 id="reportModalTitle">✅ Complete Task</h3>
     <div class="alert error" id="reportErr"></div>
-    <div style="font-size:13px;color:#64748b;margin-bottom:12px">Task complete kiya? Proof ke liye image aur/ya PDF attach karo (optional), phir submit karo. Ye admin ke Report tab me review ke liye jayega.</div>
+    <div id="reportModalHint" style="font-size:13px;color:#64748b;margin-bottom:12px"></div>
+    <div class="form-group">
+      <label>Note / Remarks (optional)</label>
+      <textarea id="reportNote" placeholder="What did you do to complete this task?" style="min-height:50px"></textarea>
+    </div>
     <div class="form-group">
       <label>Image (optional) <span style="color:#94a3b8;font-weight:400;font-size:11px">— max 3 MB</span></label>
       <input type="file" id="reportImage" accept="image/*" style="font-size:13px"/>
@@ -1279,13 +1283,9 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       <label>PDF (optional) <span style="color:#94a3b8;font-weight:400;font-size:11px">— max 3 MB</span></label>
       <input type="file" id="reportPdf" accept="application/pdf" style="font-size:13px"/>
     </div>
-    <div class="form-group">
-      <label>Note (optional)</label>
-      <textarea id="reportNote" placeholder="Koi remark…" style="min-height:50px"></textarea>
-    </div>
     <div class="modal-footer" style="justify-content:space-between">
       <button class="btn btn-outline" onclick="closeModal('reportModal')">Cancel</button>
-      <button class="btn btn-primary" id="reportSubmitBtn" onclick="submitReport()">Submit</button>
+      <button class="btn btn-primary" id="reportSubmitBtn" onclick="submitReport()">✓ Mark Complete</button>
     </div>
   </div>
 </div>
@@ -2908,7 +2908,8 @@ function renderDashTable(tasks, type) {
 // Dashboard Done: doer (plain user) ka delegation task report modal se jaye;
 // admin/hod/checklist seedha complete.
 function dashDone(id, type) {
-  if (type === 'delegation' && ME.role === 'user') openReportModal(id);
+  // Delegation ka Done sabke liye proof modal kholta hai; checklist seedha complete
+  if (type === 'delegation') openReportModal(id);
   else updateStatus(id, 'completed', 'dashboard', type);
 }
 
@@ -3035,7 +3036,9 @@ function renderTaskRow(t, isAdmin) {
       ${isReport ? `${attBtn}
         <button class="action-btn done" style="margin-left:3px" onclick="updateStatus(${t.id},'completed','alltasks','${tasksType}')" title="Report approve — Completed me daal do">✅ Complete</button>
         <button class="action-btn" style="background:#fef2f2;color:#dc2626;margin-left:3px" onclick="reportBackToPending(${t.id})" title="Wapas Pending — doer dobara kare">↩ Pending</button>` : ''}
-      ${!isCompleted && !isClosed && !isReport && !isWaiting ? `<button class="action-btn done" style="margin-left:3px" onclick="updateStatus(${t.id},'completed','alltasks','${tasksType}')">Done</button>` : ''}
+      ${!isCompleted && !isClosed && !isReport && !isWaiting ? (isChecklist
+        ? `<button class="action-btn done" style="margin-left:3px" onclick="updateStatus(${t.id},'completed','alltasks','${tasksType}')">Done</button>`
+        : `<button class="action-btn done" style="margin-left:3px" onclick="openReportModal(${t.id})" title="Complete — image/PDF proof ke saath">Done</button>`) : ''}
       ${!isChecklist && !isCompleted && !isClosed && !isReport && !isWaiting ? `<button class="action-btn revise" style="margin-left:3px" onclick="openReviseModal(${t.id},'${tasksType}')">Revise</button>` : ''}
       ${isCompleted || isClosed ? `<button class="action-btn" style="background:#fef3c7;color:#92400e;margin-left:3px" onclick="reopenTask(${t.id},'${tasksType}')" title="Reopen — mark as pending again">↺ Reopen</button>` : ''}
       ${isCompleted ? `<button class="action-btn" style="background:#e0e7ff;color:#3730a3;margin-left:3px" onclick="closeTask(${t.id},'${tasksType}')" title="Close — task will move to the Closed Tasks tab">🔒 Close</button>${attBtn}` : ''}
@@ -3225,6 +3228,13 @@ function openReportModal(id) {
   document.getElementById('reportImage').value = '';
   document.getElementById('reportPdf').value = '';
   document.getElementById('reportNote').value = '';
+  // Admin/HOD ka Done = seedha Complete; doer ka = report (admin review)
+  const isReviewer = ME.role === 'admin' || ME.role === 'hod';
+  document.getElementById('reportModalTitle').textContent = isReviewer ? '✅ Complete Task' : '📤 Submit Report';
+  document.getElementById('reportModalHint').textContent = isReviewer
+    ? 'Task complete karo — proof ke liye image/PDF attach kar sakte ho (optional).'
+    : 'Task complete kiya? Proof attach karke bhejo — admin Report tab me review karega.';
+  document.getElementById('reportSubmitBtn').textContent = isReviewer ? '✓ Mark Complete' : '📤 Submit Report';
   document.getElementById('reportModal').classList.add('open');
 }
 
@@ -3253,13 +3263,15 @@ async function submitReport() {
     const pdfData = await _fileToBase64(pdf, 3);
     if (imgData) attachments.image = imgData;
     if (pdfData) { attachments.pdf = pdfData; attachments.pdfName = pdf.name; }
+    // Admin/HOD → seedha completed; doer → report (admin review ke liye)
+    const isReviewer = ME.role === 'admin' || ME.role === 'hod';
     const r = await api(`/api/tasks/${_reportTaskId}/status`, 'PUT', {
-      status: 'report', type: 'delegation',
+      status: isReviewer ? 'completed' : 'report', type: 'delegation',
       attachments: JSON.stringify(attachments), reportNote: note
     });
     if (r && r.error) throw new Error(r.error);
     closeModal('reportModal');
-    showToast('✅ Report bhej diya — admin review karega');
+    showToast(isReviewer ? '✅ Task completed!' : '📤 Report bhej diya — admin review karega');
     loadAllTasks();
     loadDashboard();
   } catch (e) {
