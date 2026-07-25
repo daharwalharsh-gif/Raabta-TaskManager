@@ -923,6 +923,15 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
         <button class="btn btn-outline" id="reassignHarshBtn" onclick="reassignChecklistAssigner()"
           style="color:#4338ca;border-color:#c7d2fe;display:none"
           title="Jin checklist tasks me Assigned By 'Harsh' hai, unhe 'Rahul Sir' kar do">🔁 Harsh → Rahul Sir</button>
+        <!-- Doer-wise checklist CSV export — sirf harsh@gmail.com ko dikhta hai -->
+        <span id="hrExportWrap" style="display:none;align-items:center;gap:6px">
+          <select id="hrExportDoer"
+            style="padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;outline:none;background:#fff;min-width:150px">
+            <option value="">-- Select Doer --</option>
+          </select>
+          <button class="btn btn-outline" onclick="exportDoerChecklistCSV()"
+            style="color:#059669;border-color:#a7f3d0" title="Is doer ke saare checklist tasks (pure saal ke) CSV me download">⬇ Export Checklist CSV</button>
+        </span>
       </div>
     </div>
     <!-- Status filter tabs -->
@@ -2947,6 +2956,22 @@ async function loadAllTasks() {
   const reBtn = document.getElementById('reassignHarshBtn');
   if (reBtn) reBtn.style.display = (isAdmin && tasksType === 'checklist') ? '' : 'none';
 
+  // Doer-wise checklist CSV export — SIRF harsh@gmail.com ko dikhta hai
+  const hrWrap = document.getElementById('hrExportWrap');
+  if (hrWrap) {
+    const allowed = (ME.email || '').trim().toLowerCase() === 'harsh@gmail.com';
+    hrWrap.style.display = allowed ? 'inline-flex' : 'none';
+    const sel = document.getElementById('hrExportDoer');
+    if (allowed && sel && sel.options.length <= 1) {
+      const users = await api('/api/users');
+      if (Array.isArray(users)) {
+        sel.innerHTML = '<option value="">-- Select Doer --</option>' +
+          users.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+            .map(u => `<option value="${u.id}">${u.name}</option>`).join('');
+      }
+    }
+  }
+
   // Report tab (doer ke bheje reports review) — admin/HOD ko, sirf Delegation par
   const repTab = document.getElementById('statusTabReport');
   if (repTab) repTab.style.display = ((isAdmin || isHod) && tasksType === 'delegation') ? '' : 'none';
@@ -3354,6 +3379,34 @@ async function reassignChecklistAssigner() {
   showToast(`✅ ${r.updated} checklist task(s) ab "${to.name}" ke naam se hain`);
   loadAllTasks();
   loadDashboard();
+}
+
+// Doer ke SAARE checklist tasks (har status, pure saal ke) CSV me download.
+// Button sirf harsh@gmail.com ko dikhta hai.
+async function exportDoerChecklistCSV() {
+  const sel = document.getElementById('hrExportDoer');
+  const doerId = sel ? sel.value : '';
+  if (!doerId) { showToast('Pehle doer select karo', 'error'); return; }
+  const doerName = sel.selectedOptions[0]?.textContent || 'doer';
+  const r = await api(`/api/tasks/user/${doerId}?type=checklist`);
+  const tasks = (r && r.tasks) || [];
+  if (!tasks.length) { showToast(`${doerName} ka koi checklist task nahi mila`, 'error'); return; }
+  tasks.sort((a, b) => (a.due_date || '').localeCompare(b.due_date || ''));
+  const esc = v => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
+  const head = ['#', 'Description', 'Doer', 'Assigned By', 'Due Date', 'Priority', 'Frequency', 'Status', 'Remarks', 'Assigned On'];
+  const lines = [head.join(',')];
+  tasks.forEach((t, i) => {
+    lines.push([i + 1, t.description, t.assignedToName || doerName, t.assignedByName || '',
+      t.due_date || '', t.priority || '', t.frequency || '', t.status || '', t.remarks || '', t.assigned_on || ''
+    ].map(esc).join(','));
+  });
+  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `checklist_${doerName.replace(/[^a-z0-9]+/gi, '_')}_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  showToast(`✅ ${tasks.length} checklist task(s) download ho gaye`);
 }
 
 function toggleBlock(header) { header.nextElementSibling.classList.toggle('open'); }
