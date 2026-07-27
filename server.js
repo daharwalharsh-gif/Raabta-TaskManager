@@ -471,7 +471,8 @@ const MYSQL_SCHEMA = {
     priority: "VARCHAR(20) DEFAULT 'low'", approval: "VARCHAR(10) DEFAULT 'no'",
     waiting_approval: "VARCHAR(5) DEFAULT '0'", remarks: "TEXT", frequency: "VARCHAR(20) DEFAULT ''",
     last_reminder_date: "VARCHAR(40) DEFAULT ''", created_at: "VARCHAR(40) DEFAULT ''",
-    attachments: "LONGTEXT", report_note: "TEXT"
+    attachments: "LONGTEXT", report_note: "TEXT",
+    was_reported: "VARCHAR(5) DEFAULT '0'"
   },
   Checklist_Tasks: {
     description: "TEXT", assigned_to: "VARCHAR(20) DEFAULT ''", assigned_by: "VARCHAR(20) DEFAULT ''",
@@ -1338,6 +1339,7 @@ app.get('/api/tasks', requireAuth, async (req, res) => {
       // flag ki file hai ya nahi. Actual file /attachments endpoint se aati hai.
       hasAttachments: isDeleg ? !!(t.attachments && String(t.attachments).length > 5) : false,
       report_note: isDeleg ? (t.report_note || '') : '',
+      was_reported: isDeleg ? (parseInt(t.was_reported) || 0) : 0,
       assignedToName: userMap[String(t.assigned_to)]?.name || '',
       assignedByName: userMap[String(t.assigned_by)]?.name || ''
     })).sort((a, b) => (a.due_date || '').localeCompare(b.due_date || ''));
@@ -1562,7 +1564,8 @@ app.put('/api/tasks/:id/status', requireAuth, async (req, res) => {
     // REPORT flow: doer delegation task "Done" kare to seedha completed nahi,
     // balki 'report' status me jaata hai — admin Report tab me review karta hai.
     if (status === 'report') {
-      await db.update(tabName, req.params.id, { status: 'report', waiting_approval: '0', ...attUpd });
+      // was_reported: Reopen ke baad Pending me row highlight karne ke liye
+      await db.update(tabName, req.params.id, { status: 'report', waiting_approval: '0', was_reported: '1', ...attUpd });
       return res.json({ success: true });
     }
 

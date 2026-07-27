@@ -174,6 +174,12 @@ thead th{font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:upper
 tbody tr:hover{background:#f8fafc;}
 tbody td{padding:11px 14px;font-size:13px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
 tbody tr:last-child td{border-bottom:none;}
+/* Report bheja tha, Reopen ke baad wapas Pending — puri row clearly highlight.
+   Background td par lagaya hai (tr par nahi) taki hover/zebra styles se kabhi
+   override na ho. Amber combo: bg #fef3c7, hover #fde68a, border #f59e0b. */
+tbody tr.row-reported td{background:#fef3c7;border-bottom:1px solid #fde68a;}
+tbody tr.row-reported:hover td{background:#fde68a;}
+tbody tr.row-reported td:first-child{border-left:4px solid #f59e0b;}
 
 .status-badge{font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;display:inline-block;}
 .status-badge.pending{background:#fef2f2;color:#dc2626;}
@@ -3089,7 +3095,12 @@ function renderTaskRow(t, isAdmin) {
   const statusLabel = t.status==='revised' ? 'Revision Requested'
     : t.status==='report' ? 'Report'
     : t.status.charAt(0).toUpperCase()+t.status.slice(1);
-  return `<tr>
+  // Report submit ho chuki thi (Reopen ke baad wapas Pending) — sirf Pending me
+  // highlight, Completed/Closed me nahi. Purane rows ke liye report_note/
+  // attachments fallback (was_reported column baad me aaya).
+  const wasReported = t.status === 'pending' && !isChecklist
+    && (t.was_reported == 1 || !!t.report_note || !!t.hasAttachments);
+  return `<tr${wasReported ? ' class="row-reported" title="Doer ne report bheji thi — Reopen ke baad wapas Pending"' : ''}>
       <td style="white-space:nowrap">${actionBtns}</td>
       <td>${t.description||''}${t.report_note ? ` <span style="font-size:10px;color:#c2410c">📝 ${t.report_note}</span>` : ''}</td>
       <td>${t.assignedToName||''}</td>
