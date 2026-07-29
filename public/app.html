@@ -947,6 +947,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
         <div class="tab" id="statusTabRevised" onclick="filterTaskStatus('revised',this)">Revised</div>
         <div class="tab" id="statusTabClosed" onclick="filterTaskStatus('closed',this)">Closed Tasks</div>
         <div class="tab" id="statusTabReport" onclick="filterTaskStatus('report',this)" style="position:relative">Report <span id="reportTabCount" style="display:none;font-size:10px;background:#f59e0b;color:#fff;border-radius:9px;padding:1px 6px;margin-left:2px">0</span></div>
+        <div class="tab" id="statusTabAssigned" onclick="filterTaskStatus('assigned',this)" title="Jo tasks aapne assign kiye — doer ne done kiya ya nahi">Assigned Task</div>
       </div>
       <button id="groupByDoerBtn" class="btn btn-outline btn-sm" onclick="toggleTasksGroup()" style="margin-left:auto">👥 Group by Doer: OFF</button>
     </div>
@@ -2938,6 +2939,7 @@ let _dueSort = '';   // '' | 'desc' (latest pehle) | 'asc' (purani pehle)
 let _tasksGroupBy = false;          // All Tasks doer-wise grouping ON/OFF
 let _tasksExpanded = new Set();     // kaunse doer groups khule hain
 let _reportTaskId = null;           // report modal ka current task
+let _assignedByMeData = [];         // Assigned Task tab — maine jo tasks assign kiye
 const ALL_TASKS_PAGE_SIZE = 50;
 
 async function loadAllTasks() {
@@ -2980,6 +2982,9 @@ async function loadAllTasks() {
   // Report tab (doer ke bheje reports review) — admin/HOD ko, sirf Delegation par
   const repTab = document.getElementById('statusTabReport');
   if (repTab) repTab.style.display = ((isAdmin || isHod) && tasksType === 'delegation') ? '' : 'none';
+  // Assigned Task tab — jo assign kar sakte hain unko, sirf Delegation par
+  const asgTab = document.getElementById('statusTabAssigned');
+  if (asgTab) asgTab.style.display = ((isAdmin || isHod || isUser) && tasksType === 'delegation') ? '' : 'none';
   // Group by Doer — jinko multiple doers dikhte hain (admin/HOD/PC)
   const grpBtn = document.getElementById('groupByDoerBtn');
   if (grpBtn) grpBtn.style.display = (isAdmin || isHod || isPC) ? '' : 'none';
@@ -3041,16 +3046,27 @@ function clearTasksDateFilter() {
 
 function filterTasks() { allTasksPage = 1; renderTasksTable(); }
 
-function filterTaskStatus(status, el) {
+async function filterTaskStatus(status, el) {
   taskStatusFilter = status;
   allTasksPage = 1;
   document.querySelectorAll('#page-alltasks .tab-group .tab').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
+  // Assigned Task tab — maine jo tasks assign kiye (sab status: done hua ya nahi)
+  if (status === 'assigned') {
+    const c = document.getElementById('tasksContent');
+    if (c) c.innerHTML = '<div class="empty" style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;">⏳ Loading…</div>';
+    const data = await api('/api/tasks?type=delegation&mine=1');
+    let list = [];
+    if (data && data.grouped) data.grouped.forEach(g => g.tasks.forEach(t => list.push(t)));
+    else list = (data && data.tasks) || [];
+    _assignedByMeData = list.filter(t => String(t.assigned_by) === String(ME.id));
+  }
   renderTasksTable();
 }
 
-// Ek task ki <tr> — action buttons role + status ke hisaab se
-function renderTaskRow(t, isAdmin) {
+// Ek task ki <tr> — action buttons role + status ke hisaab se.
+// viewOnly (Assigned Task tab): sirf comments + attachments — status dekhne ke liye hai
+function renderTaskRow(t, isAdmin, viewOnly) {
   const isCompleted = t.status === 'completed';
   const isClosed = t.status === 'closed';
   const isReport = t.status === 'report';
@@ -3059,7 +3075,9 @@ function renderTaskRow(t, isAdmin) {
   const attBtn = t.hasAttachments
     ? `<button class="action-btn" style="background:#fff7ed;color:#c2410c;margin-left:3px" onclick="viewReportAttachments(${t.id})" title="Attachments dekho">📎 View</button>` : '';
 
-  const actionBtns = isAdmin ? `
+  const actionBtns = viewOnly ? `
+      <button class="action-btn" style="background:#ecfdf5;color:#1d4ed8;padding:4px 7px" onclick="openComments(${t.id},'delegation')" title="Comments">💬</button>${attBtn}
+    ` : isAdmin ? `
       <button class="action-btn edit" style="padding:4px 7px" onclick="openEditTask(${t.id},'${tasksType}')" title="Edit">✏️</button>
       <button class="action-btn delete" style="padding:4px 7px;margin-left:3px" onclick="deleteTask(${t.id},'${tasksType}')" title="Delete">🗑</button>
       <button class="action-btn" style="background:#ecfdf5;color:#1d4ed8;padding:4px 7px;margin-left:3px" onclick="openComments(${t.id},'${tasksType}')" title="Comments">💬</button>
@@ -3125,9 +3143,11 @@ function renderTasksTable() {
   const repBadge = document.getElementById('reportTabCount');
   if (repBadge) { repBadge.textContent = repCount; repBadge.style.display = repCount ? 'inline-block' : 'none'; }
 
-  let tasks = allTasksData.filter(t => {
+  // Assigned Task tab: maine jo assign kiye — sab status dikhte hain (done hua ya nahi)
+  const isAssignedView = taskStatusFilter === 'assigned';
+  let tasks = (isAssignedView ? _assignedByMeData : allTasksData).filter(t => {
     // Completed tab hata diya hai — completed tasks ab Closed Tasks tab me dikhte hain
-    const matchStatus = taskStatusFilter === 'all' || t.status === taskStatusFilter
+    const matchStatus = isAssignedView || taskStatusFilter === 'all' || t.status === taskStatusFilter
       || (taskStatusFilter === 'closed' && t.status === 'completed');
     const matchSearch = !search ||
       (t.description||'').toLowerCase().includes(search) ||
@@ -3145,7 +3165,7 @@ function renderTasksTable() {
   });
 
   if (!tasks.length) {
-    container.innerHTML = `<div class="empty" style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;">No tasks found</div>`;
+    container.innerHTML = `<div class="empty" style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;">${isAssignedView ? 'Aapne abhi tak koi task assign nahi kiya' : 'No tasks found'}</div>`;
     return;
   }
 
@@ -3186,7 +3206,7 @@ function renderTasksTable() {
             <div style="font-size:14px;font-weight:700;color:#1e293b"><span style="color:#64748b">${open ? '▼' : '▶'}</span> ${name}</div>
             <span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe">${list.length} total</span>
           </div>
-          ${open ? `<div class="flat-tasks-table" style="border:none;border-radius:0"><div style="overflow-x:auto"><table style="min-width:760px">${theadHtml}<tbody>${list.map(t => renderTaskRow(t, isAdmin)).join('')}</tbody></table></div></div>` : ''}
+          ${open ? `<div class="flat-tasks-table" style="border:none;border-radius:0"><div style="overflow-x:auto"><table style="min-width:760px">${theadHtml}<tbody>${list.map(t => renderTaskRow(t, isAdmin, isAssignedView)).join('')}</tbody></table></div></div>` : ''}
         </div>`;
       }).join('')}`;
     return;
@@ -3196,7 +3216,7 @@ function renderTasksTable() {
   const pageTasks = tasks.slice((allTasksPage-1)*ALL_TASKS_PAGE_SIZE, allTasksPage*ALL_TASKS_PAGE_SIZE);
 
   // Re-build rows only for this page
-  const pageRows = pageTasks.map(t => renderTaskRow(t, isAdmin)).join('');
+  const pageRows = pageTasks.map(t => renderTaskRow(t, isAdmin, isAssignedView)).join('');
   const paginationHtml = totalPages > 1 ? `
     <div style="display:flex;align-items:center;justify-content:center;gap:10px;padding:12px;border-top:1px solid #f1f5f9;font-size:13px;color:#64748b">
       <button onclick="if(allTasksPage>1){allTasksPage--;renderTasksTable();}" 
