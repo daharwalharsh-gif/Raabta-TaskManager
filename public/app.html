@@ -3126,7 +3126,9 @@ function renderTasksTable() {
   if (repBadge) { repBadge.textContent = repCount; repBadge.style.display = repCount ? 'inline-block' : 'none'; }
 
   let tasks = allTasksData.filter(t => {
-    const matchStatus = taskStatusFilter === 'all' || t.status === taskStatusFilter;
+    // Completed tab hata diya hai — completed tasks ab Closed Tasks tab me dikhte hain
+    const matchStatus = taskStatusFilter === 'all' || t.status === taskStatusFilter
+      || (taskStatusFilter === 'closed' && t.status === 'completed');
     const matchSearch = !search ||
       (t.description||'').toLowerCase().includes(search) ||
       (t.assignedToName||'').toLowerCase().includes(search) ||
