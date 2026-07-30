@@ -3042,11 +3042,6 @@ app.get('/api/fms-tasks/:fmsId/steps/:stepId/rows', requireAuth, async (req, res
     const actualIdx = colLetterToIdx(step.actualCol || '');
     const planIdx   = colLetterToIdx(step.planCol   || '');
 
-    // Pre-compute previous steps' actualCol indices
-    const prevStepActualIdxs = fms.steps.slice(0, stepIdx)
-      .map(s => colLetterToIdx(s.actualCol || ''))
-      .filter(i => i >= 0);
-
     // Determine first-column check range for "real data" (skip pure-checkbox/formula-only rows)
     const hasRealData = (row) => {
       const checkLen = Math.min(10, headers.length);
@@ -3063,14 +3058,30 @@ app.get('/api/fms-tasks/:fmsId/steps/:stepId/rows', requireAuth, async (req, res
       return v !== '' && v.toUpperCase() !== 'FALSE';
     };
 
-    // Filter: real data row + ALL previous steps done + current step pending
+    // Filter: real data row + row is relevant to THIS step + all relevant previous
+    // steps done + current step pending.
+    // "Relevant" = step ka planCol us row mein khali nahi hai. Kuch sheets mein (jaise
+    // Sale Type = Store Visit / Customised) har row sirf EK step par lagu hoti hai —
+    // Planned column sirf usi step ke liye bharta hai. Isliye jis step ka Planned
+    // column is row mein khali hai, wo step us row par apply hi nahi hota (skip),
+    // aur wo "previous step must be done" wali check ko bhi block nahi karega.
+    const isRelevant = (row, s) => {
+      const pIdx = colLetterToIdx(s.planCol || '');
+      return pIdx < 0 || (row[pIdx] || '').trim() !== '';
+    };
     const pending = rawDataRows
       .map((row, idx) => ({ row, sheetRow: headerRow + idx + 1 }))
       .filter(({ row }) => {
         if (!hasRealData(row)) return false;
-        // All previous steps must be done
-        for (const prevIdx of prevStepActualIdxs) {
-          if (!isDone(row[prevIdx])) return false;
+        // Ye row is step par apply hi nahi hoti to yahan pending nahi dikhegi
+        if (!isRelevant(row, step)) return false;
+        // Sirf un previous steps ko "done hona chahiye" treat karo jo IS ROW par
+        // relevant hain — jo step row par lagu hi nahi, wo block nahi karega
+        for (let i = 0; i < stepIdx; i++) {
+          const prevStep = fms.steps[i];
+          if (!isRelevant(row, prevStep)) continue;
+          const prevIdx = colLetterToIdx(prevStep.actualCol || '');
+          if (prevIdx >= 0 && !isDone(row[prevIdx])) return false;
         }
         // Current step must be pending
         if (actualIdx < 0) return true;
