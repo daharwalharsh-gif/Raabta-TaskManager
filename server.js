@@ -702,6 +702,52 @@ function reminderEmailHtml(byUser, todayStr) {
   </div>`;
 }
 
+// ── Leave request notification (employee → HR) ──
+function leaveRequestEmailHtml({ employeeName, fromDate, toDate, days, reason }) {
+  const appUrl = process.env.APP_URL || '#';
+  return `
+  <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f6f9fc;padding:20px;">
+    <div style="background:#fff;border-radius:8px;padding:30px;box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+      <h2 style="color:#d97706;margin-top:0;">🏖️ New Leave Request</h2>
+      <p><b>${employeeName || 'An employee'}</b> has submitted a leave request and is awaiting your review.</p>
+      <table style="width:100%;border-collapse:collapse;margin:20px 0;">
+        <tr><td style="padding:8px;background:#f0f4f8;width:140px;"><b>Employee</b></td><td style="padding:8px;">${employeeName || '—'}</td></tr>
+        <tr><td style="padding:8px;background:#f0f4f8;"><b>From</b></td><td style="padding:8px;">${fromDate}</td></tr>
+        <tr><td style="padding:8px;background:#f0f4f8;"><b>To</b></td><td style="padding:8px;">${toDate}</td></tr>
+        <tr><td style="padding:8px;background:#f0f4f8;"><b>Duration</b></td><td style="padding:8px;">${days} day${days > 1 ? 's' : ''}</td></tr>
+        <tr><td style="padding:8px;background:#f0f4f8;"><b>Reason</b></td><td style="padding:8px;">${reason || '—'}</td></tr>
+      </table>
+      <a href="${appUrl}" style="display:inline-block;background:#d97706;color:#fff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:600;">Review Request</a>
+      <p style="color:#94a3b8;font-size:11px;margin-top:18px">Please approve or reject this request in the Raabta Task Manager.</p>
+    </div>
+  </div>`;
+}
+
+// ── Leave decision notification (HR → employee) ──
+function leaveDecisionEmailHtml({ employeeName, fromDate, toDate, days, action, note, reviewerName }) {
+  const appUrl = process.env.APP_URL || '#';
+  const isApproved = action === 'approved';
+  const color = isApproved ? '#16a34a' : '#dc2626';
+  const icon = isApproved ? '✅' : '❌';
+  const label = isApproved ? 'Approved' : 'Rejected';
+  return `
+  <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f6f9fc;padding:20px;">
+    <div style="background:#fff;border-radius:8px;padding:30px;box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+      <h2 style="color:${color};margin-top:0;">${icon} Your Leave Request has been ${label}</h2>
+      <p>Hi <b>${employeeName || 'there'}</b>,</p>
+      <p>Your leave request has been <b style="color:${color}">${label.toLowerCase()}</b>${reviewerName ? ` by <b>${reviewerName}</b>` : ''}.</p>
+      <table style="width:100%;border-collapse:collapse;margin:20px 0;">
+        <tr><td style="padding:8px;background:#f0f4f8;width:140px;"><b>From</b></td><td style="padding:8px;">${fromDate}</td></tr>
+        <tr><td style="padding:8px;background:#f0f4f8;"><b>To</b></td><td style="padding:8px;">${toDate}</td></tr>
+        <tr><td style="padding:8px;background:#f0f4f8;"><b>Duration</b></td><td style="padding:8px;">${days} day${days > 1 ? 's' : ''}</td></tr>
+        <tr><td style="padding:8px;background:#f0f4f8;"><b>Status</b></td><td style="padding:8px;color:${color};font-weight:700">${label}</td></tr>
+        ${note ? `<tr><td style="padding:8px;background:#f0f4f8;"><b>Note</b></td><td style="padding:8px;">${note}</td></tr>` : ''}
+      </table>
+      <a href="${appUrl}" style="display:inline-block;background:${color};color:#fff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:600;">Open Task Manager</a>
+    </div>
+  </div>`;
+}
+
 // ── Delegation reminders ──
 async function runDelegationReminders() {
   try {
@@ -1933,6 +1979,16 @@ app.post('/api/leaves', requireAuth, async (req, res) => {
       reason: reason || '', status: 'pending', note: '', created_at: nowStr
     });
     res.json({ success: true, id: parseInt(created.id) });
+
+    // HR ko mail — fire-and-forget, response ko block nahi karta
+    (async () => {
+      const hrEmail = (process.env.HR_EMAIL || '').trim();
+      if (!hrEmail) return;
+      const employee = await d.findOne('Users', { id: String(req.session.userId) });
+      const days = Math.round((new Date(to_date) - new Date(from_date)) / 86400000) + 1;
+      await sendMail(hrEmail, `Leave Request — ${employee?.name || 'Employee'} (${from_date} to ${to_date})`,
+        leaveRequestEmailHtml({ employeeName: employee?.name, fromDate: from_date, toDate: to_date, days, reason }));
+    })().catch(e => console.error('  Leave request email failed:', e.message));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1968,6 +2024,22 @@ app.put('/api/leaves/:id', requireAuth, async (req, res) => {
     if (!leave) return res.status(404).json({ error: 'Leave request not found' });
     await d.update('Leave_Requests', req.params.id, { status: action, note: note || '' });
     res.json({ success: true });
+
+    // Employee ko decision mail — fire-and-forget, response ko block nahi karta
+    (async () => {
+      const [employee, reviewer] = await Promise.all([
+        d.findOne('Users', { id: String(leave.user_id) }),
+        d.findOne('Users', { id: String(req.session.userId) })
+      ]);
+      if (!employee || !employee.notification_email) return;
+      const days = Math.round((new Date(leave.to_date) - new Date(leave.from_date)) / 86400000) + 1;
+      const label = action === 'approved' ? 'Approved' : 'Rejected';
+      await sendMail(employee.notification_email, `Leave Request ${label} — ${leave.from_date} to ${leave.to_date}`,
+        leaveDecisionEmailHtml({
+          employeeName: employee.name, fromDate: leave.from_date, toDate: leave.to_date,
+          days, action, note: note || '', reviewerName: reviewer?.name
+        }));
+    })().catch(e => console.error('  Leave decision email failed:', e.message));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
