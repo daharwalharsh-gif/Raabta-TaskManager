@@ -3210,6 +3210,36 @@ function nextUniqId(existingIds, prefix, pad) {
   return `${prefix}-${String(max + 1).padStart(pad, '0')}`;
 }
 
+// Entry form ka target tab — naya data FORM tab me jaata hai (FMS tab wahi
+// data formulas ke through kheenchta hai). FORM naam ka tab na mile to FMS
+// config wala tab hi use hota hai.
+async function fmsEntryTarget(d, spreadsheetId, fallbackTab) {
+  const meta = await withRetry(() => d.sheets.spreadsheets.get({
+    spreadsheetId, fields: 'sheets(properties(title,sheetId,gridProperties(rowCount,columnCount)))'
+  }));
+  const sheets = meta.data.sheets || [];
+  const target = sheets.find(s => String(s.properties.title || '').trim().toUpperCase() === 'FORM')
+              || sheets.find(s => s.properties.title === fallbackTab);
+  if (!target) return null;
+  const g = target.properties.gridProperties || {};
+  return {
+    tabName: target.properties.title,
+    sheetId: target.properties.sheetId,
+    rowCount: g.rowCount || 0,
+    columnCount: g.columnCount || 0
+  };
+}
+
+// Header row dhoondo — wo row jisme "UNIQ ID" likha hai (FORM tab me row 1,
+// FMS tab me row 6). Na mile to 1 maan lo.
+function fmsEntryHeaderRow(all) {
+  for (let i = 0; i < Math.min(12, all.length); i++) {
+    const row = (all[i] || []).map(v => String(v || '').trim().toUpperCase());
+    if (row.includes('UNIQ ID') || row.includes('UNIQID')) return i + 1;
+  }
+  return 1;
+}
+
 // GET /api/fms-entry/:fmsId/config — form fields + agli UNIQ ID
 app.get('/api/fms-entry/:fmsId/config', requireAuth, async (req, res) => {
   try {
@@ -3218,20 +3248,24 @@ app.get('/api/fms-entry/:fmsId/config', requireAuth, async (req, res) => {
     if (!fmsRow) return res.status(404).json({ error: 'FMS not found' });
     const fms = parseFMSRow(fmsRow);
     const spreadsheetId = extractSheetId(fms.sheet_id);
-    const headerRow = parseInt(fms.header_row) || 1;
+
+    const target = await fmsEntryTarget(d, spreadsheetId, fms.sheet_name);
+    if (!target) return res.status(404).json({ error: 'Entry tab (FORM) nahi mila' });
 
     const resp = await withRetry(() => d.sheets.spreadsheets.values.get({
-      spreadsheetId, range: `${fms.sheet_name}!A${headerRow}:H`
+      spreadsheetId, range: `${target.tabName}!A1:H`
     }));
     const all = resp.data.values || [];
-    const headers = all[0] || [];
+    const headerRow = fmsEntryHeaderRow(all);
+    const headers = all[headerRow - 1] || [];
     const idCol = colLetterToIdx('B');
-    const existingIds = all.slice(1).map(r => r[idCol]).filter(Boolean);
+    const existingIds = all.slice(headerRow).map(r => (r || [])[idCol]).filter(Boolean);
 
     res.json({
       fmsName: fms.fms_name || fms.sheet_name,
       fields: FMS_ENTRY_FIELDS,
       headers,
+      tabName: target.tabName,
       nextUniqId: nextUniqId(existingIds, 'DS', 4)
     });
   } catch (err) {
@@ -3263,13 +3297,17 @@ app.post('/api/fms-entry/:fmsId/submit', requireAuth, async (req, res) => {
     if (!fmsRow) return res.status(404).json({ error: 'FMS not found' });
     const fms = parseFMSRow(fmsRow);
     const spreadsheetId = extractSheetId(fms.sheet_id);
-    const headerRow = parseInt(fms.header_row) || 1;
 
-    // Poori sheet padho — agli khali row aur formula-template row dhoondhne ke liye
+    // Data FORM tab me jaata hai (FMS tab wahi se kheenchta hai)
+    const meta = await fmsEntryTarget(d, spreadsheetId, fms.sheet_name);
+    if (!meta) return res.status(404).json({ error: 'Entry tab (FORM) nahi mila' });
+
+    // Poora tab padho — agli khali row aur formula-template row dhoondhne ke liye
     const resp = await withRetry(() => d.sheets.spreadsheets.values.get({
-      spreadsheetId, range: `${fms.sheet_name}!A1:ZZ`
+      spreadsheetId, range: `${meta.tabName}!A1:ZZ`
     }));
     const all = resp.data.values || [];
+    const headerRow = fmsEntryHeaderRow(all);
     const dataRows = all.slice(headerRow);
 
     // Aakhri ASLI bhari hui data row — uske neeche append karenge.
@@ -3304,11 +3342,10 @@ app.post('/api/fms-entry/:fmsId/submit', requireAuth, async (req, res) => {
       ];
     });
 
-    // Sheet ki grid me itni rows hain ya nahi — na hon to pehle expand karo,
+    // Tab ki grid me itni rows hain ya nahi — na hon to pehle expand karo,
     // warna "Range exceeds grid limits" error aata hai
-    const meta = await fmsSheetMeta(d, spreadsheetId, fms.sheet_name);
     const lastNeededRow = firstNewRow + values.length - 1;
-    if (meta && meta.rowCount && lastNeededRow > meta.rowCount) {
+    if (meta.rowCount && lastNeededRow > meta.rowCount) {
       await withRetry(() => d.sheets.spreadsheets.batchUpdate({
         spreadsheetId,
         requestBody: { requests: [{ appendDimension: {
@@ -3320,15 +3357,15 @@ app.post('/api/fms-entry/:fmsId/submit', requireAuth, async (req, res) => {
 
     await withRetry(() => d.sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `${fms.sheet_name}!A${firstNewRow}:H${lastNeededRow}`,
+      range: `${meta.tabName}!A${firstNewRow}:H${lastNeededRow}`,
       valueInputOption: 'USER_ENTERED',
       requestBody: { values }
     }));
 
-    // Planned/Actual formula columns naye rows me copy karo — warna row kisi bhi
-    // FMS step me pending nahi dikhegi (step-relevance Planned column par depend
-    // karta hai). Template = aakhri bhari hui row, jispe formulas already hain.
-    if (lastFilledIdx >= 0 && meta) {
+    // Agar is tab me H ke aage formula columns hain (FMS-style layout) to unhe
+    // naye rows me copy karo — warna row kisi step me pending nahi dikhegi.
+    // FORM tab me H ke aage kuch nahi hota, to ye apne aap skip ho jaata hai.
+    if (lastFilledIdx >= 0) {
       const templateRow = headerRow + lastFilledIdx + 1;
       // Header ke columns tak, par sheet ki grid width se aage nahi
       const headerCols = (all[headerRow - 1] || []).length;
@@ -3355,20 +3392,6 @@ app.post('/api/fms-entry/:fmsId/submit', requireAuth, async (req, res) => {
     res.status(500).json({ error: msg });
   }
 });
-
-// Sheet tab ka numeric sheetId + grid size (formula copy aur row expand ke liye)
-async function fmsSheetMeta(d, spreadsheetId, tabName) {
-  const meta = await withRetry(() => d.sheets.spreadsheets.get({
-    spreadsheetId, fields: 'sheets(properties(title,sheetId,gridProperties(rowCount,columnCount)))'
-  }));
-  for (const s of (meta.data.sheets || [])) {
-    if (s.properties.title === tabName) {
-      const g = s.properties.gridProperties || {};
-      return { sheetId: s.properties.sheetId, rowCount: g.rowCount || 0, columnCount: g.columnCount || 0 };
-    }
-  }
-  return null;
-}
 
 // ══════════════════════════════════════════════════════
 // TASK TRANSFERS
