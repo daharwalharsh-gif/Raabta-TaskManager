@@ -3272,11 +3272,19 @@ app.post('/api/fms-entry/:fmsId/submit', requireAuth, async (req, res) => {
     const all = resp.data.values || [];
     const dataRows = all.slice(headerRow);
 
-    // Aakhri bhari hui data row (A..H me kuch bhi ho) — uske neeche append karenge
+    // Aakhri ASLI bhari hui data row — uske neeche append karenge.
+    // FALSE/TRUE ko data nahi maante: sheet me neeche tak drag kiye hue
+    // checkbox/formula cells hote hain jo poori grid ke end tak "FALSE" dete
+    // hain — unhe data maan lein to append point sheet ki limit ke bahar chala
+    // jaata hai. Yahi rule baaki FMS code (hasRealData) me bhi hai.
     let lastFilledIdx = -1;
     for (let i = 0; i < dataRows.length; i++) {
       const r = dataRows[i] || [];
-      if (r.slice(0, 8).some(v => String(v || '').trim() !== '')) lastFilledIdx = i;
+      const real = r.slice(0, 8).some(v => {
+        const s = String(v || '').trim().toUpperCase();
+        return s !== '' && s !== 'FALSE' && s !== 'TRUE';
+      });
+      if (real) lastFilledIdx = i;
     }
     const firstNewRow = headerRow + lastFilledIdx + 2; // 1-based sheet row
 
@@ -3296,9 +3304,23 @@ app.post('/api/fms-entry/:fmsId/submit', requireAuth, async (req, res) => {
       ];
     });
 
+    // Sheet ki grid me itni rows hain ya nahi — na hon to pehle expand karo,
+    // warna "Range exceeds grid limits" error aata hai
+    const meta = await fmsSheetMeta(d, spreadsheetId, fms.sheet_name);
+    const lastNeededRow = firstNewRow + values.length - 1;
+    if (meta && meta.rowCount && lastNeededRow > meta.rowCount) {
+      await withRetry(() => d.sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        requestBody: { requests: [{ appendDimension: {
+          sheetId: meta.sheetId, dimension: 'ROWS',
+          length: (lastNeededRow - meta.rowCount) + 100   // thoda buffer
+        }}]}
+      }));
+    }
+
     await withRetry(() => d.sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `${fms.sheet_name}!A${firstNewRow}:H${firstNewRow + values.length - 1}`,
+      range: `${fms.sheet_name}!A${firstNewRow}:H${lastNeededRow}`,
       valueInputOption: 'USER_ENTERED',
       requestBody: { values }
     }));
@@ -3306,28 +3328,24 @@ app.post('/api/fms-entry/:fmsId/submit', requireAuth, async (req, res) => {
     // Planned/Actual formula columns naye rows me copy karo — warna row kisi bhi
     // FMS step me pending nahi dikhegi (step-relevance Planned column par depend
     // karta hai). Template = aakhri bhari hui row, jispe formulas already hain.
-    let formulaCopy = null;
-    if (lastFilledIdx >= 0) {
+    if (lastFilledIdx >= 0 && meta) {
       const templateRow = headerRow + lastFilledIdx + 1;
-      const lastCol = idxToColLetter(Math.max(0, (all[headerRow - 1] || []).length - 1));
-      const sheetId = await fmsSheetTabId(d, spreadsheetId, fms.sheet_name);
-      if (sheetId != null) {
-        formulaCopy = {
-          copyPaste: {
-            source: { sheetId, startRowIndex: templateRow - 1, endRowIndex: templateRow,
-                      startColumnIndex: 8, endColumnIndex: colLetterToIdx(lastCol) + 1 },
-            destination: { sheetId, startRowIndex: firstNewRow - 1,
+      // Header ke columns tak, par sheet ki grid width se aage nahi
+      const headerCols = (all[headerRow - 1] || []).length;
+      const endCol = Math.min(headerCols, meta.columnCount || headerCols);
+      if (endCol > 8) {
+        await withRetry(() => d.sheets.spreadsheets.batchUpdate({
+          spreadsheetId,
+          requestBody: { requests: [{ copyPaste: {
+            source: { sheetId: meta.sheetId, startRowIndex: templateRow - 1, endRowIndex: templateRow,
+                      startColumnIndex: 8, endColumnIndex: endCol },
+            destination: { sheetId: meta.sheetId, startRowIndex: firstNewRow - 1,
                            endRowIndex: firstNewRow - 1 + values.length,
-                           startColumnIndex: 8, endColumnIndex: colLetterToIdx(lastCol) + 1 },
+                           startColumnIndex: 8, endColumnIndex: endCol },
             pasteType: 'PASTE_FORMULA'
-          }
-        };
+          }}]}
+        }));
       }
-    }
-    if (formulaCopy) {
-      await withRetry(() => d.sheets.spreadsheets.batchUpdate({
-        spreadsheetId, requestBody: { requests: [formulaCopy] }
-      }));
     }
 
     res.json({ success: true, count: values.length, uniqIds: values.map(v => v[1]), firstRow: firstNewRow });
@@ -3338,13 +3356,16 @@ app.post('/api/fms-entry/:fmsId/submit', requireAuth, async (req, res) => {
   }
 });
 
-// Sheet tab ka numeric sheetId (formula copy ke liye chahiye)
-async function fmsSheetTabId(d, spreadsheetId, tabName) {
+// Sheet tab ka numeric sheetId + grid size (formula copy aur row expand ke liye)
+async function fmsSheetMeta(d, spreadsheetId, tabName) {
   const meta = await withRetry(() => d.sheets.spreadsheets.get({
-    spreadsheetId, fields: 'sheets(properties(title,sheetId))'
+    spreadsheetId, fields: 'sheets(properties(title,sheetId,gridProperties(rowCount,columnCount)))'
   }));
   for (const s of (meta.data.sheets || [])) {
-    if (s.properties.title === tabName) return s.properties.sheetId;
+    if (s.properties.title === tabName) {
+      const g = s.properties.gridProperties || {};
+      return { sheetId: s.properties.sheetId, rowCount: g.rowCount || 0, columnCount: g.columnCount || 0 };
+    }
   }
   return null;
 }
