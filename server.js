@@ -13,8 +13,10 @@ const JWT_SECRET = process.env.SESSION_SECRET || 'taskmanager_secret_2026';
 const SHEET_ID = process.env.SHEET_ID || '1SlUOgq1QN70tbIdlNat_XEY4JYGHG3JQyyh3NBG_lYQ';
 
 app.use(cookieParser());
-app.use(express.json({ limit: '20mb' }));   // report attachments (image+pdf base64)
-app.use(express.urlencoded({ extended: true, limit: '20mb' }));
+// Base64 payload asli file se ~33% bada hota hai, isliye 15 MB ki FMS upload
+// limit ke liye body limit 30mb rakhi hai (report attachments bhi isi se jaate).
+app.use(express.json({ limit: '30mb' }));
+app.use(express.urlencoded({ extended: true, limit: '30mb' }));
 // Har request par reminder slot check (minute me ek baar) — app so kar uthe to
 // bhi missed reminder chala jaata hai, bina kisi bahri cron ke.
 app.use((req, res, next) => waRequestHook(req, res, next));
@@ -511,6 +513,15 @@ const MYSQL_SCHEMA = {
     user_id: "VARCHAR(20) DEFAULT ''", from_date: "VARCHAR(40) DEFAULT ''",
     to_date: "VARCHAR(40) DEFAULT ''", reason: "TEXT",
     status: "VARCHAR(20) DEFAULT 'pending'", note: "TEXT", created_at: "VARCHAR(40) DEFAULT ''"
+  },
+  // FMS extra-input me upload hui files (image/PDF/video) — file DB me base64
+  // rehti hai, sheet me sirf uska link jaata hai.
+  FMS_Uploads: {
+    fms_id: "VARCHAR(20) DEFAULT ''", step_id: "VARCHAR(20) DEFAULT ''",
+    row_index: "VARCHAR(20) DEFAULT ''", col_letter: "VARCHAR(10) DEFAULT ''",
+    file_name: "VARCHAR(255) DEFAULT ''", mime_type: "VARCHAR(120) DEFAULT ''",
+    file_size: "VARCHAR(20) DEFAULT '0'", file_data: "LONGTEXT",
+    uploaded_by: "VARCHAR(20) DEFAULT ''", created_at: "VARCHAR(40) DEFAULT ''"
   },
   // Chhoti key-value table — abhi WhatsApp reminder ke "aaj is slot ka pass ho
   // chuka" marker ke liye. App restart hone par bhi yaad rehta hai, isliye
@@ -3166,6 +3177,71 @@ app.post('/api/fms-tasks/:fmsId/steps/:stepId/done', requireAuth, async (req, re
     if (msg.includes('403')) msg = 'Access denied — sheet ko service account ke saath Editor access de';
     res.status(500).json({ error: msg });
   }
+});
+
+// ══════════════════════════════════════════════════════
+// FMS FILE UPLOADS — extra-input ke image / PDF / video
+// ══════════════════════════════════════════════════════
+// File DB me base64 store hoti hai; sheet me sirf uska open-link jaata hai.
+const FMS_UPLOAD_TYPES = {
+  image: { label: 'Image', accept: 'image/*', mimes: ['image/'] },
+  pdf:   { label: 'PDF',   accept: 'application/pdf', mimes: ['application/pdf'] },
+  video: { label: 'Video', accept: 'video/*', mimes: ['video/'] }
+};
+const FMS_UPLOAD_MAX_BYTES = 15 * 1024 * 1024;   // 15 MB
+
+// POST /api/fms-uploads — base64 file save karo, link wapas do
+app.post('/api/fms-uploads', requireAuth, async (req, res) => {
+  try {
+    const { fmsId, stepId, rowIndex, colLetter, fieldType, fileName, mimeType, dataUrl } = req.body || {};
+    if (!dataUrl || typeof dataUrl !== 'string') return res.status(400).json({ error: 'File missing' });
+
+    const spec = FMS_UPLOAD_TYPES[fieldType];
+    if (!spec) return res.status(400).json({ error: 'Field type galat hai' });
+    const mime = String(mimeType || '');
+    if (!spec.mimes.some(p => mime.startsWith(p)))
+      return res.status(400).json({ error: `Sirf ${spec.label} file allowed hai` });
+
+    // base64 payload size (data:...;base64,XXXX) — 4 base64 chars = 3 bytes
+    const b64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
+    const bytes = Math.floor(b64.length * 3 / 4);
+    if (bytes > FMS_UPLOAD_MAX_BYTES)
+      return res.status(400).json({ error: `File bahut badi hai (max ${FMS_UPLOAD_MAX_BYTES / 1024 / 1024} MB)` });
+
+    const d = await getDB();
+    const nowStr = new Date().toISOString().replace('T', ' ').split('.')[0];
+    const saved = await d.insert('FMS_Uploads', {
+      fms_id: String(fmsId || ''), step_id: String(stepId || ''),
+      row_index: String(rowIndex || ''), col_letter: String(colLetter || ''),
+      file_name: String(fileName || 'file'), mime_type: mime,
+      file_size: String(bytes), file_data: dataUrl,
+      uploaded_by: String(req.session.userId), created_at: nowStr
+    });
+
+    const base = (process.env.APP_URL || '').replace(/\/+$/, '');
+    res.json({
+      success: true, id: parseInt(saved.id),
+      url: `${base}/f/${saved.id}`,          // sheet me yahi link jaata hai
+      fileName: String(fileName || 'file'), size: bytes
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /f/:id — uploaded file kholo (sheet ke link se click karne par)
+app.get('/f/:id', async (req, res) => {
+  try {
+    const d = await getDB();
+    const row = await d.findOne('FMS_Uploads', { id: String(req.params.id) });
+    if (!row) return res.status(404).send('File not found');
+    const dataUrl = String(row.file_data || '');
+    const b64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
+    if (!b64) return res.status(404).send('File empty');
+    const buf = Buffer.from(b64, 'base64');
+    res.setHeader('Content-Type', row.mime_type || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `inline; filename="${String(row.file_name || 'file').replace(/"/g, '')}"`);
+    res.setHeader('Cache-Control', 'private, max-age=86400');
+    res.send(buf);
+  } catch (err) { res.status(500).send('Error: ' + err.message); }
 });
 
 // ══════════════════════════════════════════════════════

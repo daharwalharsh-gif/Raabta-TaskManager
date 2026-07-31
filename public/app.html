@@ -6081,6 +6081,9 @@ function buildStepBoxHTML(idx) {
       <option value="date" ${r.field_type==='date'?'selected':''}>📅 Date</option>
       <option value="link" ${r.field_type==='link'?'selected':''}>🔗 Link</option>
       <option value="dropdown" ${r.field_type==='dropdown'?'selected':''}>🔽 Dropdown</option>
+      <option value="image" ${r.field_type==='image'?'selected':''}>🖼️ Image Upload</option>
+      <option value="pdf" ${r.field_type==='pdf'?'selected':''}>📄 PDF Upload</option>
+      <option value="video" ${r.field_type==='video'?'selected':''}>🎥 Video Upload</option>
     </select>`;
     const dropSection = r.field_type==='dropdown' ? buildDropdownOptionsHTML(idx, ri, r) : '';
     return `<div class="extra-row-item" id="fmsExtraRow_${idx}_${ri}" style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:10px;margin-bottom:10px">
@@ -6281,6 +6284,9 @@ function buildExtraRowHTML(idx, ri, headers) {
     <option value="date" ${r.field_type==='date'?'selected':''}>📅 Date</option>
     <option value="link" ${r.field_type==='link'?'selected':''}>🔗 Link</option>
     <option value="dropdown" ${r.field_type==='dropdown'?'selected':''}>🔽 Dropdown</option>
+    <option value="image" ${r.field_type==='image'?'selected':''}>🖼️ Image Upload</option>
+    <option value="pdf" ${r.field_type==='pdf'?'selected':''}>📄 PDF Upload</option>
+    <option value="video" ${r.field_type==='video'?'selected':''}>🎥 Video Upload</option>
   </select>`;
   const dropOptsSection = r.field_type==='dropdown' ? buildDropdownOptionsHTML(idx, ri, r) : '';
   return `
@@ -6964,6 +6970,19 @@ function openFMSDoneModal(stepId, rowIdx) {
           inputHtml = `<select id="fmsExtra_${i}" style="${inputStyle};background:#fff"><option value="">-- Select --</option>${optionsList}</select>`;
           break;
         }
+        case 'image': case 'pdf': case 'video': {
+          // File upload — file DB me jaati hai, sheet me uska link. Hidden input
+          // me upload ke baad URL bhar jaata hai (wahi sheet me likha jaata hai).
+          const accept = r.field_type === 'image' ? 'image/*'
+                       : r.field_type === 'pdf'   ? 'application/pdf' : 'video/*';
+          inputHtml = `
+            <input type="hidden" id="fmsExtra_${i}"/>
+            <input type="file" accept="${accept}" id="fmsExtraFile_${i}"
+              onchange="uploadFMSExtraFile(${i},'${r.field_type}','${r.col_letter}')"
+              style="${inputStyle};padding:7px"/>
+            <div id="fmsExtraFileStatus_${i}" style="font-size:11px;margin-top:4px;color:#64748b"></div>`;
+          break;
+        }
         default:
           inputHtml = `<input type="text" id="fmsExtra_${i}" placeholder="Enter value..." style="${inputStyle}"/>`;
       }
@@ -6982,6 +7001,55 @@ function openFMSDoneModal(stepId, rowIdx) {
 }
 
 // (delay reason is now a plain text input — no dropdown listener needed)
+
+// Extra-input ki file (image/PDF/video) upload — DB me save hoti hai aur uska
+// link hidden input me aa jaata hai, wahi link sheet me likha jaata hai.
+const FMS_UPLOAD_MAX_MB = 15;
+async function uploadFMSExtraFile(i, fieldType, colLetter) {
+  const fileEl = document.getElementById(`fmsExtraFile_${i}`);
+  const hidden = document.getElementById(`fmsExtra_${i}`);
+  const status = document.getElementById(`fmsExtraFileStatus_${i}`);
+  const saveBtn = document.getElementById('fmsDoneSaveBtn');
+  const file = fileEl && fileEl.files && fileEl.files[0];
+  hidden.value = '';
+  if (!file) { status.textContent = ''; return; }
+
+  if (file.size > FMS_UPLOAD_MAX_MB * 1024 * 1024) {
+    status.innerHTML = `<span style="color:#ef4444">⚠️ File ${FMS_UPLOAD_MAX_MB} MB se choti honi chahiye</span>`;
+    fileEl.value = '';
+    return;
+  }
+
+  status.innerHTML = '<span style="color:#64748b">⏳ Uploading…</span>';
+  if (saveBtn) saveBtn.disabled = true;
+
+  const dataUrl = await new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(fr.result);
+    fr.onerror = () => reject(new Error('File padhi nahi ja saki'));
+    fr.readAsDataURL(file);
+  }).catch(e => { status.innerHTML = `<span style="color:#ef4444">⚠️ ${e.message}</span>`; return null; });
+
+  if (!dataUrl) { if (saveBtn) saveBtn.disabled = false; return; }
+
+  const r = await api('/api/fms-uploads', 'POST', {
+    fmsId: document.getElementById('fmsDoneFmsId').value,
+    stepId: document.getElementById('fmsDoneStepId').value,
+    rowIndex: document.getElementById('fmsDoneRowNum').value,
+    colLetter, fieldType,
+    fileName: file.name, mimeType: file.type, dataUrl
+  });
+  if (saveBtn) saveBtn.disabled = false;
+
+  if (r.error) {
+    status.innerHTML = `<span style="color:#ef4444">⚠️ ${r.error}</span>`;
+    fileEl.value = '';
+    return;
+  }
+  hidden.value = r.url;
+  const kb = Math.round((r.size || 0) / 1024);
+  status.innerHTML = `<span style="color:#16a34a">✅ ${r.fileName} (${kb} KB) uploaded</span> — <a href="${r.url}" target="_blank" style="color:#2563eb">open</a>`;
+}
 
 async function saveFMSDone() {
   const fmsId = document.getElementById('fmsDoneFmsId').value;
@@ -7005,14 +7073,18 @@ async function saveFMSDone() {
     const val = el ? el.value.trim() : '';
     if (!val) {
       const label = r.label || r.row_label || r.col_letter || `Field ${i+1}`;
-      errEl.textContent = `"${label}" field is required!`;
+      const isFile = ['image', 'pdf', 'video'].includes(r.field_type);
+      errEl.textContent = isFile ? `"${label}" ke liye file upload karo!` : `"${label}" field is required!`;
       errEl.style.display = 'block';
       saveBtn.textContent = '💾 Save to Sheet';
       saveBtn.disabled = false;
-      if (el) { el.style.border = '1.5px solid #ef4444'; el.focus(); }
+      // File field ka asli input hidden hai — highlight file picker par karo
+      const focusEl = isFile ? (document.getElementById(`fmsExtraFile_${i}`) || el) : el;
+      if (focusEl) { focusEl.style.border = '1.5px solid #ef4444'; focusEl.focus(); }
       return;
     } else {
-      if (el) el.style.border = '1.5px solid #e2e8f0';
+      const focusEl = document.getElementById(`fmsExtraFile_${i}`) || el;
+      if (focusEl) focusEl.style.border = '1.5px solid #e2e8f0';
     }
   }
   const extraInputs = extraRows.map((r, i) => {
