@@ -1149,8 +1149,19 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       </select>
     </div>
 
+    <!-- Tasks / Form tabs -->
+    <div id="fmsTasksViewTabs" style="display:none;margin-bottom:16px">
+      <div class="tab-group">
+        <div class="tab active" id="fmsViewTabTasks" onclick="switchFMSView('tasks',this)">Tasks</div>
+        <div class="tab" id="fmsViewTabForm" onclick="switchFMSView('form',this)">📝 Form</div>
+      </div>
+    </div>
+
     <!-- Steps Stack — har step apne table ke saath (train view replaced) -->
     <div id="fmsStepsStack" style="display:none"></div>
+
+    <!-- Entry Form view -->
+    <div id="fmsEntryFormView" style="display:none"></div>
 
     <!-- Empty state -->
     <div id="fmsTasksEmpty" class="empty" style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;display:none">
@@ -6586,11 +6597,22 @@ async function loadFMSTasks() {
 async function onFMSTasksSelect() {
   const fmsId = document.getElementById('fmsTasksSelect').value;
   const stack = document.getElementById('fmsStepsStack');
+  const viewTabs = document.getElementById('fmsTasksViewTabs');
+  const formView = document.getElementById('fmsEntryFormView');
 
   if (!fmsId) {
     stack.style.display = 'none';
+    if (viewTabs) viewTabs.style.display = 'none';
+    if (formView) formView.style.display = 'none';
     return;
   }
+
+  // FMS badla to wapas Tasks view par
+  if (viewTabs) viewTabs.style.display = 'block';
+  if (formView) { formView.style.display = 'none'; formView.innerHTML = ''; }
+  _fmsEntryRows = null;
+  document.getElementById('fmsViewTabTasks')?.classList.add('active');
+  document.getElementById('fmsViewTabForm')?.classList.remove('active');
 
   fmsTasksActiveFmsId = parseInt(fmsId);
   fmsTasksActiveStepId = null;
@@ -6604,6 +6626,154 @@ async function onFMSTasksSelect() {
     return;
   }
   buildFMSStack(data.steps || []);
+}
+
+// ══════════════════════════════════════════════════════
+// FMS ENTRY FORM — naye sale rows seedha sheet me (Delhi Sales form jaisa)
+// ══════════════════════════════════════════════════════
+let _fmsEntryRows = null;      // [{name, phone, salesPerson, dateOfSale, billNo, saleType}]
+let _fmsEntryConfig = null;    // {fields, nextUniqId, fmsName}
+
+function switchFMSView(view, el) {
+  document.querySelectorAll('#fmsTasksViewTabs .tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  const stack = document.getElementById('fmsStepsStack');
+  const formView = document.getElementById('fmsEntryFormView');
+  if (view === 'form') {
+    stack.style.display = 'none';
+    formView.style.display = 'block';
+    if (!_fmsEntryRows) loadFMSEntryForm();
+  } else {
+    formView.style.display = 'none';
+    stack.style.display = 'block';
+  }
+}
+
+function fmsTodayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function fmsBlankEntryRow() {
+  return { name:'', phone:'', salesPerson:'', dateOfSale: fmsTodayStr(), billNo:'', saleType:'' };
+}
+
+async function loadFMSEntryForm() {
+  const view = document.getElementById('fmsEntryFormView');
+  view.innerHTML = '<div class="empty" style="background:#fff;border-radius:12px;border:1px solid #e2e8f0">⏳ Loading form…</div>';
+  const cfg = await api(`/api/fms-entry/${fmsTasksActiveFmsId}/config`);
+  if (cfg.error) {
+    view.innerHTML = `<div class="empty" style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;color:#ef4444">⚠️ ${cfg.error}</div>`;
+    return;
+  }
+  _fmsEntryConfig = cfg;
+  _fmsEntryRows = [fmsBlankEntryRow()];
+  renderFMSEntryForm();
+}
+
+function renderFMSEntryForm() {
+  const view = document.getElementById('fmsEntryFormView');
+  const cfg = _fmsEntryConfig;
+  if (!cfg) return;
+  const inputFields = cfg.fields.filter(f => f.type !== 'auto');
+  const baseId = parseInt(String(cfg.nextUniqId).replace(/^\D+/, '')) || 1;
+
+  const rowsHtml = _fmsEntryRows.map((r, i) => `
+    <tr>
+      <td><span style="display:inline-block;background:#f1f5f9;color:#475569;font-weight:700;font-size:12px;padding:7px 12px;border-radius:6px;white-space:nowrap">DS-${String(baseId + i).padStart(4,'0')}</span></td>
+      ${inputFields.map(f => `<td>${
+        f.type === 'select'
+          ? `<select onchange="fmsEntrySet(${i},'${f.key}',this.value)" style="padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px;font-family:'Inter',sans-serif;outline:none;background:#fff;min-width:130px">
+               <option value="">Select</option>
+               ${f.options.map(o => `<option value="${o}" ${r[f.key]===o?'selected':''}>${o}</option>`).join('')}
+             </select>`
+          : `<input type="${f.type}" value="${String(r[f.key]||'').replace(/"/g,'&quot;')}" placeholder="${f.label}"
+               oninput="fmsEntrySet(${i},'${f.key}',this.value)"
+               style="padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px;font-family:'Inter',sans-serif;outline:none;min-width:130px"/>`
+      }</td>`).join('')}
+      <td style="white-space:nowrap">
+        <button class="btn btn-sm" onclick="fmsEntryDuplicate(${i})" style="background:#2563eb;color:#fff;border:none">Duplicate</button>
+        <button class="btn btn-sm" onclick="fmsEntryRemove(${i})" ${_fmsEntryRows.length === 1 ? 'disabled' : ''}
+          style="background:#ef4444;color:#fff;border:none;margin-left:6px${_fmsEntryRows.length === 1 ? ';opacity:.45;cursor:not-allowed' : ''}">Remove</button>
+      </td>
+    </tr>`).join('');
+
+  view.innerHTML = `
+    <div style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden">
+      <div style="background:linear-gradient(135deg,#1e40af,#2563eb);padding:26px 20px;text-align:center">
+        <div style="font-size:22px;font-weight:800;color:#fff">${cfg.fmsName}</div>
+        <div style="font-size:13px;color:#dbeafe;margin-top:4px">Details.</div>
+      </div>
+      <div style="padding:18px">
+        <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px">
+          Timestamp <span style="color:#94a3b8;font-weight:500">(Live • 24×7 IST)</span>
+        </div>
+        <div style="display:inline-flex;align-items:center;gap:8px;background:#f1f5f9;border-radius:8px;padding:9px 14px;margin-bottom:16px">
+          <span style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block"></span>
+          <span id="fmsEntryClock" style="font-size:14px;font-weight:700;color:#1e293b"></span>
+        </div>
+        <div style="overflow-x:auto">
+          <table style="min-width:900px">
+            <thead><tr>
+              <th>UNIQ ID</th>
+              ${inputFields.map(f => `<th>${f.label}</th>`).join('')}
+              <th>Actions</th>
+            </tr></thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
+          <button class="btn btn-outline" onclick="fmsEntryAddRow()" style="color:#2563eb;border-color:#bfdbfe">+ Add Row</button>
+          <button class="btn btn-primary" id="fmsEntrySubmitBtn" onclick="submitFMSEntry()" style="background:#2563eb">Submit All</button>
+        </div>
+      </div>
+    </div>`;
+  startFMSEntryClock();
+}
+
+let _fmsEntryClockTimer = null;
+function startFMSEntryClock() {
+  if (_fmsEntryClockTimer) clearInterval(_fmsEntryClockTimer);
+  const tick = () => {
+    const el = document.getElementById('fmsEntryClock');
+    if (!el) { clearInterval(_fmsEntryClockTimer); _fmsEntryClockTimer = null; return; }
+    const s = new Date().toLocaleString('en-GB', { timeZone:'Asia/Kolkata',
+      day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false });
+    const [date, time] = s.split(', ');
+    el.textContent = `${date} • ${time}`;
+  };
+  tick();
+  _fmsEntryClockTimer = setInterval(tick, 1000);
+}
+
+function fmsEntrySet(i, key, val) { if (_fmsEntryRows[i]) _fmsEntryRows[i][key] = val; }
+function fmsEntryAddRow() { _fmsEntryRows.push(fmsBlankEntryRow()); renderFMSEntryForm(); }
+function fmsEntryDuplicate(i) { _fmsEntryRows.splice(i + 1, 0, { ..._fmsEntryRows[i] }); renderFMSEntryForm(); }
+function fmsEntryRemove(i) {
+  if (_fmsEntryRows.length === 1) return;
+  _fmsEntryRows.splice(i, 1);
+  renderFMSEntryForm();
+}
+
+async function submitFMSEntry() {
+  const btn = document.getElementById('fmsEntrySubmitBtn');
+  const inputFields = _fmsEntryConfig.fields.filter(f => f.type !== 'auto');
+  for (const [i, r] of _fmsEntryRows.entries()) {
+    for (const f of inputFields) {
+      if (f.required && !String(r[f.key] || '').trim()) {
+        showToast(`Row ${i + 1}: ${f.label} bharo`, 'error');
+        return;
+      }
+    }
+  }
+  btn.disabled = true; btn.textContent = '⏳ Submitting…';
+  const r = await api(`/api/fms-entry/${fmsTasksActiveFmsId}/submit`, 'POST', { rows: _fmsEntryRows });
+  btn.disabled = false; btn.textContent = 'Submit All';
+  if (r.error) { showToast(r.error, 'error'); return; }
+  showToast(`✅ ${r.count} row(s) sheet me save ho gaye — ${r.uniqIds.join(', ')}`);
+  _fmsEntryRows = [fmsBlankEntryRow()];
+  const cfg = await api(`/api/fms-entry/${fmsTasksActiveFmsId}/config`);
+  if (!cfg.error) _fmsEntryConfig = cfg;
+  renderFMSEntryForm();
 }
 
 // Saare steps upar se neeche sections me — har step ka apna table (train view replaced)

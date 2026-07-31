@@ -3168,6 +3168,188 @@ app.post('/api/fms-tasks/:fmsId/steps/:stepId/done', requireAuth, async (req, re
 });
 
 // ══════════════════════════════════════════════════════
+// FMS ENTRY FORM — naye rows sheet me daalne ke liye (Delhi Sales jaisa form)
+// ══════════════════════════════════════════════════════
+// Entry form ke input columns — sheet ke header order ke hisaab se (A..H).
+// Timestamp app khud bharta hai, UNIQ ID auto-generate hota hai.
+const FMS_ENTRY_FIELDS = [
+  { col: 'A', key: 'timestamp',    label: 'Timestamp',            type: 'auto' },
+  { col: 'B', key: 'uniqId',       label: 'UNIQ ID',              type: 'auto' },
+  { col: 'C', key: 'name',         label: 'Name',                 type: 'text',   required: true },
+  { col: 'D', key: 'phone',        label: 'Phone Number',         type: 'tel',    required: true },
+  { col: 'E', key: 'salesPerson',  label: 'Sales Person Attended',type: 'text',   required: true },
+  { col: 'F', key: 'dateOfSale',   label: 'Date of Sale',         type: 'date',   required: true },
+  { col: 'G', key: 'billNo',       label: 'Bill No.',             type: 'text',   required: true },
+  { col: 'H', key: 'saleType',     label: 'Sale Type',            type: 'select', required: true,
+    options: ['Store Visit', 'Customised'] }
+];
+
+// Formula injection rok — "=" / "+" / "-" / "@" se shuru hone wali text value
+// USER_ENTERED mode me sheet ke andar formula ban jaati hai, isliye escape karo
+function sheetSafeText(v) {
+  const s = String(v == null ? '' : v).trim();
+  return /^[=+\-@]/.test(s) ? `'${s}` : s;
+}
+
+// dd/MM/yyyy HH:mm:ss — sheet ke Timestamp format jaisa (IST)
+function fmsEntryTimestamp() {
+  const p = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+  }).formatToParts(new Date()).reduce((a, x) => (a[x.type] = x.value, a), {});
+  return `${p.day}/${p.month}/${p.year} ${p.hour}:${p.minute}:${p.second}`;
+}
+
+// Sheet ke existing UNIQ IDs dekh kar agla number — prefix + zero-padded
+function nextUniqId(existingIds, prefix, pad) {
+  let max = 0;
+  for (const raw of existingIds) {
+    const m = String(raw || '').trim().match(new RegExp('^' + prefix + '-?(\\d+)$', 'i'));
+    if (m) { const n = parseInt(m[1]); if (n > max) max = n; }
+  }
+  return `${prefix}-${String(max + 1).padStart(pad, '0')}`;
+}
+
+// GET /api/fms-entry/:fmsId/config — form fields + agli UNIQ ID
+app.get('/api/fms-entry/:fmsId/config', requireAuth, async (req, res) => {
+  try {
+    const d = await getDB();
+    const fmsRow = await d.findOne('FMS_Config', { id: String(req.params.fmsId) });
+    if (!fmsRow) return res.status(404).json({ error: 'FMS not found' });
+    const fms = parseFMSRow(fmsRow);
+    const spreadsheetId = extractSheetId(fms.sheet_id);
+    const headerRow = parseInt(fms.header_row) || 1;
+
+    const resp = await withRetry(() => d.sheets.spreadsheets.values.get({
+      spreadsheetId, range: `${fms.sheet_name}!A${headerRow}:H`
+    }));
+    const all = resp.data.values || [];
+    const headers = all[0] || [];
+    const idCol = colLetterToIdx('B');
+    const existingIds = all.slice(1).map(r => r[idCol]).filter(Boolean);
+
+    res.json({
+      fmsName: fms.fms_name || fms.sheet_name,
+      fields: FMS_ENTRY_FIELDS,
+      headers,
+      nextUniqId: nextUniqId(existingIds, 'DS', 4)
+    });
+  } catch (err) {
+    let msg = err.message || 'Unknown error';
+    if (msg.includes('403')) msg = 'Access denied — FMS sheet ko service account ke saath share karo';
+    if (msg.includes('404')) msg = 'Sheet not found — FMS config mein Sheet ID/Tab check karo';
+    res.status(500).json({ error: msg });
+  }
+});
+
+// POST /api/fms-entry/:fmsId/submit — ek ya multiple rows sheet me append
+app.post('/api/fms-entry/:fmsId/submit', requireAuth, async (req, res) => {
+  try {
+    const { rows } = req.body || {};
+    if (!Array.isArray(rows) || !rows.length) return res.status(400).json({ error: 'Kam se kam ek row chahiye' });
+
+    const validOptions = FMS_ENTRY_FIELDS.find(f => f.key === 'saleType').options;
+    for (const [i, row] of rows.entries()) {
+      for (const f of FMS_ENTRY_FIELDS) {
+        if (f.required && !String(row[f.key] || '').trim())
+          return res.status(400).json({ error: `Row ${i + 1}: ${f.label} required hai` });
+      }
+      if (!validOptions.includes(String(row.saleType).trim()))
+        return res.status(400).json({ error: `Row ${i + 1}: Sale Type galat hai` });
+    }
+
+    const d = await getDB();
+    const fmsRow = await d.findOne('FMS_Config', { id: String(req.params.fmsId) });
+    if (!fmsRow) return res.status(404).json({ error: 'FMS not found' });
+    const fms = parseFMSRow(fmsRow);
+    const spreadsheetId = extractSheetId(fms.sheet_id);
+    const headerRow = parseInt(fms.header_row) || 1;
+
+    // Poori sheet padho — agli khali row aur formula-template row dhoondhne ke liye
+    const resp = await withRetry(() => d.sheets.spreadsheets.values.get({
+      spreadsheetId, range: `${fms.sheet_name}!A1:ZZ`
+    }));
+    const all = resp.data.values || [];
+    const dataRows = all.slice(headerRow);
+
+    // Aakhri bhari hui data row (A..H me kuch bhi ho) — uske neeche append karenge
+    let lastFilledIdx = -1;
+    for (let i = 0; i < dataRows.length; i++) {
+      const r = dataRows[i] || [];
+      if (r.slice(0, 8).some(v => String(v || '').trim() !== '')) lastFilledIdx = i;
+    }
+    const firstNewRow = headerRow + lastFilledIdx + 2; // 1-based sheet row
+
+    const idCol = colLetterToIdx('B');
+    const existingIds = dataRows.map(r => (r || [])[idCol]).filter(Boolean);
+    const ts = fmsEntryTimestamp();
+
+    const values = rows.map(row => {
+      const uniq = nextUniqId(existingIds, 'DS', 4);
+      existingIds.push(uniq);
+      return [
+        ts, uniq,
+        sheetSafeText(row.name), sheetSafeText(row.phone), sheetSafeText(row.salesPerson),
+        String(row.dateOfSale || '').trim(),   // ISO date — Sheets khud parse karta hai
+        sheetSafeText(row.billNo),
+        String(row.saleType).trim()            // whitelist se already validate ho chuka
+      ];
+    });
+
+    await withRetry(() => d.sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${fms.sheet_name}!A${firstNewRow}:H${firstNewRow + values.length - 1}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values }
+    }));
+
+    // Planned/Actual formula columns naye rows me copy karo — warna row kisi bhi
+    // FMS step me pending nahi dikhegi (step-relevance Planned column par depend
+    // karta hai). Template = aakhri bhari hui row, jispe formulas already hain.
+    let formulaCopy = null;
+    if (lastFilledIdx >= 0) {
+      const templateRow = headerRow + lastFilledIdx + 1;
+      const lastCol = idxToColLetter(Math.max(0, (all[headerRow - 1] || []).length - 1));
+      const sheetId = await fmsSheetTabId(d, spreadsheetId, fms.sheet_name);
+      if (sheetId != null) {
+        formulaCopy = {
+          copyPaste: {
+            source: { sheetId, startRowIndex: templateRow - 1, endRowIndex: templateRow,
+                      startColumnIndex: 8, endColumnIndex: colLetterToIdx(lastCol) + 1 },
+            destination: { sheetId, startRowIndex: firstNewRow - 1,
+                           endRowIndex: firstNewRow - 1 + values.length,
+                           startColumnIndex: 8, endColumnIndex: colLetterToIdx(lastCol) + 1 },
+            pasteType: 'PASTE_FORMULA'
+          }
+        };
+      }
+    }
+    if (formulaCopy) {
+      await withRetry(() => d.sheets.spreadsheets.batchUpdate({
+        spreadsheetId, requestBody: { requests: [formulaCopy] }
+      }));
+    }
+
+    res.json({ success: true, count: values.length, uniqIds: values.map(v => v[1]), firstRow: firstNewRow });
+  } catch (err) {
+    let msg = err.message || 'Unknown error';
+    if (msg.includes('403')) msg = 'Access denied — sheet ko service account ke saath Editor access do';
+    res.status(500).json({ error: msg });
+  }
+});
+
+// Sheet tab ka numeric sheetId (formula copy ke liye chahiye)
+async function fmsSheetTabId(d, spreadsheetId, tabName) {
+  const meta = await withRetry(() => d.sheets.spreadsheets.get({
+    spreadsheetId, fields: 'sheets(properties(title,sheetId))'
+  }));
+  for (const s of (meta.data.sheets || [])) {
+    if (s.properties.title === tabName) return s.properties.sheetId;
+  }
+  return null;
+}
+
+// ══════════════════════════════════════════════════════
 // TASK TRANSFERS
 // ══════════════════════════════════════════════════════
 app.post('/api/transfers', requireAuth, async (req, res) => {
