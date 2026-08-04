@@ -1275,9 +1275,11 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
         if (t.status === 'pending') pending++;
         else if (t.status === 'revised') revised++;
         else if (t.status === 'completed' || t.status === 'closed') completed++;
-        // Dashboard table: only show tasks due today or overdue (not future).
-        // Revised tasks bhi dikhte hain — doer ko unpar kaam karna hota hai.
-        if ((t.status === 'pending' || t.status === 'revised') && (!t.due_date || t.due_date <= todayStr)) {
+        // Delegation: due date chahe aage ki ho, task assign hote hi dashboard
+        // me dikhta hai — doer ko pata rehta hai ki kya aa raha hai.
+        // (Checklist alag hai — wo daily recurring hai, isliye wahan sirf aaj
+        // tak wale dikhte hain, warna saal bhar ke rows dashboard bhar dete.)
+        if (t.status === 'pending' || t.status === 'revised') {
           delegationPending.push({
             id: parseInt(t.id), type: 'delegation',
             description: t.description, status: t.status,
