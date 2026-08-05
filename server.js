@@ -3808,6 +3808,91 @@ app.post('/api/admin/run-wa-reminders', requireAuth, requireAdmin, async (req, r
   res.json({ started: true });
 });
 
+// GET /api/admin/wa-diagnose?phone=9516896449
+// "Is number par reminder kyun nahi gaya?" — ek jagah pura jawab. Kuch bhejta
+// nahi, sirf batata hai. Har wo condition check karta hai jo reminder rokti hai.
+app.get('/api/admin/wa-diagnose', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const raw = String(req.query.phone || '').trim();
+    if (!raw) return res.status(400).json({ error: 'phone query param chahiye, jaise ?phone=9516896449' });
+    const want = normalizePhone(raw);
+
+    const d = await getDB();
+    const ist = new Date(Date.now() + 330 * 60000);
+    const istDate = ist.toISOString().split('T')[0];
+    const nowMin = ist.getUTCHours() * 60 + ist.getUTCMinutes();
+
+    const users = await d.findAll('Users');
+    const matches = users.filter(u => normalizePhone(u.phone) === want);
+
+    const reasons = [];
+    if (!WA.enabled) reasons.push('WhatsApp disabled hai (config me enabled:false)');
+    if (!WA.url || !WA.apiKey) reasons.push('WhatsApp API configure nahi hai');
+    if (ist.getUTCDay() === 1) reasons.push('Aaj Monday hai — Monday ko reminders skip hote hain');
+    if (nowMin < 615) reasons.push(`Abhi ${ist.toISOString().slice(11,16)} IST hai — pehla slot 10:15 par hai, abhi tak chala hi nahi`);
+    if (nowMin >= 1140) reasons.push('7 PM ke baad reminders nahi jaate');
+
+    let userInfo = null;
+    if (!matches.length) {
+      reasons.push(`Ye number kisi bhi USER ka nahi hai (Users me ${users.length} users hain). Reminder sirf app ke users ko jaate hain — customer/FMS sheet ke numbers par kabhi nahi.`);
+    } else {
+      const cutoff = new Date(Date.now() + 2 * 864e5).toISOString().split('T')[0];
+      const todayStr = new Date().toISOString().split('T')[0];
+      const [del, chl] = await Promise.all([
+        d.findAll('Delegation_Tasks'), d.findAll('Checklist_Tasks')
+      ]);
+      // Reminder ka asli filter (runWhatsAppReminders jaisa hi)
+      const qualifies = t => t.status === 'pending' && t.due_date && t.due_date <= cutoff;
+
+      userInfo = matches.map(u => {
+        const mine = t => String(t.assigned_to) === String(u.id);
+        const myDel = del.filter(mine), myChl = chl.filter(mine);
+        const eligible = [
+          ...myDel.filter(qualifies).map(t => ({ kind: 'Delegation', due: t.due_date, desc: String(t.description || '').slice(0, 70) })),
+          ...myChl.filter(qualifies).map(t => ({ kind: 'Checklist', due: t.due_date, desc: String(t.description || '').slice(0, 70) }))
+        ];
+        // Kyun chhoot gaye — sirf pending tasks ke liye (baki statuses ka reminder hota hi nahi)
+        const skippedWhy = [];
+        for (const t of [...myDel, ...myChl]) {
+          if (t.status !== 'pending') continue;
+          if (!t.due_date) skippedWhy.push('due date khali hai');
+          else if (t.due_date > cutoff) skippedWhy.push(`due ${t.due_date} — abhi 2 din se door hai`);
+        }
+        if (!u.phone) reasons.push(`User "${u.name}" ka phone field khali hai`);
+        if (!eligible.length) reasons.push(`User "${u.name}" ka koi bhi task reminder ke layak nahi (pending + due date agle 2 din me — ye chahiye)`);
+        return {
+          id: parseInt(u.id), name: u.name, role: u.role, phoneOnFile: u.phone || '(khali)',
+          counts: {
+            delegationPending: myDel.filter(t => t.status === 'pending').length,
+            checklistPending: myChl.filter(t => t.status === 'pending').length,
+            revised: [...myDel, ...myChl].filter(t => t.status === 'revised').length,
+            report: myDel.filter(t => t.status === 'report').length
+          },
+          reminderEligibleTasks: eligible,
+          skippedReasons: [...new Set(skippedWhy)]
+        };
+      });
+    }
+
+    // Aaj ke slots ka pass hua ya nahi
+    const slotStatus = {};
+    for (const s of waSlots()) {
+      const key = `${s.h}:${String(s.m || 0).padStart(2, '0')}`;
+      const mk = `wa_pass_${istDate}_${s.h}${String(s.m || 0).padStart(2, '0')}`;
+      slotStatus[key] = (await _waSlotDone(mk)) ? 'aaj ka pass ho chuka' : 'abhi tak nahi chala';
+    }
+
+    res.json({
+      phoneAsked: raw, phoneNormalized: want,
+      nowIST: ist.toISOString().replace('T', ' ').slice(0, 16),
+      isUser: matches.length > 0,
+      user: userInfo,
+      todaySlots: slotStatus,
+      verdict: reasons.length ? reasons : ['Sab theek hai — is number par reminder jaana chahiye tha. Na gaya ho to server logs me "WhatsApp failed" dekho (API side ka issue).']
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // Send a one-off test WhatsApp: { phone, message }
 app.post('/api/admin/test-whatsapp', requireAuth, requireAdmin, async (req, res) => {
   const { phone, message } = req.body || {};
