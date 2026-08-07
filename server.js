@@ -1162,12 +1162,40 @@ function requireAdminOrPC(req, res, next) {
 //  • ya email se — jiska email .env ke HR_EMAIL se match kare
 // Email wala rasta isliye hai ki HR ka role kuch bhi ho (user bhi), use
 // leaves ka access mile — role badalne ka intezaar na karna pade.
-function canManageLeaves(role, email) {
+function canManageLeaves(role, email, notificationEmail) {
   if (['admin', 'pc', 'hr', 'hod'].includes(String(role || '').trim().toLowerCase())) return true;
   const hr = String(process.env.HR_EMAIL || '').trim().toLowerCase();
-  const mine = String(email || '').trim().toLowerCase();
-  return !!hr && hr === mine;
+  if (!hr) return false;
+  const mine = [email, notificationEmail].map(e => String(e || '').trim().toLowerCase());
+  return mine.includes(hr);
 }
+
+// Ek hi jagah se poora sach: HR_EMAIL kya set hai, kis-kis ko leave ka
+// access mil raha hai aur kyun. Kuch badalta nahi — sirf batata hai.
+app.get('/api/admin/leave-access', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const d = await getDB();
+    const users = await d.findAll('Users');
+    const hrRaw = process.env.HR_EMAIL;
+    const hr = String(hrRaw || '').trim().toLowerCase();
+    const withAccess = users
+      .filter(u => canManageLeaves(u.role, u.email, u.notification_email))
+      .map(u => ({
+        id: parseInt(u.id), name: u.name, email: u.email, role: u.role,
+        kyun: ['admin', 'pc', 'hr', 'hod'].includes(String(u.role || '').trim().toLowerCase())
+          ? `role "${u.role}" ki wajah se` : 'HR_EMAIL se match hone ki wajah se'
+      }));
+    res.json({
+      HR_EMAIL: hrRaw === undefined ? 'SET HI NAHI HAI ❌' : `"${hrRaw}"`,
+      HR_EMAIL_normalized: hr || '(khali)',
+      totalUsers: users.length,
+      leaveAccessWaale: withAccess,
+      verdict: withAccess.length
+        ? `${withAccess.length} logon ko leave ka pura access hai`
+        : 'KISI ko bhi access nahi — HR_EMAIL galat hai ya kisi ka role admin/pc/hr/hod nahi'
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 // ── Helpers ──
 function getTabName(type) {
@@ -1221,7 +1249,7 @@ app.get('/api/me', requireAuth, async (req, res) => {
       week_off: user.week_off || '',
       extra_off: user.extra_off || '',
       // Leave page ko batata hai ki sabki leaves + approve/reject dikhana hai
-      canManageLeaves: canManageLeaves(user.role, user.email)
+      canManageLeaves: canManageLeaves(user.role, user.email, user.notification_email)
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -2047,7 +2075,7 @@ app.get('/api/leaves', requireAuth, async (req, res) => {
     for (const u of users) userMap[String(u.id)] = u;
     // Role se ya HR_EMAIL se — dono me se koi bhi match kare to sabki dikhengi
     const me = userMap[String(req.session.userId)];
-    const canSeeAll = canManageLeaves(req.session.role, me?.email);
+    const canSeeAll = canManageLeaves(req.session.role, me?.email, me?.notification_email);
     let list = leaves;
     if (!canSeeAll) list = leaves.filter(l => String(l.user_id) === String(req.session.userId));
     const result = list.map(l => ({
@@ -2066,7 +2094,7 @@ app.put('/api/leaves/:id', requireAuth, async (req, res) => {
     const d = await getDB();
     // Role se ya HR_EMAIL se — dono me se koi bhi match kare to allow
     const me = await d.findOne('Users', { id: String(req.session.userId) });
-    if (!canManageLeaves(req.session.role, me?.email))
+    if (!canManageLeaves(req.session.role, me?.email, me?.notification_email))
       return res.status(403).json({ error: 'Not allowed' });
     const leave = await d.findOne('Leave_Requests', { id: req.params.id });
     if (!leave) return res.status(404).json({ error: 'Leave request not found' });
