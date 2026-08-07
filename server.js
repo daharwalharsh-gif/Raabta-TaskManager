@@ -1047,17 +1047,37 @@ async function runWhatsAppReminders(slotKey, force) {
     for (const t of delegation) if (isPending(t)) push(t, 'Delegation');
     for (const t of checklist) if (isPending(t)) push(t, 'Checklist');
 
-    let sent = 0, skipped = 0;
+    // Messages PARALLEL batches me jaate hain, ek-ek karke nahi. Aumpfy har
+    // message me ~50 sec leta hai — 40+ logon ko serially bhejne me 35+ minute
+    // lagte the, aur Hostinger par app utni der me restart ho jaati thi, isliye
+    // aadhe logon ko message milta hi nahi tha (marker "bhej diya" bol deta tha).
+    // Batches me poora pass ab kuch minute me khatam ho jaata hai.
+    const BATCH = 8;
+    const recipients = [];
+    let noPhone = 0;
     for (const uid of Object.keys(byUser)) {
       const user = userMap[uid];
       const phone = user && user.phone ? normalizePhone(user.phone) : '';
-      if (!phone) { skipped++; continue; }
+      if (!phone) { noPhone++; continue; }
       const tasks = byUser[uid].sort((a, b) => (a.due_date || '').localeCompare(b.due_date || ''));
-      const r = await sendWhatsApp(phone, waReminderMsg(user.name, tasks, todayStr));
-      if (r.ok) sent++; else skipped++;
+      recipients.push({ phone, name: user.name, tasks });
     }
-    console.log(`  WhatsApp reminder pass @ ${todayStr}: ${sent} sent, ${skipped} skipped`);
-    return { sent, skipped };
+
+    let sent = 0, failed = 0;
+    for (let i = 0; i < recipients.length; i += BATCH) {
+      const batch = recipients.slice(i, i + BATCH);
+      const results = await Promise.all(batch.map(r =>
+        sendWhatsApp(r.phone, waReminderMsg(r.name, r.tasks, todayStr))
+          .catch(e => ({ ok: false, error: e.message }))
+      ));
+      results.forEach((r, j) => {
+        if (r && r.ok) sent++;
+        else { failed++; console.error(`  WA reminder failed — ${batch[j].name} (${batch[j].phone}): ${(r && (r.error || r.status)) || 'unknown'}`); }
+      });
+    }
+    const skipped = noPhone + failed;
+    console.log(`  WhatsApp reminder pass @ ${todayStr}: ${recipients.length} recipients — ${sent} sent, ${failed} failed, ${noPhone} without phone`);
+    return { sent, failed, noPhone, skipped, recipients: recipients.length };
   } catch (err) {
     console.error('  runWhatsAppReminders error:', err.message);
     return { error: err.message };
