@@ -2117,21 +2117,35 @@ app.put('/api/leaves/:id', requireAuth, async (req, res) => {
         d.findOne('Users', { id: String(leave.user_id) }),
         d.findOne('Users', { id: String(req.session.userId) })
       ]);
-      // notification_email khali ho to login wali email par bhejo
-      const to = String(employee?.notification_email || employee?.email || '').trim();
-      if (!to) {
+      // Doer ke DONO address par bhejo — notification_email aur login wali
+      // email. Pehle sirf notification_email par jaati thi, aur usme purana ya
+      // galat address pada ho (Users page par wo dikhta bhi nahi) to mail
+      // chupchap kahin aur chali jaati thi. Dono same ho to ek hi jaayegi.
+      const tos = [...new Set(
+        [employee?.notification_email, employee?.email]
+          .map(e => String(e || '').trim()).filter(Boolean)
+          .map(e => e.toLowerCase())
+      )];
+      if (!tos.length) {
         mail.note = `${employee?.name || 'Doer'} ki koi email app me nahi hai — Users page me daalo`;
       } else {
         const days = Math.round((new Date(leave.to_date) - new Date(leave.from_date)) / 86400000) + 1;
         const label = action === 'approved' ? 'Approved' : 'Rejected';
-        const r = await sendMail(to, `Leave Request ${label} — ${leave.from_date} to ${leave.to_date}`,
-          leaveDecisionEmailHtml({
-            employeeName: employee.name, fromDate: leave.from_date, toDate: leave.to_date,
-            days, action, note: note || '', reviewerName: reviewer?.name
-          }));
-        if (r && r.ok) { mail.sent = true; mail.note = `Mail bhej di — ${to}`; }
-        else if (r && r.skipped) mail.note = `Mail nahi gayi (${r.skipped})${r.hint ? ' — ' + r.hint : ''}`;
-        else mail.note = `Mail fail — ${to}: ${(r && r.error) || 'unknown'}`;
+        const html = leaveDecisionEmailHtml({
+          employeeName: employee.name, fromDate: leave.from_date, toDate: leave.to_date,
+          days, action, note: note || '', reviewerName: reviewer?.name
+        });
+        const subject = `Leave Request ${label} — ${leave.from_date} to ${leave.to_date}`;
+        const ok = [], bad = [];
+        for (const to of tos) {
+          const r = await sendMail(to, subject, html);
+          if (r && r.ok) ok.push(to);
+          else bad.push(`${to}: ${(r && (r.error || r.skipped)) || 'unknown'}`);
+        }
+        mail.sent = ok.length > 0;
+        mail.note = ok.length
+          ? `Mail bhej di — ${ok.join(', ')}` + (bad.length ? ` (fail: ${bad.join('; ')})` : '')
+          : `Mail fail — ${bad.join('; ')}`;
       }
     } catch (e) {
       mail.note = 'Mail error: ' + e.message;
