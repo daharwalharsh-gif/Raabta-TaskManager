@@ -1162,12 +1162,20 @@ function requireAdminOrPC(req, res, next) {
 //  • ya email se — jiska email .env ke HR_EMAIL se match kare
 // Email wala rasta isliye hai ki HR ka role kuch bhi ho (user bhi), use
 // leaves ka access mile — role badalne ka intezaar na karna pade.
+// HR ki email — .env ke HR_EMAIL se aati hai, aur DEFAULT_HR_EMAILS hamesha
+// saath rehti hai taaki env set na ho ya usme typo ho to bhi HR ka access aur
+// leave ki mail na ruke. (Yahi tareeka CRM me pc@raabtajewels.com ke liye
+// pehle se use hota hai.)
+const DEFAULT_HR_EMAILS = ['hr@raabtajewels.com'];
+function hrEmailList() {
+  const fromEnv = String(process.env.HR_EMAIL || '').trim().toLowerCase();
+  return [...new Set([...(fromEnv ? [fromEnv] : []), ...DEFAULT_HR_EMAILS])];
+}
+
 function canManageLeaves(role, email, notificationEmail) {
   if (['admin', 'pc', 'hr', 'hod'].includes(String(role || '').trim().toLowerCase())) return true;
-  const hr = String(process.env.HR_EMAIL || '').trim().toLowerCase();
-  if (!hr) return false;
-  const mine = [email, notificationEmail].map(e => String(e || '').trim().toLowerCase());
-  return mine.includes(hr);
+  const mine = [email, notificationEmail].map(e => String(e || '').trim().toLowerCase()).filter(Boolean);
+  return hrEmailList().some(hr => mine.includes(hr));
 }
 
 // Ek hi jagah se poora sach: HR_EMAIL kya set hai, kis-kis ko leave ka
@@ -2048,9 +2056,7 @@ app.post('/api/leaves', requireAuth, async (req, res) => {
       const [allUsers, employee] = await Promise.all([
         d.findAll('Users'), d.findOne('Users', { id: String(req.session.userId) })
       ]);
-      const targets = new Set();
-      const envHr = (process.env.HR_EMAIL || '').trim().toLowerCase();
-      if (envHr) targets.add(envHr);
+      const targets = new Set(hrEmailList());
       for (const u of allUsers) {
         if (String(u.role || '').toLowerCase() !== 'hr') continue;
         const mail = String(u.notification_email || u.email || '').trim().toLowerCase();
