@@ -1157,6 +1157,18 @@ function requireAdminOrPC(req, res, next) {
   res.status(403).json({ error: 'Admin or PC only' });
 }
 
+// Leaves ka pura access (sabki leaves + approve/reject) kise mile:
+//  • role se — admin / pc / hr / hod
+//  • ya email se — jiska email .env ke HR_EMAIL se match kare
+// Email wala rasta isliye hai ki HR ka role kuch bhi ho (user bhi), use
+// leaves ka access mile — role badalne ka intezaar na karna pade.
+function canManageLeaves(role, email) {
+  if (['admin', 'pc', 'hr', 'hod'].includes(String(role || '').trim().toLowerCase())) return true;
+  const hr = String(process.env.HR_EMAIL || '').trim().toLowerCase();
+  const mine = String(email || '').trim().toLowerCase();
+  return !!hr && hr === mine;
+}
+
 // ── Helpers ──
 function getTabName(type) {
   return type === 'delegation' ? 'Delegation_Tasks' : 'Checklist_Tasks';
@@ -1207,7 +1219,9 @@ app.get('/api/me', requireAuth, async (req, res) => {
       profile_image: user.profile_image || '',
       department: user.department || '',
       week_off: user.week_off || '',
-      extra_off: user.extra_off || ''
+      extra_off: user.extra_off || '',
+      // Leave page ko batata hai ki sabki leaves + approve/reject dikhana hai
+      canManageLeaves: canManageLeaves(user.role, user.email)
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -2028,12 +2042,12 @@ app.get('/api/leaves', requireAuth, async (req, res) => {
   try {
     const d = await getDB();
     await ensureLeaveTab(d);
-    const role = req.session.role;
-    // HR ko sabki leaves dikhti hain — wahi approve/reject karta hai
-    const canSeeAll = role === 'admin' || role === 'pc' || role === 'hr' || role === 'hod';
     const [leaves, users] = await Promise.all([d.findAll('Leave_Requests'), d.findAll('Users')]);
     const userMap = {};
     for (const u of users) userMap[String(u.id)] = u;
+    // Role se ya HR_EMAIL se — dono me se koi bhi match kare to sabki dikhengi
+    const me = userMap[String(req.session.userId)];
+    const canSeeAll = canManageLeaves(req.session.role, me?.email);
     let list = leaves;
     if (!canSeeAll) list = leaves.filter(l => String(l.user_id) === String(req.session.userId));
     const result = list.map(l => ({
@@ -2047,12 +2061,13 @@ app.get('/api/leaves', requireAuth, async (req, res) => {
 // Approve / reject leave — admin / PC / HR
 app.put('/api/leaves/:id', requireAuth, async (req, res) => {
   try {
-    const role = req.session.role;
-    if (role !== 'admin' && role !== 'pc' && role !== 'hr' && role !== 'hod')
-      return res.status(403).json({ error: 'Not allowed' });
     const { action, note } = req.body || {};
     if (action !== 'approved' && action !== 'rejected') return res.status(400).json({ error: 'Invalid action' });
     const d = await getDB();
+    // Role se ya HR_EMAIL se — dono me se koi bhi match kare to allow
+    const me = await d.findOne('Users', { id: String(req.session.userId) });
+    if (!canManageLeaves(req.session.role, me?.email))
+      return res.status(403).json({ error: 'Not allowed' });
     const leave = await d.findOne('Leave_Requests', { id: req.params.id });
     if (!leave) return res.status(404).json({ error: 'Leave request not found' });
     await d.update('Leave_Requests', req.params.id, { status: action, note: note || '' });
