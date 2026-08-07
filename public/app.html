@@ -4346,6 +4346,13 @@ async function handleLeave(id, action) {
   const r = await api(`/api/leaves/${id}`, 'PUT', { action, note });
   if (r && r.error) { showToast('Failed: ' + r.error, 'error'); return; }
   showToast(action === 'approved' ? '✅ Leave approved!' : '❌ Leave rejected');
+  // Doer ko mail gayi ya nahi — turant batao, warna chupchap fail ho jati hai
+  if (r && r.mail) {
+    setTimeout(() => showToast(
+      (r.mail.sent ? '📧 ' : '⚠️ ') + r.mail.note,
+      r.mail.sent ? 'success' : 'error'
+    ), 1200);
+  }
   loadLeaves();
 }
 

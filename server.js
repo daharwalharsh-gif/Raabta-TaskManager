@@ -624,7 +624,9 @@ const EMAIL_ENABLED = (process.env.EMAIL_ENABLED || 'false').toLowerCase() === '
 
 const mailTransporter = nodemailer.createTransport({
   service: 'gmail',
-  auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+  auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+  // Timeouts — warna SMTP atak jaye to request hamesha ke liye latki rehti hai
+  connectionTimeout: 15000, greetingTimeout: 15000, socketTimeout: 20000
 });
 
 // Status object wapas karta hai (diagnose ke liye) — throw kabhi nahi karta,
@@ -2105,26 +2107,38 @@ app.put('/api/leaves/:id', requireAuth, async (req, res) => {
     const leave = await d.findOne('Leave_Requests', { id: req.params.id });
     if (!leave) return res.status(404).json({ error: 'Leave request not found' });
     await d.update('Leave_Requests', req.params.id, { status: action, note: note || '' });
-    res.json({ success: true });
 
-    // Employee ko decision mail — fire-and-forget, response ko block nahi karta
-    (async () => {
+    // Employee ko decision mail. Ise await karte hain aur result response me
+    // bhejte hain — taaki HR ko turant screen par dikhe ki mail gayi ya nahi,
+    // aur kyun nahi (pehle ye chupchap fail hoti thi to pata hi nahi chalta tha).
+    let mail = { sent: false, note: '' };
+    try {
       const [employee, reviewer] = await Promise.all([
         d.findOne('Users', { id: String(leave.user_id) }),
         d.findOne('Users', { id: String(req.session.userId) })
       ]);
-      // notification_email khali ho to login wali email par bhejo — warna
-      // zyadatar doers ko approve/reject ki mail kabhi milti hi nahi thi.
+      // notification_email khali ho to login wali email par bhejo
       const to = String(employee?.notification_email || employee?.email || '').trim();
-      if (!to) return;
-      const days = Math.round((new Date(leave.to_date) - new Date(leave.from_date)) / 86400000) + 1;
-      const label = action === 'approved' ? 'Approved' : 'Rejected';
-      await sendMail(to, `Leave Request ${label} — ${leave.from_date} to ${leave.to_date}`,
-        leaveDecisionEmailHtml({
-          employeeName: employee.name, fromDate: leave.from_date, toDate: leave.to_date,
-          days, action, note: note || '', reviewerName: reviewer?.name
-        }));
-    })().catch(e => console.error('  Leave decision email failed:', e.message));
+      if (!to) {
+        mail.note = `${employee?.name || 'Doer'} ki koi email app me nahi hai — Users page me daalo`;
+      } else {
+        const days = Math.round((new Date(leave.to_date) - new Date(leave.from_date)) / 86400000) + 1;
+        const label = action === 'approved' ? 'Approved' : 'Rejected';
+        const r = await sendMail(to, `Leave Request ${label} — ${leave.from_date} to ${leave.to_date}`,
+          leaveDecisionEmailHtml({
+            employeeName: employee.name, fromDate: leave.from_date, toDate: leave.to_date,
+            days, action, note: note || '', reviewerName: reviewer?.name
+          }));
+        if (r && r.ok) { mail.sent = true; mail.note = `Mail bhej di — ${to}`; }
+        else if (r && r.skipped) mail.note = `Mail nahi gayi (${r.skipped})${r.hint ? ' — ' + r.hint : ''}`;
+        else mail.note = `Mail fail — ${to}: ${(r && r.error) || 'unknown'}`;
+      }
+    } catch (e) {
+      mail.note = 'Mail error: ' + e.message;
+    }
+    if (!mail.sent) console.error('  Leave decision email:', mail.note);
+
+    res.json({ success: true, mail });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
