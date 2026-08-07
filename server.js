@@ -1999,14 +1999,26 @@ app.post('/api/leaves', requireAuth, async (req, res) => {
     });
     res.json({ success: true, id: parseInt(created.id) });
 
-    // HR ko mail — fire-and-forget, response ko block nahi karta
+    // HR ko mail — fire-and-forget, response ko block nahi karta.
+    // Do jagah se HR nikalta hai: .env ka HR_EMAIL, aur jinka role 'hr' hai.
+    // Isliye Users me HR banate hi mail jaane lagti hai, env chhede bina.
     (async () => {
-      const hrEmail = (process.env.HR_EMAIL || '').trim();
-      if (!hrEmail) return;
-      const employee = await d.findOne('Users', { id: String(req.session.userId) });
+      const [allUsers, employee] = await Promise.all([
+        d.findAll('Users'), d.findOne('Users', { id: String(req.session.userId) })
+      ]);
+      const targets = new Set();
+      const envHr = (process.env.HR_EMAIL || '').trim().toLowerCase();
+      if (envHr) targets.add(envHr);
+      for (const u of allUsers) {
+        if (String(u.role || '').toLowerCase() !== 'hr') continue;
+        const mail = String(u.notification_email || u.email || '').trim().toLowerCase();
+        if (mail) targets.add(mail);
+      }
+      if (!targets.size) return;
       const days = Math.round((new Date(to_date) - new Date(from_date)) / 86400000) + 1;
-      await sendMail(hrEmail, `Leave Request — ${employee?.name || 'Employee'} (${from_date} to ${to_date})`,
-        leaveRequestEmailHtml({ employeeName: employee?.name, fromDate: from_date, toDate: to_date, days, reason }));
+      const subject = `Leave Request — ${employee?.name || 'Employee'} (${from_date} to ${to_date})`;
+      const html = leaveRequestEmailHtml({ employeeName: employee?.name, fromDate: from_date, toDate: to_date, days, reason });
+      for (const to of targets) await sendMail(to, subject, html);
     })().catch(e => console.error('  Leave request email failed:', e.message));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -2017,12 +2029,13 @@ app.get('/api/leaves', requireAuth, async (req, res) => {
     const d = await getDB();
     await ensureLeaveTab(d);
     const role = req.session.role;
-    const isAdminOrPC = role === 'admin' || role === 'pc';
+    // HR ko sabki leaves dikhti hain — wahi approve/reject karta hai
+    const canSeeAll = role === 'admin' || role === 'pc' || role === 'hr';
     const [leaves, users] = await Promise.all([d.findAll('Leave_Requests'), d.findAll('Users')]);
     const userMap = {};
     for (const u of users) userMap[String(u.id)] = u;
     let list = leaves;
-    if (!isAdminOrPC) list = leaves.filter(l => String(l.user_id) === String(req.session.userId));
+    if (!canSeeAll) list = leaves.filter(l => String(l.user_id) === String(req.session.userId));
     const result = list.map(l => ({
       ...l, id: parseInt(l.id), user_id: parseInt(l.user_id),
       userName: userMap[String(l.user_id)]?.name || ''
@@ -2031,11 +2044,12 @@ app.get('/api/leaves', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Approve / reject leave — sirf admin/PC
+// Approve / reject leave — admin / PC / HR
 app.put('/api/leaves/:id', requireAuth, async (req, res) => {
   try {
     const role = req.session.role;
-    if (role !== 'admin' && role !== 'pc') return res.status(403).json({ error: 'Not allowed' });
+    if (role !== 'admin' && role !== 'pc' && role !== 'hr')
+      return res.status(403).json({ error: 'Not allowed' });
     const { action, note } = req.body || {};
     if (action !== 'approved' && action !== 'rejected') return res.status(400).json({ error: 'Invalid action' });
     const d = await getDB();
@@ -2050,10 +2064,13 @@ app.put('/api/leaves/:id', requireAuth, async (req, res) => {
         d.findOne('Users', { id: String(leave.user_id) }),
         d.findOne('Users', { id: String(req.session.userId) })
       ]);
-      if (!employee || !employee.notification_email) return;
+      // notification_email khali ho to login wali email par bhejo — warna
+      // zyadatar doers ko approve/reject ki mail kabhi milti hi nahi thi.
+      const to = String(employee?.notification_email || employee?.email || '').trim();
+      if (!to) return;
       const days = Math.round((new Date(leave.to_date) - new Date(leave.from_date)) / 86400000) + 1;
       const label = action === 'approved' ? 'Approved' : 'Rejected';
-      await sendMail(employee.notification_email, `Leave Request ${label} — ${leave.from_date} to ${leave.to_date}`,
+      await sendMail(to, `Leave Request ${label} — ${leave.from_date} to ${leave.to_date}`,
         leaveDecisionEmailHtml({
           employeeName: employee.name, fromDate: leave.from_date, toDate: leave.to_date,
           days, action, note: note || '', reviewerName: reviewer?.name
