@@ -2030,7 +2030,7 @@ app.get('/api/leaves', requireAuth, async (req, res) => {
     await ensureLeaveTab(d);
     const role = req.session.role;
     // HR ko sabki leaves dikhti hain — wahi approve/reject karta hai
-    const canSeeAll = role === 'admin' || role === 'pc' || role === 'hr';
+    const canSeeAll = role === 'admin' || role === 'pc' || role === 'hr' || role === 'hod';
     const [leaves, users] = await Promise.all([d.findAll('Leave_Requests'), d.findAll('Users')]);
     const userMap = {};
     for (const u of users) userMap[String(u.id)] = u;
@@ -2048,7 +2048,7 @@ app.get('/api/leaves', requireAuth, async (req, res) => {
 app.put('/api/leaves/:id', requireAuth, async (req, res) => {
   try {
     const role = req.session.role;
-    if (role !== 'admin' && role !== 'pc' && role !== 'hr')
+    if (role !== 'admin' && role !== 'pc' && role !== 'hr' && role !== 'hod')
       return res.status(403).json({ error: 'Not allowed' });
     const { action, note } = req.body || {};
     if (action !== 'approved' && action !== 'rejected') return res.status(400).json({ error: 'Invalid action' });
