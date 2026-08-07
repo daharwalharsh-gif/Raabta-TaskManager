@@ -1776,6 +1776,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
           <option value="user">User</option>
           <option value="hod">HOD</option>
           <option value="pc">PC (View + Approve)</option>
+          <option value="hr">HR (Leave Approve)</option>
           <option value="admin">Admin</option>
         </select>
       </div>
@@ -4282,7 +4283,8 @@ async function deleteUser(id) {
 // LEAVE
 // ══════════════════════════════════════════════════════
 async function loadLeaves() {
-  const isAdminOrPC = ME.role === 'admin' || ME.role === 'pc';
+  // HR bhi sabki leaves dekh kar approve/reject kar sakta hai
+  const isAdminOrPC = ME.role === 'admin' || ME.role === 'pc' || ME.role === 'hr';
   document.getElementById('leaveListTitle').textContent = isAdminOrPC ? 'All Leave Requests' : 'My Leave Requests';
   const list = document.getElementById('leaveList');
   list.innerHTML = '<div style="padding:20px;text-align:center;color:#94a3b8;font-size:13px">⏳ Loading...</div>';
