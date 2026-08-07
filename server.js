@@ -627,17 +627,22 @@ const mailTransporter = nodemailer.createTransport({
   auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
 });
 
+// Status object wapas karta hai (diagnose ke liye) — throw kabhi nahi karta,
+// taaki koi bhi mail fail ho to app ka flow na ruke.
 async function sendMail(to, subject, html) {
-  if (!EMAIL_ENABLED) return;               // email disabled — WhatsApp only
-  if (!to || !process.env.SMTP_USER) return;
+  if (!EMAIL_ENABLED) return { skipped: 'email-disabled', hint: '.env me EMAIL_ENABLED=true karo' };
+  if (!to) return { skipped: 'no-recipient' };
+  if (!process.env.SMTP_USER) return { skipped: 'smtp-not-configured', hint: '.env me SMTP_USER set nahi hai' };
   try {
     await mailTransporter.sendMail({
       from: `"${process.env.SMTP_FROM_NAME || 'Task Manager'}" <${process.env.SMTP_USER}>`,
       to, subject, html
     });
     console.log(`  Email sent to ${to} — ${subject}`);
+    return { ok: true };
   } catch (err) {
     console.error(`  Email failed (${to}):`, err.message);
+    return { ok: false, error: err.message };
   }
 }
 
@@ -3899,6 +3904,43 @@ app.post('/api/admin/test-whatsapp', requireAuth, requireAdmin, async (req, res)
   if (!phone) return res.status(400).json({ error: 'phone required' });
   const r = await sendWhatsApp(phone, message || 'Test message from Raabta Task Manager ✅');
   res.json(r);
+});
+
+// GET /api/admin/test-email — email setup sahi hai ya nahi, ek jagah jawab.
+// Test mail HR_EMAIL par jaati hai (ya ?to=koi@email.com par). Fail ho to
+// asli SMTP error yahin dikh jaata hai — server logs dhoondhne ki zaroorat nahi.
+app.get('/api/admin/test-email', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const to = String(req.query.to || process.env.HR_EMAIL || '').trim();
+    const setup = {
+      EMAIL_ENABLED: EMAIL_ENABLED ? 'true ✅' : 'false ❌ (isi wajah se koi mail nahi jaati)',
+      SMTP_USER: process.env.SMTP_USER || 'NOT SET ❌',
+      SMTP_PASS: process.env.SMTP_PASS
+        ? `set ✅ (${String(process.env.SMTP_PASS).length} chars${String(process.env.SMTP_PASS).length === 16 ? '' : ' — Gmail App Password 16 ka hota hai, check karo'})`
+        : 'NOT SET ❌',
+      HR_EMAIL: process.env.HR_EMAIL || 'NOT SET ❌ (leave apply hone par mail kahin nahi jayegi)',
+      APP_URL: process.env.APP_URL || 'NOT SET (mail me link nahi aayega)'
+    };
+    if (!to) return res.json({ setup, sent: false, error: 'HR_EMAIL set nahi hai — ya ?to=email daalo' });
+
+    const r = await sendMail(to, 'Test — Raabta Task Manager email setup ✅', `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f6f9fc;padding:20px">
+        <div style="background:#fff;border-radius:8px;padding:30px">
+          <h2 style="color:#16a34a;margin-top:0">✅ Email setup kaam kar raha hai</h2>
+          <p>Ye test mail Raabta Task Manager se bheji gayi hai.</p>
+          <p style="color:#64748b;font-size:13px">Ab leave apply hone par HR ko, aur approve/reject par employee ko mail jayegi.</p>
+        </div>
+      </div>`);
+
+    res.json({
+      setup, to,
+      sent: !!(r && r.ok),
+      result: r,
+      verdict: (r && r.ok) ? `Mail bhej di — ${to} ka inbox check karo (spam bhi dekh lena)`
+        : (r && r.skipped) ? `Nahi bheji: ${r.skipped}${r.hint ? ' — ' + r.hint : ''}`
+        : `Fail: ${r && r.error}`
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/debug', async (req, res) => {
