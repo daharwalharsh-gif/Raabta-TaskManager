@@ -2921,8 +2921,7 @@ function renderDashTable(tasks, type) {
       <td>${t.type!=='checklist' ? `<span class="priority-badge ${t.priority||'low'}">${t.priority||'low'}</span>` : '—'}</td>
       <td>
         ${t.waiting_approval==1 ? `
-          <span style="font-size:11px;color:#f59e0b;font-weight:600">⏳ Waiting Approval</span>
-          ${(!isPC || t.type==='checklist') ? `<button class="action-btn done" style="margin-left:3px" onclick="dashDone(${t.id},'${t.type}')">Done</button>` : ''}
+          <span style="font-size:11px;color:#f59e0b;font-weight:600" title="Approver ke decision ka intezaar hai">⏳ Waiting Approval</span>
         ` : `
           ${(!isPC || t.type==='checklist') ? `<button class="action-btn done" onclick="dashDone(${t.id},'${t.type}')">Done</button>` : ''}
           ${(!isPC && t.type!=='checklist') ? `<button class="action-btn revise" style="margin-left:3px" onclick="openReviseModal(${t.id},'${t.type}')">Revise</button>` : ''}
@@ -3099,8 +3098,7 @@ function renderTaskRow(t, isAdmin) {
              <button class="action-btn revise" style="margin-left:3px" onclick="openReviseModal(${t.id},'${tasksType}')">Revise</button>`}
       ` : ''}
       ${isWaiting ? `
-        <button class="action-btn done" style="margin-left:3px" onclick="updateStatus(${t.id},'completed','alltasks','${tasksType}')">Done</button>
-        <span style="font-size:11px;color:#f59e0b;font-weight:600;margin-left:4px">⏳ Waiting</span>` : ''}
+        <span style="font-size:11px;color:#f59e0b;font-weight:600;margin-left:4px" title="Approver ke decision ka intezaar hai">⏳ Waiting for approval</span>` : ''}
     `;
 
   const statusLabel = t.status==='revised' ? 'Revision Requested'
@@ -3317,7 +3315,10 @@ async function submitReport() {
     });
     if (r && r.error) throw new Error(r.error);
     closeModal('reportModal');
-    showToast('📤 Report bhej diya — Report tab me chala gaya');
+    // Approval wala task: pehle approver approve karega, tabhi Report me jayega
+    showToast(r && r.needsApproval
+      ? '⏳ Approval ke liye bheja — approver approve karega tab Report me jayega'
+      : '📤 Report bhej diya — Report tab me chala gaya');
     loadAllTasks();
     loadDashboard();
   } catch (e) {
@@ -4251,7 +4252,7 @@ async function loadApprovals() {
                 <td style="font-weight:600">${a.requestedByName}</td>
                 ${isAdminOrPC ? `<td style="color:#64748b;font-size:12px">${a.requestedToName}</td>` : ''}
                 <td>${a.description||'—'}</td>
-                <td><span class="status-badge ${a.action_type}">${a.action_type==='completed'?'✅ Mark Complete':a.action_type==='pending'?'🆕 New Task':'🔄 Revision'}</span></td>
+                <td><span class="status-badge ${a.action_type}">${a.action_type==='completed'?'✅ Mark Complete':a.action_type==='pending'?'🆕 New Task':a.action_type==='report'?'📤 Done — Report Approval':'🔄 Revision'}</span></td>
                 <td style="color:#64748b;font-size:12px">${new Date(a.created_at).toLocaleDateString('en-IN')}</td>
                 <td>
                   <button class="action-btn done" onclick="handleApproval(${a.id},'approved')">Approve</button>

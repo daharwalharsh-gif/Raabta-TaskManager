@@ -1701,6 +1701,24 @@ app.put('/api/tasks/:id/status', requireAuth, async (req, res) => {
     // REPORT flow: doer delegation task "Done" kare to seedha completed nahi,
     // balki 'report' status me jaata hai — admin Report tab me review karta hai.
     if (status === 'report') {
+      // APPROVAL wala task: doer ka "Done" pehle APPROVER ke paas jaata hai
+      // (approver = assigned_by, wahi jo assign karte waqt chuna gaya tha).
+      // Approver approve kare tabhi task Report tab me aata hai.
+      const reportNeedsApproval = type === 'delegation' && task.approval === 'yes' && !isAdmin && !isPC;
+      if (reportNeedsApproval) {
+        const existing = await db.findWhere('Task_Approvals', { task_id: req.params.id, task_type: type, status: 'pending' });
+        if (existing.length) return res.status(400).json({ error: 'Approval already pending' });
+        const nowStr = new Date().toISOString().replace('T', ' ').split('.')[0];
+        await db.insert('Task_Approvals', {
+          task_id: req.params.id, task_type: type,
+          requested_by: String(uid), requested_to: task.assigned_by,
+          action_type: 'report', status: 'pending',
+          note: req.body.reportNote || '', created_at: nowStr
+        });
+        // Attachments abhi save kar lo — approve hone par yehi Report me dikhenge
+        await db.update(tabName, req.params.id, { waiting_approval: '1', ...attUpd });
+        return res.json({ success: true, needsApproval: true });
+      }
       // was_reported: Reopen ke baad Pending me row highlight karne ke liye
       await db.update(tabName, req.params.id, { status: 'report', waiting_approval: '0', was_reported: '1', ...attUpd });
       return res.json({ success: true });
@@ -2025,7 +2043,12 @@ app.put('/api/approvals/:id', requireAuth, async (req, res) => {
     await db.update('Task_Approvals', req.params.id, { status: action, note: note || '' });
     const tabName = getTabName(appr.task_type);
     if (action === 'approved') {
-      await db.update(tabName, appr.task_id, { status: appr.action_type, waiting_approval: '0' });
+      // action_type hi naya status ban jaata hai. 'report' approve hua to task
+      // Report tab me aata hai — was_reported bhi lagta hai (Reopen ke baad
+      // Pending me highlight isi se hota hai).
+      const upd = { status: appr.action_type, waiting_approval: '0' };
+      if (appr.action_type === 'report') upd.was_reported = '1';
+      await db.update(tabName, appr.task_id, upd);
       // New-task approval (action_type 'pending'): ab jaake doer ko task dikha hai,
       // isliye WhatsApp bhi ab hi jaata hai (create ke waqt nahi gaya tha).
       if (WA.notifyOnAssign && appr.action_type === 'pending' && appr.task_type === 'delegation') {
