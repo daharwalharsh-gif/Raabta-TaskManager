@@ -1406,6 +1406,50 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
   </div>
 </div>
 
+<!-- HR Reporting — Delete attendance data (date range) -->
+<div class="modal-overlay" id="hrDeleteModal">
+  <div class="modal" style="max-width:460px">
+    <h3 style="color:#dc2626;margin-top:0">🗑 Delete Attendance Data</h3>
+    <div class="alert error" id="hrDelErr" style="display:none"></div>
+    <div style="font-size:13px;color:#64748b;margin-bottom:16px">Choose the location and date range you want to remove. Data outside this range stays untouched.</div>
+    <div class="form-group">
+      <label>Location</label>
+      <select id="hrDelLocation" onchange="hrDelPreview()">
+        <option value="all">All locations</option>
+        <option value="store">🏬 Store</option>
+        <option value="office">🏢 Office</option>
+        <option value="karigar">🔨 Karigar</option>
+      </select>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="form-group"><label>From date</label><input type="date" id="hrDelFrom" onchange="hrDelPreview()"/></div>
+      <div class="form-group"><label>To date</label><input type="date" id="hrDelTo" onchange="hrDelPreview()"/></div>
+    </div>
+    <div id="hrDelPreviewBox" style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:10px 12px;font-size:13px;color:#991b1b">Select a date range to see how many records will be deleted.</div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('hrDeleteModal')">Cancel</button>
+      <button class="btn" id="hrDelBtn" style="background:#dc2626;color:#fff" onclick="hrDeleteConfirm()">🗑 Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- HR Reporting — Add a forgotten punch-out -->
+<div class="modal-overlay" id="hrPunchModal">
+  <div class="modal" style="max-width:400px">
+    <h3 style="margin-top:0">➕ Add Punch-Out</h3>
+    <div class="alert error" id="hrPunchErr" style="display:none"></div>
+    <div id="hrPunchWho" style="font-size:13px;color:#64748b;margin-bottom:14px"></div>
+    <div class="form-group">
+      <label>Punch-out time (24 hr)</label>
+      <input type="time" id="hrPunchTime" value="20:00"/>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('hrPunchModal')">Cancel</button>
+      <button class="btn btn-green" id="hrPunchBtn" onclick="hrPunchSave()">✓ Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- Dashboard status card popup (doer select karke card click karne par) -->
 <div class="modal-overlay" id="dashStatusModal">
   <div class="modal">
@@ -4478,24 +4522,57 @@ function hrClearFilters() {
   hrFetch();
 }
 
-// Chuni hui range ka data delete — pehle poochta hai kab se kab tak
-async function hrDeleteRange() {
-  const loc = document.getElementById('hrFltLocation').value || 'all';
-  const from = prompt('DELETE ATTENDANCE DATA\n\nFrom date (YYYY-MM-DD):', document.getElementById('hrFltFrom').value || '');
-  if (from === null) return;
-  const to = prompt('DELETE ATTENDANCE DATA\n\nTo date (YYYY-MM-DD):', document.getElementById('hrFltTo').value || '');
-  if (to === null) return;
-  const f = String(from).trim(), t = String(to).trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(f) || !/^\d{4}-\d{2}-\d{2}$/.test(t)) {
-    showToast('Enter dates as YYYY-MM-DD (e.g. 2026-08-01)', 'error'); return;
+// ── Delete data (proper modal, browser prompt nahi) ──
+function hrDeleteRange() {
+  const dates = _hrRows.map(r => r.date).sort();
+  document.getElementById('hrDelErr').style.display = 'none';
+  document.getElementById('hrDelLocation').value = document.getElementById('hrFltLocation').value || 'all';
+  // Default: jo abhi screen par dikh raha hai wahi range
+  document.getElementById('hrDelFrom').value = document.getElementById('hrFltFrom').value || dates[0] || '';
+  document.getElementById('hrDelTo').value = document.getElementById('hrFltTo').value || dates[dates.length - 1] || '';
+  hrDelPreview();
+  document.getElementById('hrDeleteModal').classList.add('open');
+}
+
+// Live preview — kitne record delete honge (rows abhi loaded data se ginte hain)
+function hrDelPreview() {
+  const loc = document.getElementById('hrDelLocation').value || 'all';
+  const f = document.getElementById('hrDelFrom').value || '';
+  const t = document.getElementById('hrDelTo').value || '';
+  const box = document.getElementById('hrDelPreviewBox');
+  const btn = document.getElementById('hrDelBtn');
+  if (!f || !t) {
+    box.innerHTML = 'Select a date range to see how many records will be deleted.';
+    btn.disabled = true; return;
   }
-  if (t < f) { showToast('To date cannot be before From date', 'error'); return; }
-  const locLabel = loc === 'all' ? 'ALL locations' : loc.toUpperCase();
-  const willDelete = _hrRows.filter(r => (loc === 'all' || r.location === loc) && r.date >= f && r.date <= t).length;
-  if (!confirm(`Delete attendance data?\n\nLocation : ${locLabel}\nFrom     : ${f}\nTo       : ${t}\n\nThis cannot be undone. Continue?`)) return;
+  if (t < f) {
+    box.innerHTML = '⚠️ <b>To date</b> cannot be before <b>From date</b>.';
+    btn.disabled = true; return;
+  }
+  const hit = _hrRows.filter(r => (loc === 'all' || r.location === loc) && r.date >= f && r.date <= t);
+  const who = [...new Set(hit.map(r => r.name))].length;
+  const locLabel = loc === 'all' ? 'All locations' : loc.charAt(0).toUpperCase() + loc.slice(1);
+  box.innerHTML = `<b>${hit.length}</b> record(s) of <b>${who}</b> employee(s) will be deleted<br>
+    <span style="font-size:12px">${locLabel} · ${f} → ${t}</span><br>
+    <span style="font-size:12px;color:#7f1d1d">This cannot be undone.</span>`;
+  btn.disabled = false;
+}
+
+async function hrDeleteConfirm() {
+  const err = document.getElementById('hrDelErr');
+  const btn = document.getElementById('hrDelBtn');
+  const loc = document.getElementById('hrDelLocation').value || 'all';
+  const f = document.getElementById('hrDelFrom').value || '';
+  const t = document.getElementById('hrDelTo').value || '';
+  err.style.display = 'none';
+  if (!f || !t) { err.textContent = 'Both From and To dates are required'; err.style.display = 'block'; return; }
+  if (t < f) { err.textContent = 'To date cannot be before From date'; err.style.display = 'block'; return; }
+  btn.disabled = true; btn.textContent = '⏳ Deleting…';
   const r = await api('/api/hr-report/delete', 'POST', { location: loc, from: f, to: t });
-  if (r && r.error) { showToast('Failed: ' + r.error, 'error'); return; }
-  showToast(`🗑 ${r.deleted} record(s) deleted (${f} → ${t}${loc === 'all' ? '' : ', ' + locLabel})`);
+  btn.disabled = false; btn.textContent = '🗑 Delete';
+  if (r && r.error) { err.textContent = r.error; err.style.display = 'block'; return; }
+  closeModal('hrDeleteModal');
+  showToast(`🗑 ${r.deleted} record(s) deleted (${f} → ${t})`);
   hrFetch();
 }
 
@@ -4681,15 +4758,28 @@ function hrUpGate() {
   btn.disabled = !loc || !(fileEl.files && fileEl.files.length);
 }
 
-// Bhoola hua punch-out haath se daalo
-async function hrAddPunchOut(id, name, date) {
-  const t = prompt(`${name} — ${date}\nEnter punch-out time (24hr HH:MM):`, '20:00');
-  if (t === null) return;
-  const time = t.trim();
-  if (!/^([01]?\d|2[0-3]):[0-5]\d$/.test(time)) { showToast('Enter time as HH:MM (e.g. 20:00)', 'error'); return; }
-  const r = await api('/api/hr-report/punchout', 'POST', { id, punchOut: time });
-  if (r && r.error) { showToast('Failed: ' + r.error, 'error'); return; }
-  showToast(`✅ Punch-out ${time} added for ${name}`);
+// ── Bhoola hua punch-out (proper modal) ──
+let _hrPunchId = null;
+function hrAddPunchOut(id, name, date) {
+  _hrPunchId = id;
+  document.getElementById('hrPunchErr').style.display = 'none';
+  document.getElementById('hrPunchWho').innerHTML = `<b>${name}</b> · ${fmtDate(date) || date}`;
+  document.getElementById('hrPunchTime').value = '20:00';
+  document.getElementById('hrPunchModal').classList.add('open');
+}
+
+async function hrPunchSave() {
+  const err = document.getElementById('hrPunchErr');
+  const btn = document.getElementById('hrPunchBtn');
+  const time = (document.getElementById('hrPunchTime').value || '').trim();
+  err.style.display = 'none';
+  if (!/^([01]?\d|2[0-3]):[0-5]\d$/.test(time)) { err.textContent = 'Enter a valid time (e.g. 20:00)'; err.style.display = 'block'; return; }
+  btn.disabled = true; btn.textContent = '⏳ Saving…';
+  const r = await api('/api/hr-report/punchout', 'POST', { id: _hrPunchId, punchOut: time });
+  btn.disabled = false; btn.textContent = '✓ Save';
+  if (r && r.error) { err.textContent = r.error; err.style.display = 'block'; return; }
+  closeModal('hrPunchModal');
+  showToast(`✅ Punch-out ${time} added`);
   hrFetch();
 }
 
