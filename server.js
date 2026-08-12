@@ -514,6 +514,19 @@ const MYSQL_SCHEMA = {
     to_date: "VARCHAR(40) DEFAULT ''", reason: "TEXT",
     status: "VARCHAR(20) DEFAULT 'pending'", note: "TEXT", created_at: "VARCHAR(40) DEFAULT ''"
   },
+  // HR Reporting — biometric machine ke "Exception Statistic Report" Excel se
+  // aayi attendance rows. location = store | office | karigar.
+  HR_Attendance: {
+    location: "VARCHAR(20) DEFAULT ''", emp_id: "VARCHAR(20) DEFAULT ''",
+    emp_name: "VARCHAR(120) DEFAULT ''", department: "VARCHAR(120) DEFAULT ''",
+    att_date: "VARCHAR(20) DEFAULT ''", punch_in: "VARCHAR(10) DEFAULT ''",
+    punch_out: "VARCHAR(10) DEFAULT ''", punch_in2: "VARCHAR(10) DEFAULT ''",
+    punch_out2: "VARCHAR(10) DEFAULT ''", late_min: "VARCHAR(10) DEFAULT '0'",
+    early_min: "VARCHAR(10) DEFAULT '0'", absence_min: "VARCHAR(10) DEFAULT '0'",
+    total_min: "VARCHAR(10) DEFAULT '0'", note: "TEXT",
+    manual: "VARCHAR(5) DEFAULT '0'", uploaded_by: "VARCHAR(20) DEFAULT ''",
+    created_at: "VARCHAR(40) DEFAULT ''"
+  },
   // FMS extra-input me upload hui files (image/PDF/video) — file DB me base64
   // rehti hai, sheet me sirf uska link jaata hai.
   FMS_Uploads: {
@@ -2196,6 +2209,136 @@ app.put('/api/leaves/:id', requireAuth, async (req, res) => {
     if (!mail.sent) console.error('  Leave decision email:', mail.note);
 
     res.json({ success: true, mail });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ══════════════════════════════════════════════════════
+// HR REPORTING — biometric attendance Excel upload + review
+// ══════════════════════════════════════════════════════
+const HR_LOCATIONS = ['store', 'office', 'karigar'];
+
+// Sheets-mode fallback: HR_Attendance tab na ho to bana do (MySQL me schema
+// se apne aap ban jaata hai)
+async function ensureHRTab(d) {
+  if (!d.sheets || !d._hdrCache) return;   // MySQL driver — kuch nahi karna
+  try {
+    await d.findAll('HR_Attendance');
+  } catch (e) {
+    try {
+      await withRetry(() => d.sheets.spreadsheets.batchUpdate({
+        spreadsheetId: SHEET_ID,
+        requestBody: { requests: [{ addSheet: { properties: { title: 'HR_Attendance' } } }] }
+      }));
+    } catch (e2) { /* already exists race */ }
+    await withRetry(() => d.sheets.spreadsheets.values.update({
+      spreadsheetId: SHEET_ID,
+      range: 'HR_Attendance!A1:R1',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [['id','location','emp_id','emp_name','department','att_date','punch_in','punch_out','punch_in2','punch_out2','late_min','early_min','absence_min','total_min','note','manual','uploaded_by','created_at']] }
+    }));
+    delete d._hdrCache['HR_Attendance'];
+    delete d._cache['HR_Attendance'];
+  }
+}
+
+// HR report kaun dekhe/upload kare — wahi log jo leaves manage karte hain
+// (admin / pc / hr / hod / HR_EMAIL wala)
+async function hrReportAllowed(req) {
+  const d = await getDB();
+  const me = await d.findOne('Users', { id: String(req.session.userId) });
+  return canManageLeaves(req.session.role, me?.email, me?.notification_email);
+}
+
+// POST /api/hr-report/upload — parsed Excel rows save karo.
+// Same location + date-range ke purane rows REPLACE hote hain, isliye wahi
+// mahina dobara upload karna hamesha safe hai (duplicate nahi banta).
+app.post('/api/hr-report/upload', requireAuth, async (req, res) => {
+  try {
+    if (!(await hrReportAllowed(req))) return res.status(403).json({ error: 'Not allowed' });
+    const { location, rows } = req.body || {};
+    const loc = String(location || '').trim().toLowerCase();
+    if (!HR_LOCATIONS.includes(loc)) return res.status(400).json({ error: 'Location galat hai (store/office/karigar)' });
+    if (!Array.isArray(rows) || !rows.length) return res.status(400).json({ error: 'Excel me koi data row nahi mili' });
+
+    const clean = [];
+    for (const r of rows) {
+      const date = String(r.date || '').trim();
+      const name = String(r.name || '').trim();
+      if (!name || !/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+      clean.push({
+        location: loc, emp_id: String(r.empId || '').trim(), emp_name: name,
+        department: String(r.department || '').trim(), att_date: date,
+        punch_in: String(r.punchIn || '').trim(), punch_out: String(r.punchOut || '').trim(),
+        punch_in2: String(r.punchIn2 || '').trim(), punch_out2: String(r.punchOut2 || '').trim(),
+        late_min: String(parseInt(r.lateMin) || 0), early_min: String(parseInt(r.earlyMin) || 0),
+        absence_min: String(parseInt(r.absenceMin) || 0), total_min: String(parseInt(r.totalMin) || 0),
+        note: String(r.note || '').trim(), manual: '0',
+        uploaded_by: String(req.session.userId),
+        created_at: new Date().toISOString().replace('T', ' ').split('.')[0]
+      });
+    }
+    if (!clean.length) return res.status(400).json({ error: 'Kisi row me valid Name + Date nahi mila — Excel ka format check karo' });
+
+    const d = await getDB();
+    await ensureHRTab(d);
+
+    // Is location + date-range ke purane rows hatao (re-upload = replace)
+    const dates = clean.map(r => r.att_date).sort();
+    const from = dates[0], to = dates[dates.length - 1];
+    const existing = (await d.findAll('HR_Attendance'))
+      .filter(r => r.location === loc && r.att_date >= from && r.att_date <= to);
+    if (existing.length) {
+      if (typeof d.batchDeleteByIds === 'function') {
+        await d.batchDeleteByIds('HR_Attendance', existing.map(r => r.id));
+      } else {
+        for (const r of existing) await d.delete('HR_Attendance', r.id);
+      }
+    }
+    await d.batchInsert('HR_Attendance', clean);
+    res.json({ success: true, inserted: clean.length, replaced: existing.length, from, to });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/hr-report?location=&from=&to= — filtered rows
+app.get('/api/hr-report', requireAuth, async (req, res) => {
+  try {
+    if (!(await hrReportAllowed(req))) return res.status(403).json({ error: 'Not allowed' });
+    const loc = String(req.query.location || 'all').trim().toLowerCase();
+    const from = String(req.query.from || '').trim();
+    const to = String(req.query.to || '').trim();
+    const d = await getDB();
+    await ensureHRTab(d);
+    const rows = (await d.findAll('HR_Attendance'))
+      .filter(r => (loc === 'all' || r.location === loc)
+        && (!from || r.att_date >= from) && (!to || r.att_date <= to))
+      .map(r => ({
+        id: parseInt(r.id), location: r.location, empId: r.emp_id, name: r.emp_name,
+        department: r.department, date: r.att_date,
+        punchIn: r.punch_in || '', punchOut: r.punch_out || '',
+        punchIn2: r.punch_in2 || '', punchOut2: r.punch_out2 || '',
+        lateMin: parseInt(r.late_min) || 0, earlyMin: parseInt(r.early_min) || 0,
+        absenceMin: parseInt(r.absence_min) || 0, totalMin: parseInt(r.total_min) || 0,
+        note: r.note || '', manual: r.manual == 1
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name));
+    res.json({ rows });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /api/hr-report/punchout — bhoola hua punch-out haath se daalo
+app.post('/api/hr-report/punchout', requireAuth, async (req, res) => {
+  try {
+    if (!(await hrReportAllowed(req))) return res.status(403).json({ error: 'Not allowed' });
+    const { id, punchOut } = req.body || {};
+    const time = String(punchOut || '').trim();
+    if (!id) return res.status(400).json({ error: 'id required' });
+    if (!/^([01]?\d|2[0-3]):[0-5]\d$/.test(time)) return res.status(400).json({ error: 'Time HH:MM format me do (jaise 20:00)' });
+    const d = await getDB();
+    await ensureHRTab(d);
+    const row = await d.findOne('HR_Attendance', { id: String(id) });
+    if (!row) return res.status(404).json({ error: 'Row not found' });
+    await d.update('HR_Attendance', String(id), { punch_out: time, manual: '1' });
+    res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

@@ -6,6 +6,8 @@
 <title>Raabta Task Manager</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<!-- HR Reporting: Excel (.xls/.xlsx) parse karne ke liye -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:'Inter',sans-serif;background:#f1f5f9;color:#1e293b;min-height:100vh;}
@@ -714,6 +716,10 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
       <span class="nav-label-text">PC</span>
     </div>
+    <div class="nav-item" id="nav-hrreport" style="display:none" onclick="navigate('hrreport',this)">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      <span class="nav-label-text">HR Reporting</span>
+    </div>
     <div class="nav-divider"></div>
     <div class="nav-item" onclick="navigate('profile',this)">
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
@@ -1166,6 +1172,76 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     <!-- Empty state -->
     <div id="fmsTasksEmpty" class="empty" style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;display:none">
       No FMS assigned to you yet.
+    </div>
+  </div>
+
+  <!-- ── HR REPORTING (biometric attendance) ── -->
+  <div id="page-hrreport" class="page">
+    <div class="page-header"><h2>HR Reporting</h2></div>
+
+    <!-- Upload card -->
+    <div style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;padding:16px 18px;margin-bottom:16px">
+      <div style="font-size:14px;font-weight:700;color:#1e293b;margin-bottom:10px">📥 Attendance Excel Upload</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <select id="hrUpLocation" onchange="hrUpGate()" style="padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;outline:none;background:#fff">
+          <option value="">1️⃣ Select Location…</option>
+          <option value="store">🏬 Store</option>
+          <option value="office">🏢 Office</option>
+          <option value="karigar">🔨 Karigar</option>
+        </select>
+        <button class="btn btn-outline" id="hrSampleBtn" disabled onclick="hrDownloadSample()" title="Download a sample Excel in the exact upload format">⬇ Download Sample</button>
+        <input type="file" id="hrUpFile" accept=".xls,.xlsx" disabled onchange="hrUpGate()" title="Select a location first" style="font-size:13px;padding:7px;border:1.5px solid #e2e8f0;border-radius:8px;background:#fff"/>
+        <button class="btn btn-primary" id="hrUpBtn" disabled onclick="hrUpload()">⬆ Upload</button>
+        <span id="hrUpStatus" style="font-size:12px;color:#64748b"></span>
+      </div>
+      <div style="font-size:11px;color:#94a3b8;margin-top:8px">Step 1: select location → Step 2: choose the biometric "Exception Statistic Report" file (.xls / .xlsx) → Step 3: Upload. Re-uploading the same location &amp; date range replaces the old data — no duplicates.</div>
+    </div>
+
+    <!-- Filters -->
+    <div style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;padding:14px 18px;margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+      <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:3px">Location</div>
+        <select id="hrFltLocation" onchange="hrFetch()" style="padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;background:#fff;outline:none">
+          <option value="all">All</option><option value="store">Store</option><option value="office">Office</option><option value="karigar">Karigar</option>
+        </select></div>
+      <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:3px">Doer</div>
+        <select id="hrFltDoer" onchange="hrRender()" style="padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;background:#fff;outline:none;min-width:140px">
+          <option value="all">All</option>
+        </select></div>
+      <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:3px">Month</div>
+        <input type="month" id="hrFltMonth" onchange="hrSetMonth(this.value)" style="padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;background:#fff;outline:none"/></div>
+      <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:3px">From</div>
+        <input type="date" id="hrFltFrom" onchange="hrFetch()" style="padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;background:#fff;outline:none"/></div>
+      <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:3px">To</div>
+        <input type="date" id="hrFltTo" onchange="hrFetch()" style="padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;background:#fff;outline:none"/></div>
+      <button class="btn btn-outline btn-sm" onclick="hrThisWeek()">This Week</button>
+      <button class="btn btn-outline btn-sm" onclick="hrThisMonth()">This Month</button>
+    </div>
+
+    <!-- Cards -->
+    <div class="overview-cards" style="margin-bottom:16px">
+      <div class="ov-card pending" style="cursor:pointer" onclick="hrToggleMissed()" title="Click to show only missing punch-out rows / show all">
+        <div class="label">🔴 Punch-Out Missing <span id="hrMissedTag" style="font-size:10px;color:#dc2626"></span></div>
+        <div class="number" id="hrCardMissed">—</div>
+      </div>
+      <div class="ov-card revised"><div class="label">🟠 Absent (Monday excluded)</div><div class="number" id="hrCardAbsent">—</div></div>
+      <div class="ov-card completed"><div class="label">👥 Doers · 📅 Monday = Weekly Off</div><div class="number" id="hrCardDoers">—</div></div>
+    </div>
+
+    <!-- View tabs -->
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <div class="tab-group">
+        <div class="tab active" id="hrTabAll" onclick="hrSetView('all',this)">📋 All Records</div>
+        <div class="tab" id="hrTabMissing" onclick="hrSetView('missing',this)">🔴 Missing Punch-Out</div>
+        <div class="tab" id="hrTabSummary" onclick="hrSetView('summary',this)">📅 Monthly Attendance</div>
+      </div>
+    </div>
+
+    <!-- Table (view ke hisaab se JS render karta hai) -->
+    <div class="flat-tasks-table" id="hrTableWrap" style="background:#fff">
+      <div id="hrTableArea" style="overflow-x:auto">
+        <div style="text-align:center;color:#94a3b8;padding:24px;font-size:13px">Upload an Excel file above, or adjust the filters</div>
+      </div>
+      <div id="hrTableFoot" style="padding:10px 14px;font-size:12px;color:#64748b;border-top:1px solid #f1f5f9"></div>
     </div>
   </div>
 
@@ -2193,6 +2269,10 @@ async function init() {
     document.getElementById('profileNameDisplay').textContent = ME.name;
     document.getElementById('profileRoleDisplay').textContent = roleLabel;
 
+    // HR Reporting — wahi dekhe jo leaves manage karta hai (admin/pc/hr/hod/HR_EMAIL)
+    const hrNav = document.getElementById('nav-hrreport');
+    if (hrNav) hrNav.style.display = (ME.canManageLeaves === true || ME.role === 'admin') ? '' : 'none';
+
     setAvatarDisplay(ME.profile_image, initials);
 
     if (ME.role === 'admin') {
@@ -2303,7 +2383,7 @@ function setMinDates() {
 // ══════════════════════════════════════════════════════
 // NAVIGATION
 // ══════════════════════════════════════════════════════
-const pageTitles = {dashboard:'Dashboard',alltasks:'All Tasks',approvals:'Approvals',users:'Users',profile:'Profile',mis:'MIS Report',fms:'FMS Admin','fms-tasks':'FMS Tasks',records:'Employee Records',leave:'Leave',crm:'PC'};
+const pageTitles = {dashboard:'Dashboard',alltasks:'All Tasks',approvals:'Approvals',users:'Users',profile:'Profile',mis:'MIS Report',fms:'FMS Admin','fms-tasks':'FMS Tasks',records:'Employee Records',leave:'Leave',crm:'PC',hrreport:'HR Reporting'};
 
 function navigate(page, el) {
   window._currentPage = page;
@@ -2323,6 +2403,7 @@ function navigate(page, el) {
   if (page==='fms') loadFMSAdmin();
   if (page==='fms-tasks') loadFMSTasks();
   if (page==='leave') loadLeaves();
+  if (page==='hrreport') loadHRReport();
   if (page==='crm') loadCRM();
   if (page==='mis') initMISDeptFilter();
   if (page==='records') loadRecords();
@@ -4355,6 +4436,364 @@ async function handleLeave(id, action) {
     ), 1200);
   }
   loadLeaves();
+}
+
+// ══════════════════════════════════════════════════════
+// HR REPORTING — biometric attendance Excel upload + review
+// ══════════════════════════════════════════════════════
+let _hrRows = [];       // last fetch ke rows
+let _hrView = 'all';    // all | missing | summary (upar wale tabs)
+
+// Monday = sabka off. Date string YYYY-MM-DD se din nikaalo (UTC-safe).
+function hrIsMonday(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00Z');
+  return !isNaN(d) && d.getUTCDay() === 1;
+}
+// Punch-in hua par punch-out nahi — Monday ho tab bhi (aaya hai to out bhi hona chahiye)
+function hrIsMissedOut(r) { return !!r.punchIn && !r.punchOut; }
+// Poora din gayab (Monday off hai isliye Monday count nahi hota)
+function hrIsAbsent(r) { return !r.punchIn && !r.punchOut && !hrIsMonday(r.date); }
+
+function loadHRReport() {
+  // Pehli baar: current month set karo
+  const m = document.getElementById('hrFltMonth');
+  if (m && !m.value) {
+    const now = new Date();
+    m.value = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    hrSetMonth(m.value);   // from/to bhar ke fetch karega
+    return;
+  }
+  hrFetch();
+}
+
+function hrSetMonth(val) {
+  if (!/^\d{4}-\d{2}$/.test(val || '')) return;
+  const [y, mo] = val.split('-').map(Number);
+  document.getElementById('hrFltFrom').value = `${val}-01`;
+  document.getElementById('hrFltTo').value = `${val}-${String(new Date(y, mo, 0).getDate()).padStart(2, '0')}`;
+  hrFetch();
+}
+function hrThisMonth() {
+  const now = new Date();
+  const v = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  document.getElementById('hrFltMonth').value = v;
+  hrSetMonth(v);
+}
+function hrThisWeek() {
+  // Somwar se aaj tak (Monday off hai par week Monday se hi ginte hain)
+  const now = new Date();
+  const day = (now.getDay() + 6) % 7;   // Mon=0 … Sun=6
+  const mon = new Date(now); mon.setDate(now.getDate() - day);
+  const fmt = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  document.getElementById('hrFltMonth').value = '';
+  document.getElementById('hrFltFrom').value = fmt(mon);
+  document.getElementById('hrFltTo').value = fmt(now);
+  hrFetch();
+}
+
+async function hrFetch() {
+  const loc = document.getElementById('hrFltLocation').value || 'all';
+  const from = document.getElementById('hrFltFrom').value || '';
+  const to = document.getElementById('hrFltTo').value || '';
+  const area = document.getElementById('hrTableArea');
+  area.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:24px;font-size:13px">⏳ Loading…</div>';
+  const r = await api(`/api/hr-report?location=${loc}&from=${from}&to=${to}`);
+  if (r && r.error) {
+    area.innerHTML = `<div style="text-align:center;color:#ef4444;padding:24px;font-size:13px">⚠️ ${r.error}</div>`;
+    return;
+  }
+  // (empty fetch bhi render hota hai — cards 0 dikhate hain)
+  _hrRows = (r && r.rows) || [];
+  // Doer dropdown — data me jo naam hain wahi (selection preserve karke)
+  const doerSel = document.getElementById('hrFltDoer');
+  const keep = doerSel.value;
+  const names = [...new Set(_hrRows.map(x => x.name))].sort((a, b) => a.localeCompare(b));
+  doerSel.innerHTML = '<option value="all">All</option>' + names.map(n => `<option value="${n}">${n}</option>`).join('');
+  if (names.includes(keep)) doerSel.value = keep;
+  hrRender();
+}
+
+// View tabs: All Records | Missing Punch-Out | Monthly Attendance
+function hrSetView(view, el) {
+  _hrView = view;
+  ['hrTabAll', 'hrTabMissing', 'hrTabSummary'].forEach(id => document.getElementById(id).classList.remove('active'));
+  (el || document.getElementById(view === 'all' ? 'hrTabAll' : view === 'missing' ? 'hrTabMissing' : 'hrTabSummary')).classList.add('active');
+  hrRender();
+}
+// Card click bhi Missing tab par le jaata hai (dobara click -> All)
+function hrToggleMissed() { hrSetView(_hrView === 'missing' ? 'all' : 'missing'); }
+
+// Per-doer monthly attendance summary (Monday off = na present na absent)
+function hrSummaryRows(rows) {
+  const by = {};
+  for (const r of rows) {
+    const s = by[r.name] = by[r.name] || { name: r.name, location: r.location, present: 0, absent: 0, missed: 0, lateDays: 0, lateMin: 0, monOff: 0 };
+    if (hrIsMonday(r.date) && !r.punchIn && !r.punchOut) { s.monOff++; continue; }
+    if (hrIsMissedOut(r)) { s.missed++; s.present++; }     // aaya to tha, bas out bhool gaya
+    else if (!r.punchIn && !r.punchOut) { s.absent++; }
+    else s.present++;
+    if (r.lateMin > 0) { s.lateDays++; s.lateMin += r.lateMin; }
+  }
+  return Object.values(by).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function hrRender() {
+  const doer = document.getElementById('hrFltDoer').value || 'all';
+  let rows = _hrRows.filter(r => doer === 'all' || r.name === doer);
+
+  // Cards (doer filter ke baad)
+  const missed = rows.filter(hrIsMissedOut);
+  const absent = rows.filter(hrIsAbsent);
+  document.getElementById('hrCardMissed').textContent = missed.length;
+  document.getElementById('hrCardAbsent').textContent = absent.length;
+  document.getElementById('hrCardDoers').textContent = [...new Set(rows.map(r => r.name))].length;
+  document.getElementById('hrMissedTag').textContent = _hrView === 'missing' ? '(showing only these)' : '';
+
+  const area = document.getElementById('hrTableArea');
+  const foot = document.getElementById('hrTableFoot');
+  const locBadge = l => l === 'store' ? '🏬 Store' : l === 'office' ? '🏢 Office' : '🔨 Karigar';
+
+  // ── Monthly Attendance summary view ──
+  if (_hrView === 'summary') {
+    const sum = hrSummaryRows(rows);
+    if (!sum.length) { area.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:24px;font-size:13px">No records for this filter</div>'; foot.textContent = ''; return; }
+    area.innerHTML = `<table style="min-width:820px">
+      <thead><tr><th>Name</th><th>Location</th><th>✅ Present</th><th>🟠 Absent</th><th>🔴 Punch-Out Missing</th><th>⏰ Late (days)</th><th>Late (total min)</th><th>📅 Monday Off</th></tr></thead>
+      <tbody>${sum.map(s => `<tr>
+        <td style="font-weight:600">${s.name}</td>
+        <td style="white-space:nowrap">${locBadge(s.location)}</td>
+        <td style="color:#16a34a;font-weight:700">${s.present}</td>
+        <td>${s.absent ? `<span style="color:#d97706;font-weight:700">${s.absent}</span>` : '0'}</td>
+        <td>${s.missed ? `<span style="color:#dc2626;font-weight:700">${s.missed}</span>` : '0'}</td>
+        <td>${s.lateDays || '0'}</td>
+        <td style="color:#64748b">${s.lateMin || '0'}</td>
+        <td style="color:#64748b">${s.monOff}</td>
+      </tr>`).join('')}</tbody></table>`;
+    foot.textContent = `${sum.length} doer(s) · attendance summary for the selected date range`;
+    return;
+  }
+
+  // ── All / Missing views ──
+  if (_hrView === 'missing') rows = rows.filter(hrIsMissedOut);
+  if (!rows.length) {
+    area.innerHTML = `<div style="text-align:center;color:#94a3b8;padding:24px;font-size:13px">${_hrView === 'missing' ? '🎉 No missing punch-outs in this filter' : 'No records for this filter'}</div>`;
+    foot.textContent = '';
+    return;
+  }
+  area.innerHTML = `<table style="min-width:900px">
+    <thead><tr>
+      <th>Date</th><th>Name</th><th>Location</th><th>Department</th>
+      <th>In</th><th>Out</th><th>In 2</th><th>Out 2</th>
+      <th>Late (min)</th><th>Absence (min)</th><th>Note</th>
+    </tr></thead>
+    <tbody>${rows.map(r => {
+      const mon = hrIsMonday(r.date);
+      const missedRow = hrIsMissedOut(r);
+      const absentRow = hrIsAbsent(r);
+      const rowBg = missedRow ? 'background:#fef2f2' : absentRow ? 'background:#fffbeb' : mon ? 'background:#f8fafc' : '';
+      return `<tr style="${rowBg}">
+        <td style="white-space:nowrap">${fmtDate(r.date) || r.date}${mon ? ' <span style="font-size:10px;font-weight:700;color:#64748b;background:#e2e8f0;border-radius:8px;padding:1px 6px">MON OFF</span>' : ''}</td>
+        <td style="font-weight:600">${r.name}</td>
+        <td style="white-space:nowrap">${locBadge(r.location)}</td>
+        <td style="color:#64748b">${r.department || '—'}</td>
+        <td>${r.punchIn || '<span style="color:#94a3b8">—</span>'}</td>
+        <td>${r.punchOut
+          ? r.punchOut + (r.manual ? ' <span title="Added manually" style="font-size:10px;color:#7c3aed;font-weight:700">✍️</span>' : '')
+          : (r.punchIn
+              ? `<span style="color:#dc2626;font-weight:700">MISSING</span> <button class="action-btn done" style="padding:2px 8px;font-size:11px;margin-left:4px" onclick="hrAddPunchOut(${r.id},'${String(r.name).replace(/'/g, '')}','${r.date}')">➕ Add</button>`
+              : '<span style="color:#94a3b8">—</span>')}</td>
+        <td style="color:#64748b">${r.punchIn2 || '—'}</td>
+        <td style="color:#64748b">${r.punchOut2 || '—'}</td>
+        <td>${r.lateMin ? `<span style="color:#d97706;font-weight:600">${r.lateMin}</span>` : '0'}</td>
+        <td>${r.absenceMin ? `<span style="color:#dc2626;font-weight:600">${r.absenceMin}</span>` : '0'}</td>
+        <td style="color:#64748b;font-size:12px">${r.note || '—'}</td>
+      </tr>`;
+    }).join('')}</tbody></table>`;
+  foot.textContent =
+    `${rows.length} record(s) · ${[...new Set(rows.map(r => r.name))].length} doer(s)` + (_hrView === 'missing' ? ' · showing missing punch-out only' : '');
+}
+
+// Sample Excel download — bilkul wahi format jo machine deti hai aur upload me chalta hai
+function hrDownloadSample() {
+  if (typeof XLSX === 'undefined') { showToast('Excel library not loaded — refresh the page', 'error'); return; }
+  const loc = document.getElementById('hrUpLocation').value || 'store';
+  const tab = loc.charAt(0).toUpperCase() + loc.slice(1);
+  const aoa = [
+    ['Exception Statistic Report', '', '', '', '', '', '', '', '', '', '', '', ''],
+    ['Stat.Date:', '2026-08-01 ~ 2026-08-31', '', '', '', '', '', '', '', '', '', '', ''],
+    ['ID', 'Name', 'Department', 'Date', 'First time zone', '', 'Second time zone', '', 'Late time(Min)', 'Leave early(Min)', 'Absence(Min)', 'Total(Min)', 'Note'],
+    ['', '', '', '', 'On-duty', 'Off-duty', 'On-duty', 'Off-duty', '', '', '', '', ''],
+    ['1', 'RAHUL', 'Company', '2026-08-01', '11:09', '20:00', '', '', '9', '0', '0', '9', ''],
+    ['1', 'RAHUL', 'Company', '2026-08-03', '', '', '', '', '0', '0', '540', '540', 'Monday - weekly off'],
+    ['1', 'RAHUL', 'Company', '2026-08-04', '11:05', '', '', '', '5', '0', '0', '5', 'punch-out missing example'],
+    ['2', 'PRIYA', 'Company', '2026-08-01', '10:58', '20:02', '', '', '0', '0', '0', '0', ''],
+    ['2', 'PRIYA', 'Company', '2026-08-04', '', '', '', '', '0', '0', '540', '540', 'absent example'],
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{wch:4},{wch:12},{wch:12},{wch:12},{wch:9},{wch:9},{wch:9},{wch:9},{wch:13},{wch:15},{wch:12},{wch:10},{wch:24}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, tab);
+  XLSX.writeFile(wb, `attendance-sample-${loc}.xlsx`);
+}
+
+// Upload steps ka gate: location chuno -> sample + file enable, file chuno -> Upload enable
+function hrUpGate() {
+  const loc = document.getElementById('hrUpLocation').value;
+  const fileEl = document.getElementById('hrUpFile');
+  const btn = document.getElementById('hrUpBtn');
+  const sampleBtn = document.getElementById('hrSampleBtn');
+  if (sampleBtn) sampleBtn.disabled = !loc;
+  fileEl.disabled = !loc;
+  fileEl.title = loc ? '' : 'Select a location first';
+  btn.disabled = !loc || !(fileEl.files && fileEl.files.length);
+}
+
+// Bhoola hua punch-out haath se daalo
+async function hrAddPunchOut(id, name, date) {
+  const t = prompt(`${name} — ${date}\nEnter punch-out time (24hr HH:MM):`, '20:00');
+  if (t === null) return;
+  const time = t.trim();
+  if (!/^([01]?\d|2[0-3]):[0-5]\d$/.test(time)) { showToast('Enter time as HH:MM (e.g. 20:00)', 'error'); return; }
+  const r = await api('/api/hr-report/punchout', 'POST', { id, punchOut: time });
+  if (r && r.error) { showToast('Failed: ' + r.error, 'error'); return; }
+  showToast(`✅ Punch-out ${time} added for ${name}`);
+  hrFetch();
+}
+
+// ── Excel upload ──
+async function hrUpload() {
+  const loc = document.getElementById('hrUpLocation').value;
+  const fileEl = document.getElementById('hrUpFile');
+  const status = document.getElementById('hrUpStatus');
+  const btn = document.getElementById('hrUpBtn');
+  const file = fileEl.files && fileEl.files[0];
+  if (!loc) { showToast('Select a location first (Store / Office / Karigar)', 'error'); return; }
+  if (!file) { showToast('Choose an Excel file (.xls / .xlsx)', 'error'); return; }
+  if (typeof XLSX === 'undefined') { showToast('Excel library not loaded — refresh the page (internet required)', 'error'); return; }
+
+  btn.disabled = true; btn.textContent = '⏳ Parsing…';
+  status.textContent = '';
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
+    // Location ke naam ki sheet ho to wahi lo, warna pehli
+    const match = wb.SheetNames.find(n => n.toLowerCase().includes(loc)) || wb.SheetNames[0];
+    const grid = XLSX.utils.sheet_to_json(wb.Sheets[match], { header: 1, raw: false, defval: '' });
+    const rows = hrParseGrid(grid);
+    if (!rows.length) throw new Error('No attendance rows found in this sheet — check the header (ID / Name / Date)');
+
+    btn.textContent = '⏳ Uploading…';
+    status.textContent = `${rows.length} rows parsed (sheet: ${match})…`;
+    const r = await api('/api/hr-report/upload', 'POST', { location: loc, rows });
+    if (r && r.error) throw new Error(r.error);
+    status.innerHTML = `<span style="color:#16a34a">✅ ${r.inserted} rows saved (${r.from} → ${r.to})${r.replaced ? `, ${r.replaced} old replaced` : ''}</span>`;
+    showToast(`✅ ${r.inserted} attendance rows uploaded`);
+    fileEl.value = '';
+    hrUpGate();
+    // Filter ko upload wale range/location par le jao taki data turant dikhe
+    document.getElementById('hrFltLocation').value = loc;
+    document.getElementById('hrFltMonth').value = '';
+    document.getElementById('hrFltFrom').value = r.from;
+    document.getElementById('hrFltTo').value = r.to;
+    hrFetch();
+  } catch (e) {
+    status.innerHTML = `<span style="color:#ef4444">⚠️ ${e.message}</span>`;
+    showToast(e.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = '⬆ Upload';
+  }
+}
+
+// Machine ke "Exception Statistic Report" grid ko rows me badlo.
+// Header row dhoondta hai (ID + Name + Date), uske neeche sub-header
+// (On-duty/Off-duty) apne aap skip ho jaata hai kyunki us row me date nahi hoti.
+function hrParseGrid(grid) {
+  let h = -1;
+  for (let i = 0; i < Math.min(20, grid.length); i++) {
+    const row = (grid[i] || []).map(c => String(c || '').trim().toLowerCase());
+    if (row.includes('id') && row.includes('name') && row.includes('date')) { h = i; break; }
+  }
+  if (h < 0) throw new Error('Header row not found — the Excel must have a row with ID / Name / Date columns');
+  const hdr = (grid[h] || []).map(c => String(c || '').trim().toLowerCase());
+  const iId = hdr.indexOf('id'), iName = hdr.indexOf('name'), iDate = hdr.indexOf('date');
+  const iDept = hdr.indexOf('department');
+  const iFirst = hdr.findIndex(c => c.startsWith('first time'));
+  const iSecond = hdr.findIndex(c => c.startsWith('second time'));
+  const iLate = hdr.findIndex(c => c.startsWith('late'));
+  const iEarly = hdr.findIndex(c => c.startsWith('leave early'));
+  const iAbs = hdr.findIndex(c => c.startsWith('absence'));
+  const iTot = hdr.findIndex(c => c.startsWith('total'));
+  const iNote = hdr.indexOf('note');
+  const inCol = iFirst >= 0 ? iFirst : iDate + 1;   // First time zone: On-duty, Off-duty
+  const in2Col = iSecond >= 0 ? iSecond : inCol + 2;
+  const num = v => parseInt(String(v || '').trim()) || 0;
+
+  const out = [];
+  for (let i = h + 1; i < grid.length; i++) {
+    const row = grid[i] || [];
+    const name = String(row[iName] || '').trim();
+    const date = hrNormDate(String(row[iDate] || '').trim());
+    if (!name || !date) continue;
+    out.push({
+      empId: String(row[iId] || '').trim(), name,
+      department: iDept >= 0 ? String(row[iDept] || '').trim() : '',
+      date,
+      punchIn: hrNormTime(row[inCol]), punchOut: hrNormTime(row[inCol + 1]),
+      punchIn2: hrNormTime(row[in2Col]), punchOut2: hrNormTime(row[in2Col + 1]),
+      lateMin: iLate >= 0 ? num(row[iLate]) : 0, earlyMin: iEarly >= 0 ? num(row[iEarly]) : 0,
+      absenceMin: iAbs >= 0 ? num(row[iAbs]) : 0, totalMin: iTot >= 0 ? num(row[iTot]) : 0,
+      note: iNote >= 0 ? String(row[iNote] || '').trim() : ''
+    });
+  }
+  return out;
+}
+
+// Har tarah ki date ko YYYY-MM-DD banao (machine ISO deta hai; Excel kabhi
+// serial number ya D/M/Y bhi de deta hai)
+function hrNormDate(s) {
+  s = String(s || '').trim();
+  if (!s) return '';
+  let m = s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);           // 2026-07-01 ya 2026/7/1
+  if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+  m = s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})$/);              // D-M-YYYY ya M/D/YYYY
+  if (m) {
+    let a = parseInt(m[1]), b = parseInt(m[2]);
+    let day = a, mon = b;
+    if (a <= 12 && b > 12) { day = b; mon = a; }                      // pakka M/D tha
+    if (mon > 12 || day > 31) return '';
+    return `${m[3]}-${String(mon).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  }
+  m = s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{2})$/);              // D/M/YY
+  if (m) {
+    let a = parseInt(m[1]), b = parseInt(m[2]);
+    let day = a, mon = b;
+    if (a <= 12 && b > 12) { day = b; mon = a; }
+    if (mon > 12 || day > 31) return '';
+    return `20${m[3]}-${String(mon).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  }
+  if (/^\d{5}$/.test(s)) {                                            // Excel serial date
+    const d = new Date(Math.round((parseInt(s) - 25569) * 86400 * 1000));
+    return isNaN(d) ? '' : d.toISOString().split('T')[0];
+  }
+  return '';
+}
+
+// Time ko HH:MM banao ('9:5' → 09:05, '20:00:30' → 20:00, Excel fraction bhi)
+function hrNormTime(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (!s) return '';
+  const m = s.match(/^(\d{1,2}):(\d{1,2})(?::\d{1,2})?$/);
+  if (m) {
+    const h = parseInt(m[1]), mi = parseInt(m[2]);
+    if (h > 23 || mi > 59) return '';
+    return `${String(h).padStart(2, '0')}:${String(mi).padStart(2, '0')}`;
+  }
+  const f = parseFloat(s);                                            // Excel time = din ka fraction
+  if (!isNaN(f) && f > 0 && f < 1) {
+    const mins = Math.round(f * 24 * 60);
+    return `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`;
+  }
+  return '';
 }
 
 // ══════════════════════════════════════════════════════
