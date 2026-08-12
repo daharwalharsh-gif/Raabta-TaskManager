@@ -46,7 +46,11 @@ body{font-family:'Inter',sans-serif;background:#f1f5f9;color:#1e293b;min-height:
 }
 .sidebar:hover .logo-text{opacity:1;}
 
-.nav{padding:10px 8px;flex:1;overflow:hidden;}
+/* overflow-y:auto — items screen se zyada hon to nav scroll hota hai;
+   pehle overflow:hidden tha to neeche wale items (Profile/HR Reporting)
+   chupchap kat jaate the aur kisi ko dikhte hi nahi the */
+.nav{padding:10px 8px;flex:1;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;}
+.nav::-webkit-scrollbar{display:none;}
 .nav-item{
   display:flex;align-items:center;gap:10px;
   padding:10px 12px;border-radius:10px;cursor:pointer;
@@ -2269,9 +2273,10 @@ async function init() {
     document.getElementById('profileNameDisplay').textContent = ME.name;
     document.getElementById('profileRoleDisplay').textContent = roleLabel;
 
-    // HR Reporting — wahi dekhe jo leaves manage karta hai (admin/pc/hr/hod/HR_EMAIL)
+    // HR Reporting — SIRF Admin + HR ko (server ka hrReport flag; purane
+    // deploy me flag na aaye to admin role se fallback)
     const hrNav = document.getElementById('nav-hrreport');
-    if (hrNav) hrNav.style.display = (ME.canManageLeaves === true || ME.role === 'admin') ? '' : 'none';
+    if (hrNav) hrNav.style.display = (ME.hrReport === true || ME.role === 'admin') ? '' : 'none';
 
     setAvatarDisplay(ME.profile_image, initials);
 

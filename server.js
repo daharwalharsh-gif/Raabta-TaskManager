@@ -1292,7 +1292,9 @@ app.get('/api/me', requireAuth, async (req, res) => {
       week_off: user.week_off || '',
       extra_off: user.extra_off || '',
       // Leave page ko batata hai ki sabki leaves + approve/reject dikhana hai
-      canManageLeaves: canManageLeaves(user.role, user.email, user.notification_email)
+      canManageLeaves: canManageLeaves(user.role, user.email, user.notification_email),
+      // HR Reporting tab sirf Admin + HR ko (PC/HOD ko nahi)
+      hrReport: isHrReportUser(user.role, user.email, user.notification_email)
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -2241,12 +2243,19 @@ async function ensureHRTab(d) {
   }
 }
 
-// HR report kaun dekhe/upload kare — wahi log jo leaves manage karte hain
-// (admin / pc / hr / hod / HR_EMAIL wala)
+// HR Reporting SIRF Admin aur HR ke liye — PC/HOD ko nahi.
+// HR = role 'hr' YA jiska email HR_EMAIL/default HR list se match kare
+// (Samridhi ka role kuch bhi ho, email se pehchan ho jaati hai).
+function isHrReportUser(role, email, notificationEmail) {
+  const r = String(role || '').trim().toLowerCase();
+  if (r === 'admin' || r === 'hr') return true;
+  const mine = [email, notificationEmail].map(e => String(e || '').trim().toLowerCase()).filter(Boolean);
+  return hrEmailList().some(hr => mine.includes(hr));
+}
 async function hrReportAllowed(req) {
   const d = await getDB();
   const me = await d.findOne('Users', { id: String(req.session.userId) });
-  return canManageLeaves(req.session.role, me?.email, me?.notification_email);
+  return isHrReportUser(req.session.role, me?.email, me?.notification_email);
 }
 
 // POST /api/hr-report/upload — parsed Excel rows save karo.
@@ -4240,8 +4249,17 @@ app.get('/api/debug', async (req, res) => {
 // ══════════════════════════════════════════════════════
 // PAGES
 // ══════════════════════════════════════════════════════
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-app.get('/app', (req, res) => res.sendFile(path.join(__dirname, 'public', 'app.html')));
+// no-cache: browser har baar server se poochhe "nayi file hai kya?" — isse
+// deploy ke baad hard-refresh ki zaroorat nahi padti (bina iske log purani
+// app.html dekhte rehte the aur naye features "show nahi ho rahe" lagte the)
+app.get('/', (req, res) => {
+  res.set('Cache-Control', 'no-cache, must-revalidate');
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+app.get('/app', (req, res) => {
+  res.set('Cache-Control', 'no-cache, must-revalidate');
+  res.sendFile(path.join(__dirname, 'public', 'app.html'));
+});
 
 // ══════════════════════════════════════════════════════
 // STARTUP
