@@ -1219,6 +1219,8 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
         <input type="date" id="hrFltTo" onchange="hrFetch()" style="padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;background:#fff;outline:none"/></div>
       <button class="btn btn-outline btn-sm" onclick="hrThisWeek()">This Week</button>
       <button class="btn btn-outline btn-sm" onclick="hrThisMonth()">This Month</button>
+      <button class="btn btn-outline btn-sm" onclick="hrClearFilters()" title="Show all uploaded data (no date limit)">✕ Clear Filters</button>
+      <button class="btn btn-outline btn-sm" style="color:#dc2626;border-color:#fecaca" onclick="hrDeleteRange()" title="Delete uploaded data for a date range">🗑 Delete Data</button>
     </div>
 
     <!-- Cards -->
@@ -4460,14 +4462,40 @@ function hrIsMissedOut(r) { return !!r.punchIn && !r.punchOut; }
 function hrIsAbsent(r) { return !r.punchIn && !r.punchOut && !hrIsMonday(r.date); }
 
 function loadHRReport() {
-  // Pehli baar: current month set karo
-  const m = document.getElementById('hrFltMonth');
-  if (m && !m.value) {
-    const now = new Date();
-    m.value = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-    hrSetMonth(m.value);   // from/to bhar ke fetch karega
-    return;
+  // Bina date filter ke kholo — poora uploaded data dikhe. (Pehle current
+  // month apne aap lag jaata tha, jisse doosre mahine ka data "gayab" lagta
+  // tha jabki DB me hota tha.)
+  hrFetch();
+}
+
+// Saare filters hatao — poora data wapas dikhao
+function hrClearFilters() {
+  document.getElementById('hrFltLocation').value = 'all';
+  document.getElementById('hrFltDoer').value = 'all';
+  document.getElementById('hrFltMonth').value = '';
+  document.getElementById('hrFltFrom').value = '';
+  document.getElementById('hrFltTo').value = '';
+  hrFetch();
+}
+
+// Chuni hui range ka data delete — pehle poochta hai kab se kab tak
+async function hrDeleteRange() {
+  const loc = document.getElementById('hrFltLocation').value || 'all';
+  const from = prompt('DELETE ATTENDANCE DATA\n\nFrom date (YYYY-MM-DD):', document.getElementById('hrFltFrom').value || '');
+  if (from === null) return;
+  const to = prompt('DELETE ATTENDANCE DATA\n\nTo date (YYYY-MM-DD):', document.getElementById('hrFltTo').value || '');
+  if (to === null) return;
+  const f = String(from).trim(), t = String(to).trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(f) || !/^\d{4}-\d{2}-\d{2}$/.test(t)) {
+    showToast('Enter dates as YYYY-MM-DD (e.g. 2026-08-01)', 'error'); return;
   }
+  if (t < f) { showToast('To date cannot be before From date', 'error'); return; }
+  const locLabel = loc === 'all' ? 'ALL locations' : loc.toUpperCase();
+  const willDelete = _hrRows.filter(r => (loc === 'all' || r.location === loc) && r.date >= f && r.date <= t).length;
+  if (!confirm(`Delete attendance data?\n\nLocation : ${locLabel}\nFrom     : ${f}\nTo       : ${t}\n\nThis cannot be undone. Continue?`)) return;
+  const r = await api('/api/hr-report/delete', 'POST', { location: loc, from: f, to: t });
+  if (r && r.error) { showToast('Failed: ' + r.error, 'error'); return; }
+  showToast(`🗑 ${r.deleted} record(s) deleted (${f} → ${t}${loc === 'all' ? '' : ', ' + locLabel})`);
   hrFetch();
 }
 

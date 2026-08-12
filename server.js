@@ -2334,6 +2334,34 @@ app.get('/api/hr-report', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// POST /api/hr-report/delete — chune hue date range ka data delete (admin/HR).
+// From/To dono zaroori hain — poora table kabhi blind delete nahi hota.
+app.post('/api/hr-report/delete', requireAuth, async (req, res) => {
+  try {
+    if (!(await hrReportAllowed(req))) return res.status(403).json({ error: 'Not allowed' });
+    const loc = String((req.body || {}).location || 'all').trim().toLowerCase();
+    const from = String((req.body || {}).from || '').trim();
+    const to = String((req.body || {}).to || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to))
+      return res.status(400).json({ error: 'From and To dates are required' });
+    if (to < from) return res.status(400).json({ error: 'To date cannot be before From date' });
+    if (loc !== 'all' && !HR_LOCATIONS.includes(loc))
+      return res.status(400).json({ error: 'Invalid location' });
+    const d = await getDB();
+    await ensureHRTab(d);
+    const existing = (await d.findAll('HR_Attendance'))
+      .filter(r => (loc === 'all' || r.location === loc) && r.att_date >= from && r.att_date <= to);
+    if (existing.length) {
+      if (typeof d.batchDeleteByIds === 'function') {
+        await d.batchDeleteByIds('HR_Attendance', existing.map(r => r.id));
+      } else {
+        for (const r of existing) await d.delete('HR_Attendance', r.id);
+      }
+    }
+    res.json({ success: true, deleted: existing.length });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // POST /api/hr-report/punchout — bhoola hua punch-out haath se daalo
 app.post('/api/hr-report/punchout', requireAuth, async (req, res) => {
   try {
