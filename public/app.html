@@ -6355,7 +6355,9 @@ async function openEditFMS() {
         col_letter: r.col_letter || r.colLetter || '',
         field_type: r.field_type || 'text',
         label:      r.label || r.row_label || r.col_letter || '',
-        dropdown_options: r.dropdown_options || ''
+        dropdown_options: r.dropdown_options || '',
+        sub_options:      r.sub_options || '',
+        sub_col_letter:   r.sub_col_letter || ''
       })),
       showCols:       Array.isArray(s.showCols) ? s.showCols : [],
       delayReasonCol: s.delayReasonCol || s.delay_reason_col || '',
@@ -6430,13 +6432,7 @@ async function saveEditFMS() {
     const nameInput = box.querySelector('input[type=text]');
     if (nameInput) fmsSteps[i].stepName = nameInput.value.trim() || `Step ${i+1}`;
     fmsSteps[i].step_order = i+1;
-    // Flush dropdown_options and labels for all extraRows from DOM
-    (fmsSteps[i].extraRows||[]).forEach((_, ri) => {
-      const el = document.getElementById(`fmsDropOpt_${i}_${ri}`);
-      if (el) fmsSteps[i].extraRows[ri].dropdown_options = el.value;
-      const labelEl = document.getElementById(`fmsExtraLabel_${i}_${ri}`);
-      if (labelEl) fmsSteps[i].extraRows[ri].label = labelEl.value;
-    });
+    fmsFlushExtraRows(i);   // dropdown options, sub-options, labels — DOM se state me
   });
 
   console.log('Saving steps count:', fmsSteps.length); // debug
@@ -6444,7 +6440,7 @@ async function saveEditFMS() {
   const r = await api(`/api/fms/${fmsActiveId}`,'PUT',{
     fmsName: fmsName || sheetName,
     sheetName, sheetId, headerRow,
-    steps: fmsSteps.map(s=>({...s, showCols:s.showCols||[], delayReasonCol:s.delayReasonCol||'', doerNameCol:s.doerNameCol||s.doer_name_col||'', extraRows:(s.extraRows||[]).map(r=>({...r,dropdown_options:r.dropdown_options||''}))}))
+    steps: fmsSteps.map(s=>({...s, showCols:s.showCols||[], delayReasonCol:s.delayReasonCol||'', doerNameCol:s.doerNameCol||s.doer_name_col||'', extraRows:(s.extraRows||[]).map(r=>({...r,dropdown_options:r.dropdown_options||'',sub_options:r.sub_options||'',sub_col_letter:r.sub_col_letter||''}))}))
   });
   if (r.error) { err.textContent=r.error; err.style.display='block'; return; }
 
@@ -6821,14 +6817,8 @@ function toggleFMSExtra(idx, val) {
 
 function addFMSExtraRow(idx) {
   if (!fmsSteps[idx].extraRows) fmsSteps[idx].extraRows=[];
-  // Flush any dropdown_options values typed in DOM before re-render
-  fmsSteps[idx].extraRows.forEach((_, ri) => {
-    const el = document.getElementById(`fmsDropOpt_${idx}_${ri}`);
-    if (el) fmsSteps[idx].extraRows[ri].dropdown_options = el.value;
-    const labelEl = document.getElementById(`fmsExtraLabel_${idx}_${ri}`);
-    if (labelEl) fmsSteps[idx].extraRows[ri].label = labelEl.value;
-  });
-  fmsSteps[idx].extraRows.push({col_letter:'', field_type:'text', label:'', dropdown_options:''});
+  fmsFlushExtraRows(idx);   // re-render se pehle DOM ka data bacha lo
+  fmsSteps[idx].extraRows.push({col_letter:'', field_type:'text', label:'', dropdown_options:'', sub_options:'', sub_col_letter:''});
   refreshStepBox(idx);
   setupMultiSelect(idx);
   updateFMSDoerTags(idx);
@@ -6882,15 +6872,82 @@ function buildExtraRowHTML(idx, ri, headers) {
     <div id="fmsDropOptSection_${idx}_${ri}">${dropOptsSection}</div>`;
 }
 
+// extraRows ke DOM values (dropdown options, sub-options, label) state me save karo.
+// Re-render/save se pehle hamesha call hota hai warna typed data ud jaata hai.
+function fmsFlushExtraRows(idx) {
+  (fmsSteps[idx] && fmsSteps[idx].extraRows || []).forEach((_, ri) => {
+    const el = document.getElementById(`fmsDropOpt_${idx}_${ri}`);
+    if (el) fmsSteps[idx].extraRows[ri].dropdown_options = el.value;
+    const sub = document.getElementById(`fmsDropSub_${idx}_${ri}`);
+    if (sub) fmsSteps[idx].extraRows[ri].sub_options = sub.value;
+    const labelEl = document.getElementById(`fmsExtraLabel_${idx}_${ri}`);
+    if (labelEl) fmsSteps[idx].extraRows[ri].label = labelEl.value;
+  });
+}
+
+// Sub-options text ko map me badlo. Har line: "ParentOption: sub1, sub2"
+// Matching case-insensitive hai taaki "Done" aur "done" dono chalein.
+function fmsParseSubOptions(text) {
+  const map = {};
+  String(text || '').split(/[\n;]+/).forEach(line => {
+    const i = line.indexOf(':');
+    if (i < 0) return;
+    const parent = line.slice(0, i).trim();
+    const subs = line.slice(i + 1).split(',').map(s => s.trim()).filter(Boolean);
+    if (parent && subs.length) map[parent.toLowerCase()] = subs;
+  });
+  return map;
+}
+
+const _esc = s => String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
 function buildDropdownOptionsHTML(idx, ri, r) {
-  const opts = (r.dropdown_options || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const opts = _esc(r.dropdown_options);
+  const subs = _esc(r.sub_options);
+  const parents = String(r.dropdown_options || '').split(',').map(o => o.trim()).filter(Boolean);
+  const hint = parents.length
+    ? parents.slice(0, 2).map(p => `${p}: option1, option2`).join('\n')
+    : 'Done: Full, Partial\nCancel: By client, By us';
+  const headers = fmsSheetHeaders || [];
+  const subColSel = headers.length
+    ? `<select onchange="fmsSteps[${idx}].extraRows[${ri}].sub_col_letter=this.value"
+         style="width:100%;padding:6px 8px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:12px;background:#fff;outline:none;margin-top:3px">
+         <option value="">-- Same cell (Parent > Sub) --</option>
+         ${headers.map(h => `<option value="${h.col}" ${r.sub_col_letter === h.col ? 'selected' : ''}>${_esc(h.name)} (COL ${h.col})</option>`).join('')}
+       </select>`
+    : `<input type="text" value="${_esc(r.sub_col_letter)}" placeholder="Blank = same cell"
+         oninput="fmsSteps[${idx}].extraRows[${ri}].sub_col_letter=this.value"
+         style="width:100%;padding:6px 8px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:12px;outline:none;margin-top:3px"/>`;
+
   return `<div style="margin-top:4px">
-    <label style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.3px">Dropdown Options <span style="color:#94a3b8;font-weight:400">(comma separated, e.g. Yes,No,N/A)</span></label>
-    <input type="text" value="${opts}" placeholder="Yes,No,N/A or Option1,Option2,Option3"
-      oninput="fmsSteps[${idx}].extraRows[${ri}].dropdown_options=this.value"
+    <label style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.3px">Dropdown Options <span style="color:#94a3b8;font-weight:400">(comma separated, e.g. Done,Cancel)</span></label>
+    <input type="text" value="${opts}" placeholder="Done,Cancel or Yes,No,N/A"
+      oninput="fmsSteps[${idx}].extraRows[${ri}].dropdown_options=this.value; fmsRefreshSubHint(${idx},${ri},this.value)"
       id="fmsDropOpt_${idx}_${ri}"
       style="width:100%;padding:7px 10px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:12px;font-family:'Inter',sans-serif;outline:none;margin-top:4px"/>
+
+    <div style="margin-top:8px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;padding:8px 10px">
+      <label style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.3px">Sub-Dropdown <span style="color:#94a3b8;font-weight:400">(optional — shows after an option is picked)</span></label>
+      <div style="font-size:10px;color:#94a3b8;margin:3px 0 4px">One line per option — <b>OptionName: sub1, sub2</b>. Leave blank for no sub-dropdown.</div>
+      <textarea id="fmsDropSub_${idx}_${ri}" rows="3" placeholder="${_esc(hint)}"
+        oninput="fmsSteps[${idx}].extraRows[${ri}].sub_options=this.value"
+        style="width:100%;padding:7px 10px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:12px;font-family:'Inter',sans-serif;outline:none;resize:vertical;box-sizing:border-box">${subs}</textarea>
+      <div style="margin-top:6px">
+        <label style="font-size:10px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.3px">Save sub-answer in</label>
+        ${subColSel}
+      </div>
+    </div>
   </div>`;
+}
+
+// Parent options badle to sub-options ka placeholder bhi update ho jaye
+function fmsRefreshSubHint(idx, ri, val) {
+  const ta = document.getElementById(`fmsDropSub_${idx}_${ri}`);
+  if (!ta) return;
+  const parents = String(val || '').split(',').map(o => o.trim()).filter(Boolean);
+  ta.placeholder = parents.length
+    ? parents.slice(0, 2).map(p => `${p}: option1, option2`).join('\n')
+    : 'Done: Full, Partial\nCancel: By client, By us';
 }
 
 function onFMSExtraColChange(idx, ri, sel) {
@@ -6912,13 +6969,7 @@ function onFMSExtraTypeChange(idx, ri, val) {
 }
 
 function removeFMSExtraRow(idx, ri) {
-  // Flush all dropdown_options and labels from DOM before splice so data isn't lost
-  fmsSteps[idx].extraRows.forEach((_, i) => {
-    const el = document.getElementById(`fmsDropOpt_${idx}_${i}`);
-    if (el) fmsSteps[idx].extraRows[i].dropdown_options = el.value;
-    const labelEl = document.getElementById(`fmsExtraLabel_${idx}_${i}`);
-    if (labelEl) fmsSteps[idx].extraRows[i].label = labelEl.value;
-  });
+  fmsFlushExtraRows(idx);   // splice se pehle DOM ka data bacha lo
   fmsSteps[idx].extraRows.splice(ri,1);
   refreshStepBox(idx);
   setupMultiSelect(idx);
@@ -7102,13 +7153,7 @@ async function saveFMS() {
     const nameInput = box.querySelector('input[type=text]');
     if (nameInput) fmsSteps[i].stepName = nameInput.value.trim() || `Step ${i+1}`;
     fmsSteps[i].step_order = i+1;
-    // Flush dropdown_options and labels for all extraRows from DOM
-    (fmsSteps[i].extraRows||[]).forEach((_, ri) => {
-      const el = document.getElementById(`fmsDropOpt_${i}_${ri}`);
-      if (el) fmsSteps[i].extraRows[ri].dropdown_options = el.value;
-      const labelEl = document.getElementById(`fmsExtraLabel_${i}_${ri}`);
-      if (labelEl) fmsSteps[i].extraRows[ri].label = labelEl.value;
-    });
+    fmsFlushExtraRows(i);   // dropdown options, sub-options, labels — DOM se state me
   });
 
   if (fmsSteps.some(s=>!s.stepName)) { showToast('Please enter a name for every step','error'); return; }
@@ -7119,7 +7164,7 @@ async function saveFMS() {
     sheetId: fmsData.sheetId,
     headerRow: fmsData.headerRow,
     totalSteps: fmsSteps.length,
-    steps: fmsSteps.map(s=>({...s, showCols: s.showCols||[], delayReasonCol: s.delayReasonCol||'', doerNameCol: s.doerNameCol||s.doer_name_col||'', extraRows: (s.extraRows||[]).map(r=>({...r, dropdown_options: r.dropdown_options||''}))}))
+    steps: fmsSteps.map(s=>({...s, showCols: s.showCols||[], delayReasonCol: s.delayReasonCol||'', doerNameCol: s.doerNameCol||s.doer_name_col||'', extraRows: (s.extraRows||[]).map(r=>({...r, dropdown_options: r.dropdown_options||'', sub_options: r.sub_options||'', sub_col_letter: r.sub_col_letter||''}))}))
   };
 
   const r = await api('/api/fms', 'POST', body);
@@ -7539,7 +7584,13 @@ function openFMSDoneModal(stepId, rowIdx) {
           const optionsList = rawOpts.length
             ? rawOpts.map(o => `<option value="${o}">${o}</option>`).join('')
             : '<option value="">-- No options configured --</option>';
-          inputHtml = `<select id="fmsExtra_${i}" style="${inputStyle};background:#fff"><option value="">-- Select --</option>${optionsList}</select>`;
+          // Sub-dropdown: parent option chunte hi uske apne options dikhte hain
+          const hasSub = Object.keys(fmsParseSubOptions(r.sub_options)).length > 0;
+          inputHtml = `<select id="fmsExtra_${i}" ${hasSub ? `onchange="onFMSSubChange(${i})"` : ''} style="${inputStyle};background:#fff"><option value="">-- Select --</option>${optionsList}</select>`
+            + (hasSub ? `<div id="fmsSubWrap_${i}" style="display:none;margin-top:8px;padding-left:12px;border-left:3px solid #c7d2fe">
+                 <label style="font-size:11px;font-weight:600;color:#64748b;display:block;margin-bottom:3px">↳ <span id="fmsSubLabel_${i}">Sub option</span> <span style="color:#ef4444">*</span></label>
+                 <select id="fmsExtraSub_${i}" style="${inputStyle};background:#fff"></select>
+               </div>` : '');
           break;
         }
         case 'image': case 'pdf': case 'video': {
@@ -7570,6 +7621,23 @@ function openFMSDoneModal(stepId, rowIdx) {
   }
 
   document.getElementById('fmsDoneModal').classList.add('open');
+}
+
+// Parent dropdown badla — uske sub-options dikhao (na hon to sub chhupa do)
+function onFMSSubChange(i) {
+  const activeStep = window._fmsActiveStepData;
+  const rows = (activeStep && activeStep.extraRows) ? activeStep.extraRows.filter(r => r.col_letter) : [];
+  const r = rows[i];
+  const wrap = document.getElementById(`fmsSubWrap_${i}`);
+  const sel = document.getElementById(`fmsExtraSub_${i}`);
+  if (!r || !wrap || !sel) return;
+  const parent = (document.getElementById(`fmsExtra_${i}`) || {}).value || '';
+  const subs = fmsParseSubOptions(r.sub_options)[parent.trim().toLowerCase()] || [];
+  if (!subs.length) { wrap.style.display = 'none'; sel.innerHTML = ''; return; }
+  document.getElementById(`fmsSubLabel_${i}`).textContent = `${parent} — select one`;
+  sel.innerHTML = '<option value="">-- Select --</option>' + subs.map(o => `<option value="${o}">${o}</option>`).join('');
+  sel.style.border = '1.5px solid #e2e8f0';
+  wrap.style.display = 'block';
 }
 
 // (delay reason is now a plain text input — no dropdown listener needed)
@@ -7658,11 +7726,35 @@ async function saveFMSDone() {
       const focusEl = document.getElementById(`fmsExtraFile_${i}`) || el;
       if (focusEl) focusEl.style.border = '1.5px solid #e2e8f0';
     }
+    // Sub-dropdown khula hua hai to wo bhi bharna zaroori hai
+    const subWrap = document.getElementById(`fmsSubWrap_${i}`);
+    const subEl = document.getElementById(`fmsExtraSub_${i}`);
+    if (subWrap && subWrap.style.display !== 'none' && subEl && !subEl.value.trim()) {
+      errEl.textContent = `Select a sub-option for "${val}"`;
+      errEl.style.display = 'block';
+      saveBtn.textContent = '💾 Save to Sheet';
+      saveBtn.disabled = false;
+      subEl.style.border = '1.5px solid #ef4444'; subEl.focus();
+      return;
+    }
   }
-  const extraInputs = extraRows.map((r, i) => {
+  // Sub-dropdown ka jawab: apna column ho to wahan, warna parent cell me
+  // "Parent > Sub" ban kar jaata hai.
+  const extraInputs = [];
+  extraRows.forEach((r, i) => {
     const el = document.getElementById(`fmsExtra_${i}`);
-    return { colLetter: r.col_letter, value: el ? el.value.trim() : '' };
-  }).filter(e => e.colLetter && e.value !== '');
+    let value = el ? el.value.trim() : '';
+    if (!r.col_letter || value === '') return;
+    const subEl = document.getElementById(`fmsExtraSub_${i}`);
+    const subWrap = document.getElementById(`fmsSubWrap_${i}`);
+    const subVal = (subWrap && subWrap.style.display !== 'none' && subEl) ? subEl.value.trim() : '';
+    if (subVal) {
+      const subCol = String(r.sub_col_letter || '').trim();
+      if (subCol) extraInputs.push({ colLetter: subCol, value: subVal });
+      else value = `${value} > ${subVal}`;
+    }
+    extraInputs.push({ colLetter: r.col_letter, value });
+  });
 
   const r = await api(`/api/fms-tasks/${fmsId}/steps/${stepId}/done`, 'POST', {
     rowIndex: parseInt(rowNum),
