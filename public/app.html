@@ -6564,7 +6564,7 @@ function copyFMSEmail() {
 
 async function proceedToStepsConfig() {
   closeModal('fmsShareModal');
-  if (!fmsAllUsers.length) { const ur = await api('/api/users'); fmsAllUsers = Array.isArray(ur) ? ur : []; }
+  await fmsEnsureUsers();   // doer dropdown khali na rahe
 
   // Build default steps
   fmsSteps = [];
@@ -6617,13 +6617,56 @@ function appendFMSStepBox(idx, containerId) {
   updateFMSDoerTags(idx);
 }
 
+// Doer list kabhi khali reh jaye (users load hone se pehle step box ban gaya)
+// to load karke sab step boxes dobara render kar do — pehle dropdown khali
+// hi reh jaata tha aur kisi ko doer chunne ka rasta nahi milta tha.
+async function fmsEnsureUsers() {
+  if ((fmsAllUsers || []).length) return true;
+  const ur = await api('/api/users');
+  fmsAllUsers = Array.isArray(ur) ? ur : [];
+  if (!fmsAllUsers.length) return false;
+  // Re-render se pehle typed data (step name, dropdown options) bacha lo
+  const boxes = document.querySelectorAll('.fms-step-box');
+  boxes.forEach(box => {
+    const i = parseInt(box.dataset.idx);
+    if (isNaN(i) || !fmsSteps[i]) return;
+    const nameInput = box.querySelector('input[placeholder="Step Name"]');
+    if (nameInput) fmsSteps[i].stepName = nameInput.value.trim() || `Step ${i + 1}`;
+    fmsFlushExtraRows(i);
+  });
+  boxes.forEach(box => {
+    const i = parseInt(box.dataset.idx);
+    if (isNaN(i) || !fmsSteps[i]) return;
+    box.innerHTML = buildStepBoxHTML(i);
+    setupMultiSelect(i);
+    updateFMSDoerTags(i);
+  });
+  return true;
+}
+
+// Doer dropdown ke andar search — 40+ users me scroll karna mushkil tha
+function filterFMSDoers(idx, q) {
+  const drop = document.getElementById(`fmsDoerDrop_${idx}`);
+  if (!drop) return;
+  const needle = String(q || '').trim().toLowerCase();
+  drop.querySelectorAll('.multi-select-item').forEach(it => {
+    it.style.display = !needle || (it.dataset.name || '').includes(needle) ? 'flex' : 'none';
+  });
+}
+
 function buildStepBoxHTML(idx) {
   const s = fmsSteps[idx] || {};
   const validUsers = (fmsAllUsers || []).filter(u => u && u.id);
-  const userOptions = validUsers.map(u=>`
-    <div class="multi-select-item" data-uid="${u.id}" onclick="toggleFMSDoer(event,${idx},${u.id})">
+  const userOptions = validUsers.length
+    ? `<div style="position:sticky;top:0;background:#fff;padding:6px;border-bottom:1px solid #f1f5f9">
+         <input type="text" placeholder="🔍 Search doer…" oninput="filterFMSDoers(${idx},this.value)"
+           onclick="event.stopPropagation()"
+           style="width:100%;padding:6px 8px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:12px;outline:none;box-sizing:border-box"/>
+       </div>` + validUsers.map(u=>`
+    <div class="multi-select-item" data-uid="${u.id}" data-name="${String(u.name||'').toLowerCase()}" onclick="toggleFMSDoer(event,${idx},${u.id})">
       <input type="checkbox" ${(s.doers||[]).map(d=>parseInt(d)).includes(parseInt(u.id))?'checked':''}/> ${u.name||''}
-    </div>`).join('');
+    </div>`).join('')
+    : `<div style="padding:12px;text-align:center;color:#94a3b8;font-size:12px">⏳ Loading users…</div>`;
 
   // Build header options for selects — MUST be declared BEFORE extraRowsHTML
   const headers = fmsSheetHeaders || [];
@@ -6976,8 +7019,21 @@ function removeFMSExtraRow(idx, ri) {
   updateFMSDoerTags(idx);
 }
 
-function toggleFMSDropdown(idx) {
-  document.getElementById(`fmsDoerDrop_${idx}`).classList.toggle('open');
+async function toggleFMSDropdown(idx) {
+  const drop = document.getElementById(`fmsDoerDrop_${idx}`);
+  if (!drop) return;
+  const willOpen = !drop.classList.contains('open');
+  drop.classList.toggle('open');
+  if (!willOpen) return;
+  // Khulte waqt list khali ho to users load karke dobara render karo
+  if (!(fmsAllUsers || []).length) {
+    const ok = await fmsEnsureUsers();
+    const fresh = document.getElementById(`fmsDoerDrop_${idx}`);
+    if (fresh) {
+      if (ok) fresh.classList.add('open');
+      else fresh.innerHTML = '<div style="padding:12px;text-align:center;color:#ef4444;font-size:12px">⚠️ Users load nahi hue — page refresh karo</div>';
+    }
+  }
 }
 
 function toggleFMSDoer(e, idx, uid) {
@@ -7022,11 +7078,12 @@ function getActiveFMSContainer() {
   return 'fmsStepsContainer';
 }
 
-function addFMSStep() {
+async function addFMSStep() {
   const idx = fmsSteps.length;
   fmsSteps.push({stepName:`Step ${idx+1}`, doers:[], planCol:'', actualCol:'', extraInput:'no', extraCol:'', extraRows:[], showCols:[], delayReasonCol:'', doerNameCol:''});
   appendFMSStepBox(idx, getActiveFMSContainer());
   updateEditStepNav();
+  await fmsEnsureUsers();   // naye step ka doer dropdown khali na rahe
 }
 
 // ── Delete mode (Edit modal) ──
