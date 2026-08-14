@@ -3464,10 +3464,18 @@ app.get('/api/fms-tracking/:fmsId', requireAuth, async (req, res) => {
     const fms = parseFMSRow(fmsRow);
     if (!fms.steps.length) return res.json({ steps: [], rows: [] });
 
+    // Sirf utne hi columns padho jitne chahiye (A1:ZZ = 700+ columns, bade
+    // sheet par response bhaari ho jaata hai aur adhura aa sakta hai)
+    let lastCol = 8;   // pehle 8 columns entry ki pehchan ke liye
+    for (const s of fms.steps) {
+      lastCol = Math.max(lastCol, colLetterToIdx(s.planCol || '') + 1, colLetterToIdx(s.actualCol || '') + 1);
+    }
+    const endCol = idxToColLetter(Math.max(7, lastCol - 1));
+
     const [allUsers, response] = await Promise.all([
       d.findAll('Users'),
       withRetry(() => d.sheets.spreadsheets.values.get({
-        spreadsheetId: extractSheetId(fms.sheet_id), range: `${fms.sheet_name}!A1:ZZ`
+        spreadsheetId: extractSheetId(fms.sheet_id), range: `${fms.sheet_name}!A1:${endCol}`
       }))
     ]);
     const userMap = {};

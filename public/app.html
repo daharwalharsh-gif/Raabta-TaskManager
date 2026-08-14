@@ -5420,6 +5420,9 @@ async function _apiFetch(url, method, body, _retries) {
     console.error('API error:', url, r.status, e);
     if (r.status === 503) return { error: 'Server temporarily unavailable (503) — please try again in a moment' };
     if (r.status === 502) return { error: 'Could not connect to server (502) — please check the server is running' };
+    // 200 aaya par body padhi nahi gayi — "HTTP 200" likhna galat aur confusing
+    // tha (200 ka matlab to success hai). Asli baat batao.
+    if (r.ok) return { error: 'Server ne adhura jawab bheja — data bahut bada ho sakta hai ya request timeout hui. Dobara try karo.' };
     return { error: `HTTP ${r.status}` };
   }
 }
@@ -6617,7 +6620,9 @@ async function openEditFMS() {
         sub_options:      r.sub_options || '',
         sub_col_letter:   r.sub_col_letter || '',
         uid_prefix:       r.uid_prefix || 'UQ',
-        uid_pad:          r.uid_pad || 3
+        uid_pad:          r.uid_pad || 3,
+        sub_multi:        r.sub_multi || 0,
+        allow_other:      r.allow_other || 0
       })),
       showCols:       Array.isArray(s.showCols) ? s.showCols : [],
       delayReasonCol: s.delayReasonCol || s.delay_reason_col || '',
@@ -6700,7 +6705,7 @@ async function saveEditFMS() {
   const r = await api(`/api/fms/${fmsActiveId}`,'PUT',{
     fmsName: fmsName || sheetName,
     sheetName, sheetId, headerRow,
-    steps: fmsSteps.map(s=>({...s, showCols:s.showCols||[], delayReasonCol:s.delayReasonCol||'', doerNameCol:s.doerNameCol||s.doer_name_col||'', extraRows:(s.extraRows||[]).map(r=>({...r,dropdown_options:r.dropdown_options||'',sub_options:r.sub_options||'',sub_col_letter:r.sub_col_letter||'',uid_prefix:r.uid_prefix||'UQ',uid_pad:r.uid_pad||3}))}))
+    steps: fmsSteps.map(s=>({...s, showCols:s.showCols||[], delayReasonCol:s.delayReasonCol||'', doerNameCol:s.doerNameCol||s.doer_name_col||'', extraRows:(s.extraRows||[]).map(r=>({...r,dropdown_options:r.dropdown_options||'',sub_options:r.sub_options||'',sub_col_letter:r.sub_col_letter||'',uid_prefix:r.uid_prefix||'UQ',uid_pad:r.uid_pad||3,sub_multi:r.sub_multi||0,allow_other:r.allow_other||0}))}))
   });
   if (r.error) { err.textContent=r.error; err.style.display='block'; return; }
 
@@ -7123,7 +7128,7 @@ function toggleFMSExtra(idx, val) {
 function addFMSExtraRow(idx) {
   if (!fmsSteps[idx].extraRows) fmsSteps[idx].extraRows=[];
   fmsFlushExtraRows(idx);   // re-render se pehle DOM ka data bacha lo
-  fmsSteps[idx].extraRows.push({col_letter:'', field_type:'text', label:'', dropdown_options:'', sub_options:'', sub_col_letter:'', uid_prefix:'UQ', uid_pad:3});
+  fmsSteps[idx].extraRows.push({col_letter:'', field_type:'text', label:'', dropdown_options:'', sub_options:'', sub_col_letter:'', uid_prefix:'UQ', uid_pad:3, sub_multi:0, allow_other:0});
   refreshStepBox(idx);
   setupMultiSelect(idx);
   updateFMSDoerTags(idx);
@@ -7239,11 +7244,24 @@ function buildDropdownOptionsHTML(idx, ri, r) {
       <textarea id="fmsDropSub_${idx}_${ri}" rows="3" placeholder="${_esc(hint)}"
         oninput="fmsSteps[${idx}].extraRows[${ri}].sub_options=this.value"
         style="width:100%;padding:7px 10px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:12px;font-family:'Inter',sans-serif;outline:none;resize:vertical;box-sizing:border-box">${subs}</textarea>
+      <label style="display:flex;align-items:center;gap:6px;margin-top:7px;font-size:12px;color:#374151;cursor:pointer">
+        <input type="checkbox" ${r.sub_multi == 1 ? 'checked' : ''}
+          onchange="fmsSteps[${idx}].extraRows[${ri}].sub_multi = this.checked ? 1 : 0"
+          style="width:14px;height:14px;accent-color:#10b981;cursor:pointer"/>
+        <span><b>Multiple select</b> — doer ek se zyada sub-options chun sake</span>
+      </label>
       <div style="margin-top:6px">
         <label style="font-size:10px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.3px">Save sub-answer in</label>
         ${subColSel}
       </div>
     </div>
+
+    <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;color:#374151;cursor:pointer">
+      <input type="checkbox" ${r.allow_other == 1 ? 'checked' : ''}
+        onchange="fmsSteps[${idx}].extraRows[${ri}].allow_other = this.checked ? 1 : 0"
+        style="width:14px;height:14px;accent-color:#10b981;cursor:pointer"/>
+      <span><b>Allow manual entry</b> — list ke alawa doer khud kuch likh sake ("Other…")</span>
+    </label>
   </div>`;
 }
 
@@ -7518,7 +7536,7 @@ async function saveFMS() {
     sheetId: fmsData.sheetId,
     headerRow: fmsData.headerRow,
     totalSteps: fmsSteps.length,
-    steps: fmsSteps.map(s=>({...s, showCols: s.showCols||[], delayReasonCol: s.delayReasonCol||'', doerNameCol: s.doerNameCol||s.doer_name_col||'', extraRows: (s.extraRows||[]).map(r=>({...r, dropdown_options: r.dropdown_options||'', sub_options: r.sub_options||'', sub_col_letter: r.sub_col_letter||'', uid_prefix: r.uid_prefix||'UQ', uid_pad: r.uid_pad||3}))}))
+    steps: fmsSteps.map(s=>({...s, showCols: s.showCols||[], delayReasonCol: s.delayReasonCol||'', doerNameCol: s.doerNameCol||s.doer_name_col||'', extraRows: (s.extraRows||[]).map(r=>({...r, dropdown_options: r.dropdown_options||'', sub_options: r.sub_options||'', sub_col_letter: r.sub_col_letter||'', uid_prefix: r.uid_prefix||'UQ', uid_pad: r.uid_pad||3, sub_multi: r.sub_multi||0, allow_other: r.allow_other||0}))}))
   };
 
   const r = await api('/api/fms', 'POST', body);
@@ -7938,12 +7956,16 @@ function openFMSDoneModal(stepId, rowIdx) {
           const optionsList = rawOpts.length
             ? rawOpts.map(o => `<option value="${o}">${o}</option>`).join('')
             : '<option value="">-- No options configured --</option>';
-          // Sub-dropdown: parent option chunte hi uske apne options dikhte hain
+          const allowOther = r.allow_other == 1;
           const hasSub = Object.keys(fmsParseSubOptions(r.sub_options)).length > 0;
-          inputHtml = `<select id="fmsExtra_${i}" ${hasSub ? `onchange="onFMSSubChange(${i})"` : ''} style="${inputStyle};background:#fff"><option value="">-- Select --</option>${optionsList}</select>`
+          inputHtml = `<select id="fmsExtra_${i}" onchange="onFMSDropChange(${i})" style="${inputStyle};background:#fff">
+              <option value="">-- Select --</option>${optionsList}
+              ${allowOther ? '<option value="__OTHER__">➕ Other (type manually)</option>' : ''}
+            </select>`
+            + (allowOther ? `<input type="text" id="fmsExtraOther_${i}" placeholder="Type your answer…" style="${inputStyle};display:none;margin-top:6px"/>` : '')
             + (hasSub ? `<div id="fmsSubWrap_${i}" style="display:none;margin-top:8px;padding-left:12px;border-left:3px solid #c7d2fe">
-                 <label style="font-size:11px;font-weight:600;color:#64748b;display:block;margin-bottom:3px">↳ <span id="fmsSubLabel_${i}">Sub option</span> <span style="color:#ef4444">*</span></label>
-                 <select id="fmsExtraSub_${i}" style="${inputStyle};background:#fff"></select>
+                 <label style="font-size:11px;font-weight:600;color:#64748b;display:block;margin-bottom:4px">↳ <span id="fmsSubLabel_${i}">Sub option</span> <span style="color:#ef4444">*</span></label>
+                 <div id="fmsSubBox_${i}"></div>
                </div>` : '');
           break;
         }
@@ -7986,21 +8008,96 @@ function openFMSDoneModal(stepId, rowIdx) {
   document.getElementById('fmsDoneModal').classList.add('open');
 }
 
-// Parent dropdown badla — uske sub-options dikhao (na hon to sub chhupa do)
-function onFMSSubChange(i) {
-  const activeStep = window._fmsActiveStepData;
-  const rows = (activeStep && activeStep.extraRows) ? activeStep.extraRows.filter(r => r.col_letter) : [];
-  const r = rows[i];
+// Done modal me is field ka config nikaalo
+function fmsExtraCfg(i) {
+  const st = window._fmsActiveStepData;
+  const rows = (st && st.extraRows) ? st.extraRows.filter(r => r.col_letter) : [];
+  return rows[i] || null;
+}
+
+// Parent dropdown badla — "Other" ka box aur sub-options dono sambhalo
+function onFMSDropChange(i) {
+  const r = fmsExtraCfg(i);
+  if (!r) return;
+  const sel = document.getElementById(`fmsExtra_${i}`);
+  const picked = sel ? sel.value : '';
+
+  // Manual entry ka box
+  const other = document.getElementById(`fmsExtraOther_${i}`);
+  if (other) {
+    const show = picked === '__OTHER__';
+    other.style.display = show ? 'block' : 'none';
+    if (show) other.focus(); else other.value = '';
+  }
+
+  // Sub-options — "Other" par koi sub nahi
   const wrap = document.getElementById(`fmsSubWrap_${i}`);
-  const sel = document.getElementById(`fmsExtraSub_${i}`);
-  if (!r || !wrap || !sel) return;
-  const parent = (document.getElementById(`fmsExtra_${i}`) || {}).value || '';
-  const subs = fmsParseSubOptions(r.sub_options)[parent.trim().toLowerCase()] || [];
-  if (!subs.length) { wrap.style.display = 'none'; sel.innerHTML = ''; return; }
-  document.getElementById(`fmsSubLabel_${i}`).textContent = `${parent} — select one`;
-  sel.innerHTML = '<option value="">-- Select --</option>' + subs.map(o => `<option value="${o}">${o}</option>`).join('');
-  sel.style.border = '1.5px solid #e2e8f0';
+  const box = document.getElementById(`fmsSubBox_${i}`);
+  if (!wrap || !box) return;
+  const subs = picked === '__OTHER__' ? [] : (fmsParseSubOptions(r.sub_options)[picked.trim().toLowerCase()] || []);
+  if (!subs.length) { wrap.style.display = 'none'; box.innerHTML = ''; return; }
+
+  const style = 'width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:\'Inter\',sans-serif;outline:none;box-sizing:border-box';
+  const allowOther = r.allow_other == 1;
+  if (r.sub_multi == 1) {
+    // Multiple select — checkboxes
+    document.getElementById(`fmsSubLabel_${i}`).textContent = `${picked} — select one or more`;
+    box.innerHTML = `<div id="fmsSubList_${i}" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:6px 10px;background:#fff;max-height:170px;overflow-y:auto">
+        ${subs.map((o, k) => `<label style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px;cursor:pointer">
+          <input type="checkbox" value="${o}" data-sub="${i}" style="width:15px;height:15px;accent-color:#10b981;cursor:pointer"/> ${o}
+        </label>`).join('')}
+      </div>
+      ${allowOther ? `<input type="text" id="fmsSubOther_${i}" placeholder="➕ Other (type manually)" style="${style};margin-top:6px"/>` : ''}`;
+  } else {
+    // Ek hi chunna hai — normal dropdown
+    document.getElementById(`fmsSubLabel_${i}`).textContent = `${picked} — select one`;
+    box.innerHTML = `<select id="fmsExtraSub_${i}" onchange="onFMSSubOther(${i})" style="${style};background:#fff">
+        <option value="">-- Select --</option>${subs.map(o => `<option value="${o}">${o}</option>`).join('')}
+        ${allowOther ? '<option value="__OTHER__">➕ Other (type manually)</option>' : ''}
+      </select>
+      ${allowOther ? `<input type="text" id="fmsSubOther_${i}" placeholder="Type your answer…" style="${style};display:none;margin-top:6px"/>` : ''}`;
+  }
   wrap.style.display = 'block';
+}
+
+// Sub-dropdown me "Other" chuna to text box dikhao
+function onFMSSubOther(i) {
+  const sel = document.getElementById(`fmsExtraSub_${i}`);
+  const box = document.getElementById(`fmsSubOther_${i}`);
+  if (!sel || !box) return;
+  const show = sel.value === '__OTHER__';
+  box.style.display = show ? 'block' : 'none';
+  if (show) box.focus(); else box.value = '';
+}
+
+// Is field ka asli jawab — dropdown/Other/multi-select sab sambhal kar
+function fmsReadExtra(i, r) {
+  const sel = document.getElementById(`fmsExtra_${i}`);
+  let value = sel ? String(sel.value || '').trim() : '';
+  if (value === '__OTHER__') {
+    const o = document.getElementById(`fmsExtraOther_${i}`);
+    value = o ? o.value.trim() : '';
+  }
+  let sub = '';
+  const wrap = document.getElementById(`fmsSubWrap_${i}`);
+  if (wrap && wrap.style.display !== 'none') {
+    if (r && r.sub_multi == 1) {
+      const list = document.getElementById(`fmsSubList_${i}`);
+      const picked = list ? [...list.querySelectorAll('input[type=checkbox]:checked')].map(c => c.value) : [];
+      const extra = document.getElementById(`fmsSubOther_${i}`);
+      const typed = extra ? extra.value.trim() : '';
+      if (typed) picked.push(typed);
+      sub = picked.join(', ');
+    } else {
+      const ss = document.getElementById(`fmsExtraSub_${i}`);
+      sub = ss ? String(ss.value || '').trim() : '';
+      if (sub === '__OTHER__') {
+        const o = document.getElementById(`fmsSubOther_${i}`);
+        sub = o ? o.value.trim() : '';
+      }
+    }
+  }
+  return { value, sub, subOpen: !!(wrap && wrap.style.display !== 'none') };
 }
 
 // (delay reason is now a plain text input — no dropdown listener needed)
@@ -8070,47 +8167,42 @@ async function saveFMSDone() {
   // Collect extra input values — mandatory check
   const activeStep = window._fmsActiveStepData;
   const extraRows = (activeStep && activeStep.extraRows) ? activeStep.extraRows.filter(r => r.col_letter) : [];
+  const bail = (msg, el) => {
+    errEl.textContent = msg; errEl.style.display = 'block';
+    saveBtn.textContent = '💾 Save to Sheet'; saveBtn.disabled = false;
+    if (el) { el.style.border = '1.5px solid #ef4444'; el.focus(); }
+  };
   for (let i = 0; i < extraRows.length; i++) {
     const r = extraRows[i];
     const el = document.getElementById(`fmsExtra_${i}`);
-    const val = el ? el.value.trim() : '';
+    const label = r.label || r.row_label || r.col_letter || `Field ${i+1}`;
+    const isFile = ['image', 'pdf', 'video'].includes(r.field_type);
+    const { value: val, sub, subOpen } = fmsReadExtra(i, r);
     if (!val) {
-      const label = r.label || r.row_label || r.col_letter || `Field ${i+1}`;
-      const isFile = ['image', 'pdf', 'video'].includes(r.field_type);
-      errEl.textContent = isFile ? `"${label}" ke liye file upload karo!` : `"${label}" field is required!`;
-      errEl.style.display = 'block';
-      saveBtn.textContent = '💾 Save to Sheet';
-      saveBtn.disabled = false;
-      // File field ka asli input hidden hai — highlight file picker par karo
-      const focusEl = isFile ? (document.getElementById(`fmsExtraFile_${i}`) || el) : el;
-      if (focusEl) { focusEl.style.border = '1.5px solid #ef4444'; focusEl.focus(); }
+      // "Other" chuna par likha kuch nahi — us text box par ishara karo
+      const otherEl = document.getElementById(`fmsExtraOther_${i}`);
+      const isOther = el && el.value === '__OTHER__';
+      bail(isFile ? `"${label}" ke liye file upload karo!`
+        : isOther ? `"${label}" me apna answer likho`
+        : `"${label}" field is required!`,
+        isOther ? otherEl : (isFile ? (document.getElementById(`fmsExtraFile_${i}`) || el) : el));
       return;
-    } else {
-      const focusEl = document.getElementById(`fmsExtraFile_${i}`) || el;
-      if (focusEl) focusEl.style.border = '1.5px solid #e2e8f0';
     }
-    // Sub-dropdown khula hua hai to wo bhi bharna zaroori hai
-    const subWrap = document.getElementById(`fmsSubWrap_${i}`);
-    const subEl = document.getElementById(`fmsExtraSub_${i}`);
-    if (subWrap && subWrap.style.display !== 'none' && subEl && !subEl.value.trim()) {
-      errEl.textContent = `Select a sub-option for "${val}"`;
-      errEl.style.display = 'block';
-      saveBtn.textContent = '💾 Save to Sheet';
-      saveBtn.disabled = false;
-      subEl.style.border = '1.5px solid #ef4444'; subEl.focus();
+    const focusEl = document.getElementById(`fmsExtraFile_${i}`) || el;
+    if (focusEl) focusEl.style.border = '1.5px solid #e2e8f0';
+    // Sub khula hua hai to uska jawab bhi chahiye (multi me kam se kam ek)
+    if (subOpen && !sub) {
+      bail(r.sub_multi == 1 ? `Select at least one sub-option for "${val}"` : `Select a sub-option for "${val}"`,
+        document.getElementById(`fmsExtraSub_${i}`) || document.getElementById(`fmsSubList_${i}`));
       return;
     }
   }
   // Sub-dropdown ka jawab: apna column ho to wahan, warna parent cell me
-  // "Parent > Sub" ban kar jaata hai.
+  // "Parent > Sub" ban kar jaata hai (multi me sub comma se juda hota hai).
   const extraInputs = [];
   extraRows.forEach((r, i) => {
-    const el = document.getElementById(`fmsExtra_${i}`);
-    let value = el ? el.value.trim() : '';
-    if (!r.col_letter || value === '') return;
-    const subEl = document.getElementById(`fmsExtraSub_${i}`);
-    const subWrap = document.getElementById(`fmsSubWrap_${i}`);
-    const subVal = (subWrap && subWrap.style.display !== 'none' && subEl) ? subEl.value.trim() : '';
+    let { value, sub: subVal } = fmsReadExtra(i, r);
+    if (!r.col_letter || (value === '' && r.field_type !== 'uniqid')) return;
     if (subVal) {
       const subCol = String(r.sub_col_letter || '').trim();
       if (subCol) extraInputs.push({ colLetter: subCol, value: subVal });
