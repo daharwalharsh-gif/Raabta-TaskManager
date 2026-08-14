@@ -712,6 +712,10 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18M3 6h18M3 18h18"/></svg>
       <span class="nav-label-text">FMS Tasks</span>
     </div>
+    <div class="nav-item" id="nav-fms-tracking" onclick="navigate('fms-tracking',this)">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+      <span class="nav-label-text">FMS Tracking</span>
+    </div>
     <div class="nav-item" id="nav-leave" onclick="navigate('leave',this)">
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
       <span class="nav-label-text">Leave</span>
@@ -1179,6 +1183,52 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     </div>
   </div>
 
+  <!-- ── FMS TRACKING (kaunsa order kis step par atka hai) ── -->
+  <div id="page-fms-tracking" class="page">
+    <div class="page-header">
+      <h2>FMS Tracking</h2>
+      <button class="btn btn-outline btn-sm" onclick="ftFetch()">🔄 Refresh</button>
+    </div>
+
+    <div style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;padding:14px 18px;margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+      <div style="flex:1;min-width:200px">
+        <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:3px">Select FMS</div>
+        <select id="ftFms" onchange="ftFetch()" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;font-weight:600;background:#fff;outline:none">
+          <option value="">-- Select an FMS --</option>
+        </select>
+      </div>
+      <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:3px">Doer</div>
+        <select id="ftDoer" onchange="ftRender()" style="padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;background:#fff;outline:none;min-width:150px"><option value="all">All</option></select></div>
+      <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:3px">Step</div>
+        <select id="ftStep" onchange="ftRender()" style="padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;background:#fff;outline:none;min-width:150px"><option value="all">All</option></select></div>
+      <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:3px">From</div>
+        <input type="date" id="ftFrom" onchange="ftRender()" style="padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;background:#fff;outline:none"/></div>
+      <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:3px">To</div>
+        <input type="date" id="ftTo" onchange="ftRender()" style="padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;background:#fff;outline:none"/></div>
+      <button class="btn btn-outline btn-sm" onclick="ftClearFilters()">✕ Clear Filters</button>
+    </div>
+
+    <div style="margin-bottom:14px">
+      <input type="search" id="ftSearch" oninput="ftRender()" placeholder="🔍 Search anything — client name, phone, bill no, step, doer…"
+        autocomplete="off" style="width:100%;padding:11px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:14px;font-family:'Inter',sans-serif;outline:none;box-sizing:border-box;background:#fff"/>
+    </div>
+
+    <div class="overview-cards" style="margin-bottom:16px">
+      <div class="ov-card pending" style="cursor:pointer" onclick="ftSetView('pending')"><div class="label">⏳ In Progress</div><div class="number" id="ftCardPending">—</div></div>
+      <div class="ov-card completed" style="cursor:pointer" onclick="ftSetView('done')"><div class="label">✅ Completed</div><div class="number" id="ftCardDone">—</div></div>
+      <div class="ov-card revised" style="cursor:pointer" onclick="ftSetView('all')"><div class="label">📦 Total Entries</div><div class="number" id="ftCardTotal">—</div></div>
+    </div>
+
+    <div id="ftStepBar" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px"></div>
+
+    <div class="flat-tasks-table" style="background:#fff">
+      <div id="ftTableArea" style="overflow-x:auto">
+        <div style="text-align:center;color:#94a3b8;padding:24px;font-size:13px">Select an FMS above to see tracking</div>
+      </div>
+      <div id="ftFoot" style="padding:10px 14px;font-size:12px;color:#64748b;border-top:1px solid #f1f5f9"></div>
+    </div>
+  </div>
+
   <!-- ── HR REPORTING (biometric attendance) ── -->
   <div id="page-hrreport" class="page">
     <div class="page-header"><h2>HR Reporting</h2></div>
@@ -1403,6 +1453,18 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     <h3>📎 Report Attachments</h3>
     <div id="viewReportBody" style="max-height:70vh;overflow-y:auto"></div>
     <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('viewReportModal')">Close</button></div>
+  </div>
+</div>
+
+<!-- FMS Tracking — ek entry ki poori detail -->
+<div class="modal-overlay" id="ftDetailModal">
+  <div class="modal" style="max-width:680px">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px">
+      <h3 id="ftDetailTitle" style="margin:0">Entry Details</h3>
+      <button class="btn btn-outline btn-sm" onclick="closeModal('ftDetailModal')">✕ Close</button>
+    </div>
+    <div id="ftDetailSub" style="font-size:12px;color:#64748b;margin-bottom:14px"></div>
+    <div id="ftDetailBody" style="max-height:65vh;overflow-y:auto"></div>
   </div>
 </div>
 
@@ -2434,7 +2496,7 @@ function setMinDates() {
 // ══════════════════════════════════════════════════════
 // NAVIGATION
 // ══════════════════════════════════════════════════════
-const pageTitles = {dashboard:'Dashboard',alltasks:'All Tasks',approvals:'Approvals',users:'Users',profile:'Profile',mis:'MIS Report',fms:'FMS Admin','fms-tasks':'FMS Tasks',records:'Employee Records',leave:'Leave',crm:'PC',hrreport:'HR Reporting'};
+const pageTitles = {dashboard:'Dashboard',alltasks:'All Tasks',approvals:'Approvals',users:'Users',profile:'Profile',mis:'MIS Report',fms:'FMS Admin','fms-tasks':'FMS Tasks','fms-tracking':'FMS Tracking',records:'Employee Records',leave:'Leave',crm:'PC',hrreport:'HR Reporting'};
 
 function navigate(page, el) {
   window._currentPage = page;
@@ -2453,6 +2515,7 @@ function navigate(page, el) {
   if (page==='approvals') loadApprovals();
   if (page==='fms') loadFMSAdmin();
   if (page==='fms-tasks') loadFMSTasks();
+  if (page==='fms-tracking') loadFMSTracking();
   if (page==='leave') loadLeaves();
   if (page==='hrreport') loadHRReport();
   if (page==='crm') loadCRM();
@@ -4490,6 +4553,201 @@ async function handleLeave(id, action) {
 }
 
 // ══════════════════════════════════════════════════════
+// FMS TRACKING — kaunsa order kis step par atka hai, kiske paas hai
+// ══════════════════════════════════════════════════════
+let _ftData = null;      // { steps, labelCols, rows }
+let _ftView = 'all';     // all | pending | done
+
+async function loadFMSTracking() {
+  const sel = document.getElementById('ftFms');
+  if (sel.options.length <= 1) {
+    const list = await api('/api/fms-tasks');
+    if (Array.isArray(list) && list.length) {
+      sel.innerHTML = '<option value="">-- Select an FMS --</option>' +
+        list.map(f => `<option value="${f.id}">${f.fms_name || f.sheet_name}</option>`).join('');
+      if (list.length === 1) sel.value = list[0].id;
+    }
+  }
+  if (sel.value) ftFetch();
+}
+
+async function ftFetch() {
+  const id = document.getElementById('ftFms').value;
+  const area = document.getElementById('ftTableArea');
+  if (!id) { area.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:24px;font-size:13px">Select an FMS above to see tracking</div>'; return; }
+  area.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:24px;font-size:13px">⏳ Loading from Google Sheet…</div>';
+  const r = await api(`/api/fms-tracking/${id}`);
+  if (r && r.error) {
+    area.innerHTML = `<div style="text-align:center;color:#ef4444;padding:24px;font-size:13px">⚠️ ${r.error}</div>`;
+    return;
+  }
+  _ftData = r;
+  // Doer aur Step ke filter isi data se bhar dete hain
+  const doers = [...new Set((r.steps || []).flatMap(s => s.doers))].sort((a, b) => a.localeCompare(b));
+  const dSel = document.getElementById('ftDoer'), keepD = dSel.value;
+  dSel.innerHTML = '<option value="all">All</option>' + doers.map(d => `<option value="${d}">${d}</option>`).join('');
+  if (doers.includes(keepD)) dSel.value = keepD;
+  const sSel = document.getElementById('ftStep'), keepS = sSel.value;
+  sSel.innerHTML = '<option value="all">All</option>' + (r.steps || []).map(s => `<option value="${s.order}">Step ${s.order} — ${s.name}</option>`).join('');
+  if (keepS && sSel.querySelector(`option[value="${keepS}"]`)) sSel.value = keepS;
+  ftRender();
+}
+
+function ftSetView(v) { _ftView = v; ftRender(); }
+function ftClearFilters() {
+  document.getElementById('ftDoer').value = 'all';
+  document.getElementById('ftStep').value = 'all';
+  document.getElementById('ftFrom').value = '';
+  document.getElementById('ftTo').value = '';
+  document.getElementById('ftSearch').value = '';
+  _ftView = 'all';
+  ftRender();
+}
+
+// Row me jo bhi date jaisi value ho usse compare karo (sheet me DD/MM/YYYY hota hai)
+function ftRowDates(row) {
+  const out = [];
+  Object.values(row.data || {}).forEach(v => { const d = hrNormDate(v); if (d) out.push(d); });
+  (row.steps || []).forEach(s => { [s.planned, s.actual].forEach(v => { const d = hrNormDate(v); if (d) out.push(d); }); });
+  return out;
+}
+
+function ftRender() {
+  if (!_ftData) return;
+  const doer = document.getElementById('ftDoer').value || 'all';
+  const stepF = document.getElementById('ftStep').value || 'all';
+  const from = document.getElementById('ftFrom').value || '';
+  const to = document.getElementById('ftTo').value || '';
+  const q = (document.getElementById('ftSearch').value || '').trim().toLowerCase();
+
+  let rows = (_ftData.rows || []).filter(r => {
+    if (_ftView === 'pending' && r.complete) return false;
+    if (_ftView === 'done' && !r.complete) return false;
+    if (doer !== 'all' && !(r.currentStep && r.currentStep.doers.includes(doer))) return false;
+    if (stepF !== 'all' && !(r.currentStep && String(r.currentStep.order) === String(stepF))) return false;
+    if (from || to) {
+      const ds = ftRowDates(r);
+      if (!ds.length) return false;
+      if (from && !ds.some(d => d >= from)) return false;
+      if (to && !ds.some(d => d <= to)) return false;
+    }
+    if (q) {
+      const hay = [
+        ...Object.values(r.data || {}),
+        r.currentStep ? r.currentStep.name : 'completed',
+        r.currentStep ? r.currentStep.doers.join(' ') : '',
+        ...(r.steps || []).map(s => s.name)
+      ].join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  const all = _ftData.rows || [];
+  document.getElementById('ftCardTotal').textContent = all.length;
+  document.getElementById('ftCardDone').textContent = all.filter(r => r.complete).length;
+  document.getElementById('ftCardPending').textContent = all.filter(r => !r.complete).length;
+
+  // Har step par kitne atke hain — ek nazar me
+  const bar = document.getElementById('ftStepBar');
+  bar.innerHTML = (_ftData.steps || []).map(s => {
+    const n = all.filter(r => r.currentStep && r.currentStep.order === s.order).length;
+    const active = String(stepF) === String(s.order);
+    return `<div onclick="document.getElementById('ftStep').value='${active ? 'all' : s.order}';ftRender()"
+      style="cursor:pointer;background:${active ? '#dbeafe' : '#fff'};border:1.5px solid ${active ? '#60a5fa' : '#e2e8f0'};border-radius:10px;padding:8px 12px;min-width:130px">
+      <div style="font-size:10px;font-weight:700;color:#94a3b8">STEP ${s.order}</div>
+      <div style="font-size:12px;font-weight:700;color:#1e293b;margin:2px 0">${s.name}</div>
+      <div style="font-size:11px;color:#64748b">👤 ${s.doers.join(', ') || '—'}</div>
+      <div style="font-size:13px;font-weight:800;color:${n ? '#dc2626' : '#16a34a'};margin-top:3px">${n} pending</div>
+    </div>`;
+  }).join('');
+
+  const area = document.getElementById('ftTableArea');
+  const foot = document.getElementById('ftFoot');
+  if (!rows.length) {
+    area.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:24px;font-size:13px">No entries for this filter</div>';
+    foot.textContent = '';
+    return;
+  }
+  const cols = (_ftData.labelCols || []).filter(c => rows.some(r => r.data[c]));
+  area.innerHTML = `<table style="min-width:1000px">
+    <thead><tr>
+      ${cols.map(c => `<th>${c}</th>`).join('')}
+      <th>Progress</th><th>Currently At</th><th>Doer</th><th>Status</th>
+    </tr></thead>
+    <tbody>${rows.map(r => {
+      const pct = r.applicable ? Math.round((r.doneCount / r.applicable) * 100) : 0;
+      const dots = (r.steps || []).map(s =>
+        `<span title="Step ${s.order}: ${s.name} — ${s.state}" style="display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:3px;background:${s.state === 'done' ? '#10b981' : s.state === 'pending' ? '#e2e8f0' : '#f1f5f9'};border:${s.state === 'na' ? '1px dashed #cbd5e1' : 'none'}"></span>`
+      ).join('');
+      return `<tr onclick="ftOpenDetail(${r.sheetRow})" style="cursor:pointer;${r.complete ? 'background:#f0fdf4' : ''}" title="Click for full details">
+        ${cols.map(c => `<td style="white-space:nowrap">${r.data[c] || '—'}</td>`).join('')}
+        <td style="white-space:nowrap">${dots}<div style="font-size:10px;color:#64748b;margin-top:2px">${r.doneCount}/${r.applicable} · ${pct}%</div></td>
+        <td>${r.currentStep
+          ? `<span style="font-weight:600">Step ${r.currentStep.order}</span> — ${r.currentStep.name}`
+          : '<span style="color:#16a34a;font-weight:600">All steps done</span>'}</td>
+        <td style="color:#64748b">${r.currentStep ? (r.currentStep.doers.join(', ') || '—') : '—'}</td>
+        <td>${r.complete
+          ? '<span class="status-badge completed">Completed</span>'
+          : '<span class="status-badge pending">In Progress</span>'}</td>
+      </tr>`;
+    }).join('')}</tbody></table>`;
+  foot.textContent = `${rows.length} of ${all.length} entries` +
+    (_ftView !== 'all' ? ` · showing ${_ftView === 'done' ? 'completed' : 'in progress'}` : '') +
+    (q ? ` · search "${q}"` : '');
+}
+
+// Kisi bhi row par click — us entry ki poori detail + step-by-step safar
+function ftOpenDetail(sheetRow) {
+  const r = (_ftData && _ftData.rows || []).find(x => x.sheetRow === sheetRow);
+  if (!r) return;
+  const name = Object.values(r.data || {}).find(v => v && !/^\d+([.\/-]|$)/.test(v)) || `Row ${r.sheetRow}`;
+  const pct = r.applicable ? Math.round((r.doneCount / r.applicable) * 100) : 0;
+
+  document.getElementById('ftDetailTitle').textContent = name;
+  document.getElementById('ftDetailSub').innerHTML = r.complete
+    ? `<span style="color:#16a34a;font-weight:700">✅ All steps completed</span> · ${r.doneCount}/${r.applicable} steps · sheet row ${r.sheetRow}`
+    : `<span style="color:#dc2626;font-weight:700">⏳ Currently at Step ${r.currentStep.order} — ${r.currentStep.name}</span>`
+      + `${r.currentStep.doers.length ? ` · 👤 ${r.currentStep.doers.join(', ')}` : ''} · ${r.doneCount}/${r.applicable} steps done · sheet row ${r.sheetRow}`;
+
+  const info = Object.entries(r.data || {}).filter(([, v]) => v);
+  const stepRow = s => {
+    const icon = s.state === 'done' ? '✅' : s.state === 'pending' ? '⏳' : '➖';
+    const color = s.state === 'done' ? '#16a34a' : s.state === 'pending' ? '#dc2626' : '#94a3b8';
+    const label = s.state === 'done' ? 'Done' : s.state === 'pending' ? 'Pending' : 'Not applicable';
+    const meta = (_ftData.steps || []).find(x => x.order === s.order) || { doers: [] };
+    return `<div style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid #f1f5f9">
+      <div style="font-size:16px;line-height:1.2">${icon}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:700;color:#1e293b">Step ${s.order} — ${s.name}</div>
+        <div style="font-size:11px;color:#64748b;margin-top:2px">👤 ${meta.doers.join(', ') || '—'}</div>
+        ${s.planned ? `<div style="font-size:11px;color:#64748b">Planned: ${s.planned}</div>` : ''}
+        ${s.actual ? `<div style="font-size:11px;color:#16a34a">Actual: ${s.actual}</div>` : ''}
+      </div>
+      <div style="font-size:11px;font-weight:700;color:${color};white-space:nowrap">${label}</div>
+    </div>`;
+  };
+
+  document.getElementById('ftDetailBody').innerHTML = `
+    <div style="background:#f8fafc;border-radius:10px;padding:10px 12px;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700;color:#64748b;margin-bottom:5px">
+        <span>PROGRESS</span><span>${r.doneCount}/${r.applicable} · ${pct}%</span>
+      </div>
+      <div style="height:8px;background:#e2e8f0;border-radius:6px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:${r.complete ? '#10b981' : '#3b82f6'}"></div>
+      </div>
+    </div>
+    ${info.length ? `<div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.3px;margin-bottom:6px">Entry Details</div>
+    <div style="display:grid;grid-template-columns:150px 1fr;gap:6px 12px;font-size:13px;margin-bottom:16px">
+      ${info.map(([k, v]) => `<div style="color:#64748b">${k}</div><div style="color:#1e293b;font-weight:500">${v}</div>`).join('')}
+    </div>` : ''}
+    <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px">Step Journey</div>
+    ${(r.steps || []).map(stepRow).join('')}`;
+
+  document.getElementById('ftDetailModal').classList.add('open');
+}
+
+// ══════════════════════════════════════════════════════
 // HR REPORTING — biometric attendance Excel upload + review
 // ══════════════════════════════════════════════════════
 let _hrRows = [];       // last fetch ke rows
@@ -6357,7 +6615,9 @@ async function openEditFMS() {
         label:      r.label || r.row_label || r.col_letter || '',
         dropdown_options: r.dropdown_options || '',
         sub_options:      r.sub_options || '',
-        sub_col_letter:   r.sub_col_letter || ''
+        sub_col_letter:   r.sub_col_letter || '',
+        uid_prefix:       r.uid_prefix || 'UQ',
+        uid_pad:          r.uid_pad || 3
       })),
       showCols:       Array.isArray(s.showCols) ? s.showCols : [],
       delayReasonCol: s.delayReasonCol || s.delay_reason_col || '',
@@ -6440,7 +6700,7 @@ async function saveEditFMS() {
   const r = await api(`/api/fms/${fmsActiveId}`,'PUT',{
     fmsName: fmsName || sheetName,
     sheetName, sheetId, headerRow,
-    steps: fmsSteps.map(s=>({...s, showCols:s.showCols||[], delayReasonCol:s.delayReasonCol||'', doerNameCol:s.doerNameCol||s.doer_name_col||'', extraRows:(s.extraRows||[]).map(r=>({...r,dropdown_options:r.dropdown_options||'',sub_options:r.sub_options||'',sub_col_letter:r.sub_col_letter||''}))}))
+    steps: fmsSteps.map(s=>({...s, showCols:s.showCols||[], delayReasonCol:s.delayReasonCol||'', doerNameCol:s.doerNameCol||s.doer_name_col||'', extraRows:(s.extraRows||[]).map(r=>({...r,dropdown_options:r.dropdown_options||'',sub_options:r.sub_options||'',sub_col_letter:r.sub_col_letter||'',uid_prefix:r.uid_prefix||'UQ',uid_pad:r.uid_pad||3}))}))
   });
   if (r.error) { err.textContent=r.error; err.style.display='block'; return; }
 
@@ -6695,8 +6955,10 @@ function buildStepBoxHTML(idx) {
       <option value="image" ${r.field_type==='image'?'selected':''}>🖼️ Image Upload</option>
       <option value="pdf" ${r.field_type==='pdf'?'selected':''}>📄 PDF Upload</option>
       <option value="video" ${r.field_type==='video'?'selected':''}>🎥 Video Upload</option>
+      <option value="uniqid" ${r.field_type==='uniqid'?'selected':''}>🔢 Unique ID (auto)</option>
     </select>`;
-    const dropSection = r.field_type==='dropdown' ? buildDropdownOptionsHTML(idx, ri, r) : '';
+    const dropSection = r.field_type==='dropdown' ? buildDropdownOptionsHTML(idx, ri, r)
+      : r.field_type==='uniqid' ? buildUniqIdOptionsHTML(idx, ri, r) : '';
     return `<div class="extra-row-item" id="fmsExtraRow_${idx}_${ri}" style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:10px;margin-bottom:10px">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px">
         <div>
@@ -6861,7 +7123,7 @@ function toggleFMSExtra(idx, val) {
 function addFMSExtraRow(idx) {
   if (!fmsSteps[idx].extraRows) fmsSteps[idx].extraRows=[];
   fmsFlushExtraRows(idx);   // re-render se pehle DOM ka data bacha lo
-  fmsSteps[idx].extraRows.push({col_letter:'', field_type:'text', label:'', dropdown_options:'', sub_options:'', sub_col_letter:''});
+  fmsSteps[idx].extraRows.push({col_letter:'', field_type:'text', label:'', dropdown_options:'', sub_options:'', sub_col_letter:'', uid_prefix:'UQ', uid_pad:3});
   refreshStepBox(idx);
   setupMultiSelect(idx);
   updateFMSDoerTags(idx);
@@ -6892,8 +7154,10 @@ function buildExtraRowHTML(idx, ri, headers) {
     <option value="image" ${r.field_type==='image'?'selected':''}>🖼️ Image Upload</option>
     <option value="pdf" ${r.field_type==='pdf'?'selected':''}>📄 PDF Upload</option>
     <option value="video" ${r.field_type==='video'?'selected':''}>🎥 Video Upload</option>
+    <option value="uniqid" ${r.field_type==='uniqid'?'selected':''}>🔢 Unique ID (auto)</option>
   </select>`;
-  const dropOptsSection = r.field_type==='dropdown' ? buildDropdownOptionsHTML(idx, ri, r) : '';
+  const dropOptsSection = r.field_type==='dropdown' ? buildDropdownOptionsHTML(idx, ri, r)
+    : r.field_type==='uniqid' ? buildUniqIdOptionsHTML(idx, ri, r) : '';
   return `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px">
       <div>
@@ -6981,6 +7245,39 @@ function buildDropdownOptionsHTML(idx, ri, r) {
       </div>
     </div>
   </div>`;
+}
+
+// Unique ID field ka config — prefix aur kitne digit
+function buildUniqIdOptionsHTML(idx, ri, r) {
+  const prefix = _esc(r.uid_prefix || 'UQ');
+  const pad = parseInt(r.uid_pad) || 3;
+  const sample = `${(r.uid_prefix || 'UQ')}-${String(1).padStart(pad, '0')}`;
+  return `<div style="margin-top:4px;background:#f0fdf4;border:1px dashed #a7f3d0;border-radius:8px;padding:8px 10px">
+    <label style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.3px">Unique ID <span style="color:#94a3b8;font-weight:400">(har Done par apne aap banti hai)</span></label>
+    <div style="display:grid;grid-template-columns:1fr 90px;gap:8px;margin-top:5px">
+      <div>
+        <div style="font-size:10px;color:#94a3b8;margin-bottom:2px">Prefix</div>
+        <input type="text" value="${prefix}" placeholder="UQ" maxlength="10"
+          oninput="fmsSteps[${idx}].extraRows[${ri}].uid_prefix=this.value; fmsUidPreview(${idx},${ri})"
+          style="width:100%;padding:6px 8px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:12px;outline:none;box-sizing:border-box"/>
+      </div>
+      <div>
+        <div style="font-size:10px;color:#94a3b8;margin-bottom:2px">Digits</div>
+        <input type="number" min="1" max="8" value="${pad}"
+          oninput="fmsSteps[${idx}].extraRows[${ri}].uid_pad=this.value; fmsUidPreview(${idx},${ri})"
+          style="width:100%;padding:6px 8px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:12px;outline:none;box-sizing:border-box"/>
+      </div>
+    </div>
+    <div style="font-size:11px;color:#16a34a;font-weight:600;margin-top:6px">Example: <span id="fmsUidSample_${idx}_${ri}">${_esc(sample)}</span> → next entry gets the following number</div>
+  </div>`;
+}
+
+function fmsUidPreview(idx, ri) {
+  const el = document.getElementById(`fmsUidSample_${idx}_${ri}`);
+  if (!el) return;
+  const r = fmsSteps[idx].extraRows[ri] || {};
+  const pad = Math.min(8, Math.max(1, parseInt(r.uid_pad) || 3));
+  el.textContent = `${(r.uid_prefix || 'UQ')}-${String(1).padStart(pad, '0')}`;
 }
 
 // Parent options badle to sub-options ka placeholder bhi update ho jaye
@@ -7221,7 +7518,7 @@ async function saveFMS() {
     sheetId: fmsData.sheetId,
     headerRow: fmsData.headerRow,
     totalSteps: fmsSteps.length,
-    steps: fmsSteps.map(s=>({...s, showCols: s.showCols||[], delayReasonCol: s.delayReasonCol||'', doerNameCol: s.doerNameCol||s.doer_name_col||'', extraRows: (s.extraRows||[]).map(r=>({...r, dropdown_options: r.dropdown_options||'', sub_options: r.sub_options||'', sub_col_letter: r.sub_col_letter||''}))}))
+    steps: fmsSteps.map(s=>({...s, showCols: s.showCols||[], delayReasonCol: s.delayReasonCol||'', doerNameCol: s.doerNameCol||s.doer_name_col||'', extraRows: (s.extraRows||[]).map(r=>({...r, dropdown_options: r.dropdown_options||'', sub_options: r.sub_options||'', sub_col_letter: r.sub_col_letter||'', uid_prefix: r.uid_prefix||'UQ', uid_pad: r.uid_pad||3}))}))
   };
 
   const r = await api('/api/fms', 'POST', body);
@@ -7650,6 +7947,15 @@ function openFMSDoneModal(stepId, rowIdx) {
                </div>` : '');
           break;
         }
+        case 'uniqid': {
+          // Number server par banta hai (duplicate se bachne ke liye) — yahan
+          // sirf batate hain ki apne aap milega
+          inputHtml = `<input type="hidden" id="fmsExtra_${i}" value="__AUTO__"/>
+            <div style="${inputStyle};background:#f0fdf4;border-color:#a7f3d0;color:#16a34a;font-weight:600;display:flex;align-items:center;gap:6px">
+              🔢 Auto — next ${(r.uid_prefix || 'UQ')}-${String(1).padStart(Math.min(8, Math.max(1, parseInt(r.uid_pad) || 3)), '0')} format ID
+            </div>`;
+          break;
+        }
         case 'image': case 'pdf': case 'video': {
           // File upload — file DB me jaati hai, sheet me uska link. Hidden input
           // me upload ke baad URL bhar jaata hai (wahi sheet me likha jaata hai).
@@ -7810,6 +8116,12 @@ async function saveFMSDone() {
       if (subCol) extraInputs.push({ colLetter: subCol, value: subVal });
       else value = `${value} > ${subVal}`;
     }
+    // Unique ID — server ko bolo number khud banaye
+    if (r.field_type === 'uniqid') {
+      extraInputs.push({ colLetter: r.col_letter, value: '', auto: 'uniqid',
+        prefix: r.uid_prefix || 'UQ', pad: parseInt(r.uid_pad) || 3 });
+      return;
+    }
     extraInputs.push({ colLetter: r.col_letter, value });
   });
 
@@ -7817,7 +8129,7 @@ async function saveFMSDone() {
     rowIndex: parseInt(rowNum),
     actualValue,
     delayReason,
-    extraFields: extraInputs.map(e => ({ col: e.colLetter, value: e.value }))
+    extraFields: extraInputs.map(e => ({ col: e.colLetter, value: e.value, auto: e.auto, prefix: e.prefix, pad: e.pad }))
   });
 
   saveBtn.textContent = '💾 Save to Sheet';

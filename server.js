@@ -3453,6 +3453,91 @@ app.get('/api/fms-tasks/:fmsId/steps/:stepId/rows', requireAuth, async (req, res
   }
 });
 
+// GET /api/fms-tracking/:fmsId — har data row ka poora safar: kaunse step tak
+// pahunchi, abhi kis step par atki hai, uska doer kaun hai. FMS Tracking
+// dashboard isi se banta hai.
+app.get('/api/fms-tracking/:fmsId', requireAuth, async (req, res) => {
+  try {
+    const d = await getDB();
+    const fmsRow = await d.findOne('FMS_Config', { id: String(req.params.fmsId) });
+    if (!fmsRow) return res.status(404).json({ error: 'FMS not found' });
+    const fms = parseFMSRow(fmsRow);
+    if (!fms.steps.length) return res.json({ steps: [], rows: [] });
+
+    const [allUsers, response] = await Promise.all([
+      d.findAll('Users'),
+      withRetry(() => d.sheets.spreadsheets.values.get({
+        spreadsheetId: extractSheetId(fms.sheet_id), range: `${fms.sheet_name}!A1:ZZ`
+      }))
+    ]);
+    const userMap = {};
+    for (const u of allUsers) userMap[String(u.id)] = u.name || '';
+
+    const headerRow = parseInt(fms.header_row) || 1;
+    const allRows = response.data.values || [];
+    const headers = allRows[headerRow - 1] || [];
+    const dataRows = allRows.slice(headerRow);
+
+    const isDone = v => { const s = String(v || '').trim(); return s !== '' && s.toUpperCase() !== 'FALSE'; };
+    // Wahi rule jo pending-rows endpoint me hai: jis step ka Planned column
+    // is row me khali hai, wo step is row par lagu hi nahi hota.
+    const isRelevant = (row, s) => {
+      const p = colLetterToIdx(s.planCol || '');
+      return p < 0 || String(row[p] || '').trim() !== '';
+    };
+    const hasRealData = row => {
+      for (let i = 0; i < Math.min(10, headers.length); i++) {
+        const v = String(row[i] || '').trim();
+        if (v && v.toUpperCase() !== 'FALSE' && v.toUpperCase() !== 'TRUE') return true;
+      }
+      return false;
+    };
+
+    const stepMeta = fms.steps.map((s, i) => ({
+      id: s.id || i + 1, order: i + 1, name: s.stepName || `Step ${i + 1}`,
+      doers: (Array.isArray(s.doers) ? s.doers : []).map(uid => userMap[String(uid)] || String(uid)).filter(Boolean)
+    }));
+
+    // Row ki pehchan ke liye pehle 8 columns (Timestamp, Name, Phone, Bill…)
+    const labelCols = headers.slice(0, 8).map((h, i) => ({ name: h || `Col ${i + 1}`, idx: i }));
+
+    const rows = [];
+    dataRows.forEach((row, i) => {
+      if (!hasRealData(row)) return;
+      const per = [];
+      let current = null, doneCount = 0, applicable = 0;
+      fms.steps.forEach((s, si) => {
+        const rel = isRelevant(row, s);
+        const aIdx = colLetterToIdx(s.actualCol || '');
+        const done = rel && aIdx >= 0 && isDone(row[aIdx]);
+        if (rel) { applicable++; if (done) doneCount++; }
+        per.push({
+          order: si + 1, name: stepMeta[si].name,
+          state: !rel ? 'na' : done ? 'done' : 'pending',
+          actual: (rel && aIdx >= 0) ? String(row[aIdx] || '').trim() : '',
+          planned: (() => { const p = colLetterToIdx(s.planCol || ''); return p >= 0 ? String(row[p] || '').trim() : ''; })()
+        });
+        // Pehla relevant + pending step = abhi yahan atki hai
+        if (!current && rel && !done) current = { order: si + 1, name: stepMeta[si].name, doers: stepMeta[si].doers, planned: per[si].planned };
+      });
+      const data = {};
+      labelCols.forEach(c => { data[c.name] = String(row[c.idx] || '').trim(); });
+      rows.push({
+        sheetRow: headerRow + i + 1, data, steps: per,
+        currentStep: current, doneCount, applicable,
+        complete: applicable > 0 && doneCount === applicable
+      });
+    });
+
+    res.json({ fmsName: fms.fms_name || fms.sheet_name, steps: stepMeta, labelCols: labelCols.map(c => c.name), rows });
+  } catch (err) {
+    let msg = err.message || 'Unknown error';
+    if (msg.includes('403')) msg = 'Access denied — FMS sheet ko service account ke saath share karo';
+    if (msg.includes('404')) msg = 'Sheet not found — FMS config me Sheet ID/Tab check karo';
+    res.status(500).json({ error: msg });
+  }
+});
+
 // POST /api/fms-tasks/:fmsId/steps/:stepId/done — mark step done in external sheet
 app.post('/api/fms-tasks/:fmsId/steps/:stepId/done', requireAuth, async (req, res) => {
   try {
@@ -3480,10 +3565,29 @@ app.post('/api/fms-tasks/:fmsId/steps/:stepId/done', requireAuth, async (req, re
     if (step.doerNameCol && doerName !== undefined) {
       updates.push({ range: `${fms.sheet_name}!${step.doerNameCol.toUpperCase()}${rowIndex}`, values: [[doerName]] });
     }
+    const generatedIds = {};
     if (extraFields && Array.isArray(extraFields)) {
       for (const ef of extraFields) {
-        if (ef.col && ef.value !== undefined) {
-          updates.push({ range: `${fms.sheet_name}!${ef.col.toUpperCase()}${rowIndex}`, values: [[ef.value]] });
+        if (!ef.col) continue;
+        let val = ef.value;
+        // Unique ID: number SERVER par banta hai (browser par nahi) — do doer
+        // ek saath Done karein to bhi ek hi ID do baar nahi milti.
+        if (ef.auto === 'uniqid') {
+          const colIdx = colLetterToIdx(ef.col);
+          const prefix = String(ef.prefix || 'UQ').trim() || 'UQ';
+          const pad = Math.min(8, Math.max(1, parseInt(ef.pad) || 3));
+          let existing = [];
+          try {
+            const colResp = await withRetry(() => d.sheets.spreadsheets.values.get({
+              spreadsheetId, range: `${fms.sheet_name}!${ef.col.toUpperCase()}:${ef.col.toUpperCase()}`
+            }));
+            existing = (colResp.data.values || []).map(r => (r && r[0]) || '');
+          } catch (e) { existing = []; }
+          val = nextUniqId(existing, prefix, pad);
+          generatedIds[ef.col.toUpperCase()] = val;
+        }
+        if (val !== undefined) {
+          updates.push({ range: `${fms.sheet_name}!${ef.col.toUpperCase()}${rowIndex}`, values: [[val]] });
         }
       }
     }
@@ -3495,7 +3599,7 @@ app.post('/api/fms-tasks/:fmsId/steps/:stepId/done', requireAuth, async (req, re
       }));
     }
 
-    res.json({ success: true });
+    res.json({ success: true, generatedIds });
   } catch(err) {
     let msg = err.message || 'Unknown error';
     if (msg.includes('403')) msg = 'Access denied — sheet ko service account ke saath Editor access de';
