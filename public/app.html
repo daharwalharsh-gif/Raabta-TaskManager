@@ -4681,7 +4681,7 @@ function ftRender() {
         `<span title="Step ${s.order}: ${s.name} — ${s.state}" style="display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:3px;background:${s.state === 'done' ? '#10b981' : s.state === 'pending' ? '#e2e8f0' : '#f1f5f9'};border:${s.state === 'na' ? '1px dashed #cbd5e1' : 'none'}"></span>`
       ).join('');
       return `<tr onclick="ftOpenDetail(${r.sheetRow})" style="cursor:pointer;${r.complete ? 'background:#f0fdf4' : ''}" title="Click for full details">
-        ${cols.map(c => `<td style="white-space:nowrap">${r.data[c] || '—'}</td>`).join('')}
+        ${cols.map(c => `<td style="white-space:nowrap">${fmsLinkify(r.data[c])}</td>`).join('')}
         <td style="white-space:nowrap">${dots}<div style="font-size:10px;color:#64748b;margin-top:2px">${r.doneCount}/${r.applicable} · ${pct}%</div></td>
         <td>${r.currentStep
           ? `<span style="font-weight:600">Step ${r.currentStep.order}</span> — ${r.currentStep.name}`
@@ -4739,7 +4739,7 @@ function ftOpenDetail(sheetRow) {
     </div>
     ${info.length ? `<div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.3px;margin-bottom:6px">Entry Details</div>
     <div style="display:grid;grid-template-columns:150px 1fr;gap:6px 12px;font-size:13px;margin-bottom:16px">
-      ${info.map(([k, v]) => `<div style="color:#64748b">${k}</div><div style="color:#1e293b;font-weight:500">${v}</div>`).join('')}
+      ${info.map(([k, v]) => `<div style="color:#64748b">${k}</div><div style="color:#1e293b;font-weight:500">${fmsLinkify(v)}</div>`).join('')}
     </div>` : ''}
     <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px">Step Journey</div>
     ${(r.steps || []).map(stepRow).join('')}`;
@@ -6622,7 +6622,8 @@ async function openEditFMS() {
         uid_prefix:       r.uid_prefix || 'UQ',
         uid_pad:          r.uid_pad || 3,
         sub_multi:        r.sub_multi || 0,
-        allow_other:      r.allow_other || 0
+        allow_other:      r.allow_other || 0,
+        required:         r.required === 0 ? 0 : 1
       })),
       showCols:       Array.isArray(s.showCols) ? s.showCols : [],
       delayReasonCol: s.delayReasonCol || s.delay_reason_col || '',
@@ -6705,7 +6706,7 @@ async function saveEditFMS() {
   const r = await api(`/api/fms/${fmsActiveId}`,'PUT',{
     fmsName: fmsName || sheetName,
     sheetName, sheetId, headerRow,
-    steps: fmsSteps.map(s=>({...s, showCols:s.showCols||[], delayReasonCol:s.delayReasonCol||'', doerNameCol:s.doerNameCol||s.doer_name_col||'', extraRows:(s.extraRows||[]).map(r=>({...r,dropdown_options:r.dropdown_options||'',sub_options:r.sub_options||'',sub_col_letter:r.sub_col_letter||'',uid_prefix:r.uid_prefix||'UQ',uid_pad:r.uid_pad||3,sub_multi:r.sub_multi||0,allow_other:r.allow_other||0}))}))
+    steps: fmsSteps.map(s=>({...s, showCols:s.showCols||[], delayReasonCol:s.delayReasonCol||'', doerNameCol:s.doerNameCol||s.doer_name_col||'', extraRows:(s.extraRows||[]).map(r=>({...r,dropdown_options:r.dropdown_options||'',sub_options:r.sub_options||'',sub_col_letter:r.sub_col_letter||'',uid_prefix:r.uid_prefix||'UQ',uid_pad:r.uid_pad||3,sub_multi:r.sub_multi||0,allow_other:r.allow_other||0,required:r.required===0?0:1}))}))
   });
   if (r.error) { err.textContent=r.error; err.style.display='block'; return; }
 
@@ -6979,6 +6980,12 @@ function buildStepBoxHTML(idx) {
           ${ftSel}
         </div>
         <div style="display:flex;align-items:flex-end">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;cursor:pointer;margin-bottom:6px">
+            <input type="checkbox" ${r.required === 0 ? '' : 'checked'}
+              onchange="fmsSteps[${idx}].extraRows[${ri}].required = this.checked ? 1 : 0"
+              style="width:14px;height:14px;accent-color:#10b981;cursor:pointer"/>
+            <span><b>Required</b> — bharna zaroori</span>
+          </label>
           <button class="action-btn delete" style="padding:5px 14px;width:100%" onclick="removeFMSExtraRow(${idx},${ri})">✕ Remove</button>
         </div>
       </div>
@@ -7128,7 +7135,7 @@ function toggleFMSExtra(idx, val) {
 function addFMSExtraRow(idx) {
   if (!fmsSteps[idx].extraRows) fmsSteps[idx].extraRows=[];
   fmsFlushExtraRows(idx);   // re-render se pehle DOM ka data bacha lo
-  fmsSteps[idx].extraRows.push({col_letter:'', field_type:'text', label:'', dropdown_options:'', sub_options:'', sub_col_letter:'', uid_prefix:'UQ', uid_pad:3, sub_multi:0, allow_other:0});
+  fmsSteps[idx].extraRows.push({col_letter:'', field_type:'text', label:'', dropdown_options:'', sub_options:'', sub_col_letter:'', uid_prefix:'UQ', uid_pad:3, sub_multi:0, allow_other:0, required:1});
   refreshStepBox(idx);
   setupMultiSelect(idx);
   updateFMSDoerTags(idx);
@@ -7178,6 +7185,12 @@ function buildExtraRowHTML(idx, ri, headers) {
         ${ftSel}
       </div>
       <div style="display:flex;align-items:flex-end">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;cursor:pointer;margin-bottom:6px">
+          <input type="checkbox" ${r.required === 0 ? '' : 'checked'}
+            onchange="fmsSteps[${idx}].extraRows[${ri}].required = this.checked ? 1 : 0"
+            style="width:14px;height:14px;accent-color:#10b981;cursor:pointer"/>
+          <span><b>Required</b> — bharna zaroori</span>
+        </label>
         <button class="action-btn delete" style="padding:5px 14px;width:100%" onclick="removeFMSExtraRow(${idx},${ri})">✕ Remove</button>
       </div>
     </div>
@@ -7529,7 +7542,7 @@ async function saveFMS() {
     sheetId: fmsData.sheetId,
     headerRow: fmsData.headerRow,
     totalSteps: fmsSteps.length,
-    steps: fmsSteps.map(s=>({...s, showCols: s.showCols||[], delayReasonCol: s.delayReasonCol||'', doerNameCol: s.doerNameCol||s.doer_name_col||'', extraRows: (s.extraRows||[]).map(r=>({...r, dropdown_options: r.dropdown_options||'', sub_options: r.sub_options||'', sub_col_letter: r.sub_col_letter||'', uid_prefix: r.uid_prefix||'UQ', uid_pad: r.uid_pad||3, sub_multi: r.sub_multi||0, allow_other: r.allow_other||0}))}))
+    steps: fmsSteps.map(s=>({...s, showCols: s.showCols||[], delayReasonCol: s.delayReasonCol||'', doerNameCol: s.doerNameCol||s.doer_name_col||'', extraRows: (s.extraRows||[]).map(r=>({...r, dropdown_options: r.dropdown_options||'', sub_options: r.sub_options||'', sub_col_letter: r.sub_col_letter||'', uid_prefix: r.uid_prefix||'UQ', uid_pad: r.uid_pad||3, sub_multi: r.sub_multi||0, allow_other: r.allow_other||0, required: r.required===0?0:1}))}))
   };
 
   const r = await api('/api/fms', 'POST', body);
@@ -7863,6 +7876,24 @@ async function loadFMSStepRows(stepId) {
   renderFMSStepTable(stepId);
 }
 
+// Cell me link ho to clickable bana do (Drive/photo/video ke links sheet me
+// aate hain — pehle plain text dikhte the, khul hi nahi sakte the).
+// Ek cell me kai links comma se alag ho sakte hain.
+function fmsLinkify(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (!s) return '—';
+  if (!/https?:\/\//i.test(s)) return s;
+  const parts = s.split(/[,\s]+/).filter(Boolean);
+  const links = parts.filter(p => /^https?:\/\//i.test(p));
+  if (!links.length) return s;
+  return links.map((u, i) => {
+    const drive = /drive\.google\.com|docs\.google\.com/i.test(u);
+    const label = links.length > 1 ? `${drive ? '📎 Open' : '🔗 Open'} ${i + 1}` : (drive ? '📎 Open file' : '🔗 Open link');
+    return `<a href="${u}" target="_blank" rel="noopener" onclick="event.stopPropagation()"
+      style="display:inline-block;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:6px;padding:2px 8px;font-size:12px;font-weight:600;text-decoration:none;margin:1px 3px 1px 0">${label}</a>`;
+  }).join('');
+}
+
 function renderFMSStepTable(stepId) {
   const cont = document.getElementById(`fmsStepRows_${stepId}`);
   const st = (window._fmsStepStates || {})[stepId];
@@ -7883,7 +7914,7 @@ function renderFMSStepTable(stepId) {
           <tbody>
             ${st.rows.map((row, i) => `<tr>
               <td><button class="fms-done-btn" onclick="openFMSDoneModal(${stepId},${i})">✅ Done</button></td>
-              ${st.colKeys.map(k => `<td>${row.data[k] || '—'}</td>`).join('')}
+              ${st.colKeys.map(k => `<td>${fmsLinkify(row.data[k])}</td>`).join('')}
               <td><span class="fms-status-badge">⏳ Pending</span></td>
             </tr>`).join('')}
           </tbody>
@@ -7909,7 +7940,7 @@ function openFMSDoneModal(stepId, rowIdx) {
   // Show row data
   const colKeys = Object.keys(row.data);
   document.getElementById('fmsDoneRowPreview').innerHTML = colKeys.map(k =>
-    `<div style="display:flex;gap:8px;margin-bottom:4px"><span style="font-size:11px;font-weight:600;color:#64748b;min-width:120px;flex-shrink:0">${k}</span><span style="color:#1e293b">${row.data[k]||'—'}</span></div>`
+    `<div style="display:flex;gap:8px;margin-bottom:4px"><span style="font-size:11px;font-weight:600;color:#64748b;min-width:120px;flex-shrink:0">${k}</span><span style="color:#1e293b">${fmsLinkify(row.data[k])}</span></div>`
   ).join('');
 
   // Set plan display
@@ -7987,8 +8018,9 @@ function openFMSDoneModal(stepId, rowIdx) {
         default:
           inputHtml = `<input type="text" id="fmsExtra_${i}" placeholder="Enter value..." style="${inputStyle}"/>`;
       }
+      const req = r.required !== 0;
       return `<div style="margin-bottom:12px">
-        <label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px">${label} <span style="color:#ef4444">*</span> <span style="color:#94a3b8;font-weight:400">(COL ${r.col_letter})</span></label>
+        <label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px">${label} ${req ? '<span style="color:#ef4444">*</span>' : '<span style="color:#94a3b8;font-weight:400">(optional)</span>'} <span style="color:#94a3b8;font-weight:400">(COL ${r.col_letter})</span></label>
         ${inputHtml}
       </div>`;
     }).join('');
@@ -8142,6 +8174,8 @@ async function saveFMSDone() {
     const label = r.label || r.row_label || r.col_letter || `Field ${i+1}`;
     const isFile = ['image', 'pdf', 'video'].includes(r.field_type);
     const { value: val, sub, subOpen } = fmsReadExtra(i, r);
+    const isRequired = r.required !== 0;   // default: required (purana behaviour)
+    if (!val && !isRequired) continue;     // optional field khali chhod sakte hain
     if (!val) {
       // "Other" chuna par likha kuch nahi — us text box par ishara karo
       const otherEl = document.getElementById(`fmsExtraOther_${i}`);
