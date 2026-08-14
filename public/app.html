@@ -7244,24 +7244,17 @@ function buildDropdownOptionsHTML(idx, ri, r) {
       <textarea id="fmsDropSub_${idx}_${ri}" rows="3" placeholder="${_esc(hint)}"
         oninput="fmsSteps[${idx}].extraRows[${ri}].sub_options=this.value"
         style="width:100%;padding:7px 10px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:12px;font-family:'Inter',sans-serif;outline:none;resize:vertical;box-sizing:border-box">${subs}</textarea>
-      <label style="display:flex;align-items:center;gap:6px;margin-top:7px;font-size:12px;color:#374151;cursor:pointer">
-        <input type="checkbox" ${r.sub_multi == 1 ? 'checked' : ''}
-          onchange="fmsSteps[${idx}].extraRows[${ri}].sub_multi = this.checked ? 1 : 0"
-          style="width:14px;height:14px;accent-color:#10b981;cursor:pointer"/>
-        <span><b>Multiple select</b> — doer ek se zyada sub-options chun sake</span>
-      </label>
       <div style="margin-top:6px">
         <label style="font-size:10px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.3px">Save sub-answer in</label>
         ${subColSel}
       </div>
     </div>
 
-    <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;color:#374151;cursor:pointer">
-      <input type="checkbox" ${r.allow_other == 1 ? 'checked' : ''}
-        onchange="fmsSteps[${idx}].extraRows[${ri}].allow_other = this.checked ? 1 : 0"
-        style="width:14px;height:14px;accent-color:#10b981;cursor:pointer"/>
-      <span><b>Allow manual entry</b> — list ke alawa doer khud kuch likh sake ("Other…")</span>
-    </label>
+    <div style="margin-top:8px;font-size:11px;color:#16a34a;background:#f0fdf4;border-radius:7px;padding:7px 10px;line-height:1.5">
+      ✅ Har dropdown aur sub-dropdown me ye hamesha milta hai:
+      <b>☑ tick box se ek se zyada chunna</b> aur <b>➕ Other — khud type karna</b>.
+      Alag se kuch on karne ki zaroorat nahi.
+    </div>
   </div>`;
 }
 
@@ -7956,13 +7949,13 @@ function openFMSDoneModal(stepId, rowIdx) {
           const optionsList = rawOpts.length
             ? rawOpts.map(o => `<option value="${o}">${o}</option>`).join('')
             : '<option value="">-- No options configured --</option>';
-          const allowOther = r.allow_other == 1;
+          // "Other" har dropdown me hota hai — alag se on karne ki zaroorat nahi
           const hasSub = Object.keys(fmsParseSubOptions(r.sub_options)).length > 0;
           inputHtml = `<select id="fmsExtra_${i}" onchange="onFMSDropChange(${i})" style="${inputStyle};background:#fff">
               <option value="">-- Select --</option>${optionsList}
-              ${allowOther ? '<option value="__OTHER__">➕ Other (type manually)</option>' : ''}
-            </select>`
-            + (allowOther ? `<input type="text" id="fmsExtraOther_${i}" placeholder="Type your answer…" style="${inputStyle};display:none;margin-top:6px"/>` : '')
+              <option value="__OTHER__">➕ Other (type manually)</option>
+            </select>
+            <input type="text" id="fmsExtraOther_${i}" placeholder="Type your answer…" style="${inputStyle};display:none;margin-top:6px"/>`
             + (hasSub ? `<div id="fmsSubWrap_${i}" style="display:none;margin-top:8px;padding-left:12px;border-left:3px solid #c7d2fe">
                  <label style="font-size:11px;font-weight:600;color:#64748b;display:block;margin-bottom:4px">↳ <span id="fmsSubLabel_${i}">Sub option</span> <span style="color:#ef4444">*</span></label>
                  <div id="fmsSubBox_${i}"></div>
@@ -8038,36 +8031,15 @@ function onFMSDropChange(i) {
   if (!subs.length) { wrap.style.display = 'none'; box.innerHTML = ''; return; }
 
   const style = 'width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:\'Inter\',sans-serif;outline:none;box-sizing:border-box';
-  const allowOther = r.allow_other == 1;
-  if (r.sub_multi == 1) {
-    // Multiple select — checkboxes
-    document.getElementById(`fmsSubLabel_${i}`).textContent = `${picked} — select one or more`;
-    box.innerHTML = `<div id="fmsSubList_${i}" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:6px 10px;background:#fff;max-height:170px;overflow-y:auto">
-        ${subs.map((o, k) => `<label style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px;cursor:pointer">
-          <input type="checkbox" value="${o}" data-sub="${i}" style="width:15px;height:15px;accent-color:#10b981;cursor:pointer"/> ${o}
-        </label>`).join('')}
-      </div>
-      ${allowOther ? `<input type="text" id="fmsSubOther_${i}" placeholder="➕ Other (type manually)" style="${style};margin-top:6px"/>` : ''}`;
-  } else {
-    // Ek hi chunna hai — normal dropdown
-    document.getElementById(`fmsSubLabel_${i}`).textContent = `${picked} — select one`;
-    box.innerHTML = `<select id="fmsExtraSub_${i}" onchange="onFMSSubOther(${i})" style="${style};background:#fff">
-        <option value="">-- Select --</option>${subs.map(o => `<option value="${o}">${o}</option>`).join('')}
-        ${allowOther ? '<option value="__OTHER__">➕ Other (type manually)</option>' : ''}
-      </select>
-      ${allowOther ? `<input type="text" id="fmsSubOther_${i}" placeholder="Type your answer…" style="${style};display:none;margin-top:6px"/>` : ''}`;
-  }
+  // Sub-dropdown hamesha tick box (ek chahiye to ek hi tick karo) + Other
+  document.getElementById(`fmsSubLabel_${i}`).textContent = `${picked} — tick one or more`;
+  box.innerHTML = `<div id="fmsSubList_${i}" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:6px 10px;background:#fff;max-height:170px;overflow-y:auto">
+      ${subs.map(o => `<label style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px;cursor:pointer">
+        <input type="checkbox" value="${o}" data-sub="${i}" style="width:15px;height:15px;accent-color:#10b981;cursor:pointer"/> ${o}
+      </label>`).join('')}
+    </div>
+    <input type="text" id="fmsSubOther_${i}" placeholder="➕ Other — yahan khud likho (optional)" style="${style};margin-top:6px"/>`;
   wrap.style.display = 'block';
-}
-
-// Sub-dropdown me "Other" chuna to text box dikhao
-function onFMSSubOther(i) {
-  const sel = document.getElementById(`fmsExtraSub_${i}`);
-  const box = document.getElementById(`fmsSubOther_${i}`);
-  if (!sel || !box) return;
-  const show = sel.value === '__OTHER__';
-  box.style.display = show ? 'block' : 'none';
-  if (show) box.focus(); else box.value = '';
 }
 
 // Is field ka asli jawab — dropdown/Other/multi-select sab sambhal kar
@@ -8078,24 +8050,16 @@ function fmsReadExtra(i, r) {
     const o = document.getElementById(`fmsExtraOther_${i}`);
     value = o ? o.value.trim() : '';
   }
+  // Sub hamesha checkbox list + apna "Other" box hota hai
   let sub = '';
   const wrap = document.getElementById(`fmsSubWrap_${i}`);
   if (wrap && wrap.style.display !== 'none') {
-    if (r && r.sub_multi == 1) {
-      const list = document.getElementById(`fmsSubList_${i}`);
-      const picked = list ? [...list.querySelectorAll('input[type=checkbox]:checked')].map(c => c.value) : [];
-      const extra = document.getElementById(`fmsSubOther_${i}`);
-      const typed = extra ? extra.value.trim() : '';
-      if (typed) picked.push(typed);
-      sub = picked.join(', ');
-    } else {
-      const ss = document.getElementById(`fmsExtraSub_${i}`);
-      sub = ss ? String(ss.value || '').trim() : '';
-      if (sub === '__OTHER__') {
-        const o = document.getElementById(`fmsSubOther_${i}`);
-        sub = o ? o.value.trim() : '';
-      }
-    }
+    const list = document.getElementById(`fmsSubList_${i}`);
+    const picked = list ? [...list.querySelectorAll('input[type=checkbox]:checked')].map(c => c.value) : [];
+    const extra = document.getElementById(`fmsSubOther_${i}`);
+    const typed = extra ? extra.value.trim() : '';
+    if (typed) picked.push(typed);
+    sub = picked.join(', ');
   }
   return { value, sub, subOpen: !!(wrap && wrap.style.display !== 'none') };
 }
@@ -8192,8 +8156,8 @@ async function saveFMSDone() {
     if (focusEl) focusEl.style.border = '1.5px solid #e2e8f0';
     // Sub khula hua hai to uska jawab bhi chahiye (multi me kam se kam ek)
     if (subOpen && !sub) {
-      bail(r.sub_multi == 1 ? `Select at least one sub-option for "${val}"` : `Select a sub-option for "${val}"`,
-        document.getElementById(`fmsExtraSub_${i}`) || document.getElementById(`fmsSubList_${i}`));
+      bail(`"${val}" ke liye kam se kam ek sub-option tick karo (ya Other me likho)`,
+        document.getElementById(`fmsSubList_${i}`) || document.getElementById(`fmsSubOther_${i}`));
       return;
     }
   }
