@@ -8204,8 +8204,12 @@ async function saveFMSDone() {
     let { value, sub: subVal } = fmsReadExtra(i, r);
     if (!r.col_letter || (value === '' && r.field_type !== 'uniqid')) return;
     if (subVal) {
-      const subCol = String(r.sub_col_letter || '').trim();
-      if (subCol) extraInputs.push({ colLetter: subCol, value: subVal });
+      const subCol = String(r.sub_col_letter || '').trim().toUpperCase();
+      const parentCol = String(r.col_letter || '').trim().toUpperCase();
+      // Sub ka column parent jaisa hi chuna ho to alag entry mat banao —
+      // ek hi cell par do updates jaate the aur baad wala pehle ko mita deta
+      // tha (sirf "Cancel" bachta tha, sub-options ud jaate the).
+      if (subCol && subCol !== parentCol) extraInputs.push({ colLetter: subCol, value: subVal });
       else value = `${value} > ${subVal}`;
     }
     // Unique ID — server ko bolo number khud banaye
@@ -8217,11 +8221,26 @@ async function saveFMSDone() {
     extraInputs.push({ colLetter: r.col_letter, value });
   });
 
+  // Safety: agar do fields galti se ek hi column par point karein to unke
+  // jawab jodo — warna sheet me sirf aakhri wala bachta hai aur baki chupchap
+  // ud jaate hain.
+  const merged = [];
+  extraInputs.forEach(e => {
+    const key = String(e.colLetter || '').trim().toUpperCase();
+    if (!key) return;
+    const prev = merged.find(m => m.colLetter === key);
+    if (!prev) { merged.push({ ...e, colLetter: key }); return; }
+    if (e.auto) { prev.auto = e.auto; prev.prefix = e.prefix; prev.pad = e.pad; return; }
+    if (prev.auto) return;                       // auto-ID wale ko mat chhedo
+    const both = [prev.value, e.value].map(v => String(v || '').trim()).filter(Boolean);
+    prev.value = both.join(' > ');
+  });
+
   const r = await api(`/api/fms-tasks/${fmsId}/steps/${stepId}/done`, 'POST', {
     rowIndex: parseInt(rowNum),
     actualValue,
     delayReason,
-    extraFields: extraInputs.map(e => ({ col: e.colLetter, value: e.value, auto: e.auto, prefix: e.prefix, pad: e.pad }))
+    extraFields: merged.map(e => ({ col: e.colLetter, value: e.value, auto: e.auto, prefix: e.prefix, pad: e.pad }))
   });
 
   saveBtn.textContent = '💾 Save to Sheet';
