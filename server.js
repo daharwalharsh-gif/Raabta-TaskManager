@@ -3424,19 +3424,35 @@ app.get('/api/fms-tasks/:fmsId/steps/:stepId/rows', requireAuth, async (req, res
         return !isDone(row[actualIdx]);
       });
 
-    // Apply showCols filter to determine which columns to show in table
-    const showColsIdx = (step.showCols || []).map(Number).filter(n => !isNaN(n));
-    const visibleHeaders = showColsIdx.length > 0
-      ? headers.filter((h, i) => showColsIdx.includes(i))
-      : headers.filter((h, i) => i !== actualIdx); // hide actual col by default
+    // Kaunse columns dikhane hain — HAMESHA column index ke saath.
+    // Pehle yahan do gadbad thi aur data galat column me dikh jaata tha:
+    //  1) header ke NAAM se index dhoondha jaata tha (headers.indexOf) — is
+    //     sheet me PLANNED/ACTUAL/STATUS jaise naam kai baar aate hain, to
+    //     hamesha PEHLE wale column ka data uth jaata tha.
+    //  2) showCols jis kram me admin ne tick kiye the usi kram me aate hain,
+    //     par headers sheet ke kram me — dono match na hon to values shift ho
+    //     kar padosi column me chali jaati thin (Cash Amount me link, waghera).
+    const showColsIdx = [...new Set((step.showCols || []).map(Number).filter(n => !isNaN(n) && n >= 0 && n < headers.length))]
+      .sort((a, b) => a - b);
+    const wantedIdx = showColsIdx.length > 0
+      ? showColsIdx
+      : headers.map((_, i) => i).filter(i => i !== actualIdx);   // actual col chhupa do
+
+    // Ek jaise naam wale columns ko alag pehchan do, warna ek doosre ko
+    // overwrite kar dete hain (data object me key ek hi banti hai)
+    const seen = {};
+    const cols = wantedIdx.map(idx => {
+      const raw = String(headers[idx] || '').trim();
+      let key = raw || `Col ${idxToColLetter(idx)}`;
+      if (seen[key]) key = `${key} (${idxToColLetter(idx)})`;
+      seen[key] = (seen[key] || 0) + 1;
+      return { key, idx };
+    });
 
     // Build response in format frontend expects: {sheetRowNumber, planValue, data:{...}}
     const rows = pending.map(({ row, sheetRow }) => {
       const data = {};
-      visibleHeaders.forEach((h, vi) => {
-        const colIdx = showColsIdx.length > 0 ? showColsIdx[vi] : headers.indexOf(h);
-        data[h || `Col_${idxToColLetter(colIdx)}`] = row[colIdx] !== undefined ? String(row[colIdx]) : '';
-      });
+      cols.forEach(c => { data[c.key] = row[c.idx] !== undefined ? String(row[c.idx]) : ''; });
       return {
         sheetRowNumber: sheetRow,
         planValue: planIdx >= 0 ? (row[planIdx] || '') : '',
@@ -3444,7 +3460,7 @@ app.get('/api/fms-tasks/:fmsId/steps/:stepId/rows', requireAuth, async (req, res
       };
     });
 
-    res.json({ rows, headers: visibleHeaders, total: rows.length, allHeaders: headers });
+    res.json({ rows, headers: cols.map(c => c.key), total: rows.length, allHeaders: headers });
   } catch(err) {
     let msg = err.message || 'Unknown error';
     if (msg.includes('403')) msg = 'Access denied — FMS sheet ko service account ke saath share karo';
@@ -3506,8 +3522,16 @@ app.get('/api/fms-tracking/:fmsId', requireAuth, async (req, res) => {
       doers: (Array.isArray(s.doers) ? s.doers : []).map(uid => userMap[String(uid)] || String(uid)).filter(Boolean)
     }));
 
-    // Row ki pehchan ke liye pehle 8 columns (Timestamp, Name, Phone, Bill…)
-    const labelCols = headers.slice(0, 8).map((h, i) => ({ name: h || `Col ${i + 1}`, idx: i }));
+    // Row ki pehchan ke liye pehle 8 columns (Timestamp, Name, Phone, Bill…).
+    // Naam ek jaise hon to unhe alag pehchan do, warna ek doosre ko overwrite
+    // kar dete hain aur data galat column me dikhta hai.
+    const seenLbl = {};
+    const labelCols = headers.slice(0, 8).map((h, i) => {
+      let name = String(h || '').trim() || `Col ${idxToColLetter(i)}`;
+      if (seenLbl[name]) name = `${name} (${idxToColLetter(i)})`;
+      seenLbl[name] = (seenLbl[name] || 0) + 1;
+      return { name, idx: i };
+    });
 
     const rows = [];
     dataRows.forEach((row, i) => {
