@@ -1225,7 +1225,13 @@ function whatsAppReminderScheduler() {
   setInterval(() => {
     checkAndFireDueSlots().catch(e => console.error('  WA scheduler tick error:', e.message));
   }, 60 * 1000);
-  // FMS auto-notifications — har 3 min sheet check karke naye matches par bhejo
+  // FMS auto-notifications — pehle default rules seed karo, phir har 3 min
+  // sheet check karke naye matches par bhejo
+  setTimeout(() => {
+    seedFMSNotifyRules()
+      .then(() => runFMSNotifications())
+      .catch(e => console.error('  FMS notify seed/first-run error:', e.message));
+  }, 20 * 1000);
   setInterval(() => {
     runFMSNotifications().catch(e => console.error('  FMS notify tick error:', e.message));
   }, 3 * 60 * 1000);
@@ -3705,6 +3711,44 @@ async function runFMSNotifications(force) {
     return { error: err.message };
   } finally {
     _fmsNotifyRunning = false;
+  }
+}
+
+// Pehli baar ke rules apne aap bana do — user ko UI me kuch bharna na pade.
+// Sirf tab banta hai jab wahi rule pehle se na ho, isliye restart par duplicate
+// nahi bante. Baad me user UI se edit/pause/delete kar sakta hai.
+const FMS_SEED_RULES = [
+  { fmsName: 'pms', watch_col: 'Z', match_value: 'Yes', person: 'PM',
+    phone: '9516896449', bill_col: 'D',
+    message: 'Hello {name}, ghat to be ordered — Bill No: {D}' }
+];
+
+async function seedFMSNotifyRules() {
+  try {
+    const d = await getDB();
+    const [allFms, existing] = await Promise.all([
+      d.findAll('FMS_Config').catch(() => []),
+      d.findAll('FMS_Notify_Rules').catch(() => [])
+    ]);
+    if (!allFms.length) return;
+    for (const seed of FMS_SEED_RULES) {
+      const fms = allFms.find(f => String(f.fms_name || f.sheet_name || '').toLowerCase().includes(seed.fmsName));
+      if (!fms) continue;
+      const dup = existing.some(r =>
+        String(r.fms_id) === String(fms.id) &&
+        String(r.watch_col || '').toUpperCase() === seed.watch_col &&
+        normalizePhone(r.phone) === normalizePhone(seed.phone));
+      if (dup) continue;
+      await d.insert('FMS_Notify_Rules', {
+        fms_id: String(fms.id), watch_col: seed.watch_col, match_value: seed.match_value,
+        person: seed.person, phone: seed.phone, message: seed.message,
+        bill_col: seed.bill_col, enabled: '1',
+        created_at: new Date().toISOString().replace('T', ' ').split('.')[0]
+      });
+      console.log(`  Notify rule seeded: ${fms.fms_name || fms.sheet_name} COL ${seed.watch_col}=${seed.match_value} -> ${seed.person}`);
+    }
+  } catch (e) {
+    console.error('  seedFMSNotifyRules error:', e.message);
   }
 }
 
