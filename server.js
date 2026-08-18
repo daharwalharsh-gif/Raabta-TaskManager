@@ -1149,6 +1149,51 @@ function waRequestHook(req, res, next) {
   next();
 }
 
+// ── SELF KEEP-ALIVE ──
+// Hostinger app ko tab sula deta hai jab koi HTTP request na aaye. Sote hue
+// app ka setInterval tick nahi karta, isliye 10:15 ka slot miss ho jaata tha
+// aur reminder tabhi jaata tha jab koi app khole. Isliye app KHUD ko har kuchh
+// minute me ek request bhejti hai — traffic bana rehta hai, app jaagti rehti
+// hai, aur slot apne aap chal jaata hai (kisi bahri cron ki zaroorat nahi).
+let _keepAliveUrl = null;   // diagnostic endpoint ise dikhata hai
+function selfKeepAlive() {
+  // Sirf live server par — local machine par chala to test karte waqt asli
+  // reminders chale jaate
+  if ((process.env.NODE_ENV || '').toLowerCase() !== 'production') {
+    console.log('  Self keep-alive OFF (NODE_ENV production nahi hai)');
+    return;
+  }
+  const base = String(process.env.APP_URL || '').trim().replace(/\/+$/, '').replace(/\/app$/, '');
+  if (!base) {
+    console.log('  Self keep-alive OFF — .env me APP_URL set karo (warna app so jayegi aur slot miss hoga)');
+    return;
+  }
+  const url = `${base}/api/cron/wa-reminders`;
+  _keepAliveUrl = url;
+  const EVERY_MIN = 4;   // Hostinger ~5+ min idle par sulata hai, usse pehle jagao
+
+  const ping = async () => {
+    try {
+      const r = await fetch(url, {
+        method: 'GET',
+        headers: { 'X-Keep-Alive': '1' },
+        signal: AbortSignal.timeout(20000)
+      });
+      // Sirf tab log karo jab kuch hua ho — warna logs bhar jaate hain
+      const body = await r.json().catch(() => null);
+      if (body && body.sentToday === false && body.slot) {
+        console.log(`  keep-alive: slot ${body.slot} due tha — pass chalaya`);
+      }
+    } catch (e) {
+      console.error('  keep-alive ping failed:', e.message);
+    }
+  };
+
+  setInterval(ping, EVERY_MIN * 60 * 1000);
+  setTimeout(ping, 30 * 1000);   // start hote hi ek baar (30 sec baad)
+  console.log(`  Self keep-alive ON — har ${EVERY_MIN} min: ${url}`);
+}
+
 function whatsAppReminderScheduler() {
   if (!WA.enabled) { console.log('  WhatsApp reminders disabled (WHATSAPP_ENABLED=false)'); return; }
   if (!WA.url || !WA.apiKey) {
@@ -1159,6 +1204,7 @@ function whatsAppReminderScheduler() {
   setInterval(() => {
     checkAndFireDueSlots().catch(e => console.error('  WA scheduler tick error:', e.message));
   }, 60 * 1000);
+  selfKeepAlive();   // app khud ko jagati rahegi
   console.log(`  WhatsApp reminder scheduler started (daily ${label} IST, Monday skip, catch-up till 7PM)`);
 }
 
@@ -4250,6 +4296,13 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
         notifyOnAssign: !!WA.notifyOnAssign,
         reminderTimes: waSlots().map(s => `${s.h}:${String(s.m || 0).padStart(2, '0')}`).join(' & ')
       },
+      // Self keep-alive: app khud ko jagati rehti hai — iske bina Hostinger
+      // app ko sula deta hai aur slot miss ho jaata hai
+      keepAlive: _keepAliveUrl
+        ? `ON — har 4 min self-ping (${_keepAliveUrl})`
+        : ((process.env.NODE_ENV || '').toLowerCase() !== 'production'
+            ? 'OFF — NODE_ENV production nahi hai'
+            : 'OFF — .env me APP_URL set karo, phir restart'),
       keptAlive: true
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
