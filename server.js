@@ -3718,9 +3718,21 @@ async function runFMSNotifications(force) {
 // Sirf tab banta hai jab wahi rule pehle se na ho, isliye restart par duplicate
 // nahi bante. Baad me user UI se edit/pause/delete kar sakta hai.
 const FMS_SEED_RULES = [
+  // Z = GHAT TO BE ORDERED
   { fmsName: 'pms', watch_col: 'Z', match_value: 'Yes', person: 'PM',
     phone: '9516896449', bill_col: 'D',
-    message: 'Hello {name}, ghat to be ordered — Bill No: {D}' }
+    message: 'Hello {name}, ghat to be ordered — Bill No: {D}' },
+  // AF = NATH
+  { fmsName: 'pms', watch_col: 'AF', match_value: 'Yes', person: 'Ashok Sn',
+    phone: '9868511955', bill_col: 'D',
+    message: 'Hello {name}, nath order — Bill No: {D}' },
+  // AC = CAD/ CAM REQUIRED — jiska naam likha ho usi ko jaata hai
+  { fmsName: 'pms', watch_col: 'AC', match_value: 'Jagrati', person: 'Jagrati',
+    phone: '9217566771', bill_col: 'D',
+    message: 'Hello {name}, Cad/ Cam makeing — Bill No: {D}' },
+  { fmsName: 'pms', watch_col: 'AC', match_value: 'Ravi Kant', person: 'Ravi Kant',
+    phone: '9217414222', bill_col: 'D',
+    message: 'Hello {name}, Cad/ Cam makeing — Bill No: {D}' }
 ];
 
 async function seedFMSNotifyRules() {
