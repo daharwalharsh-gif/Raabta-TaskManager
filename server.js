@@ -514,6 +514,19 @@ const MYSQL_SCHEMA = {
     to_date: "VARCHAR(40) DEFAULT ''", reason: "TEXT",
     status: "VARCHAR(20) DEFAULT 'pending'", note: "TEXT", created_at: "VARCHAR(40) DEFAULT ''"
   },
+  // FMS auto-notifications — "jab is column me ye likha ho to us bande ko
+  // WhatsApp bhejo". Rules yahan, aur kis row par bhej chuke wo Log me.
+  FMS_Notify_Rules: {
+    fms_id: "VARCHAR(20) DEFAULT ''", watch_col: "VARCHAR(10) DEFAULT ''",
+    match_value: "VARCHAR(120) DEFAULT ''", person: "VARCHAR(120) DEFAULT ''",
+    phone: "VARCHAR(30) DEFAULT ''", message: "TEXT",
+    bill_col: "VARCHAR(10) DEFAULT 'D'",
+    enabled: "VARCHAR(5) DEFAULT '1'", created_at: "VARCHAR(40) DEFAULT ''"
+  },
+  FMS_Notify_Log: {
+    rule_id: "VARCHAR(20) DEFAULT ''", sheet_row: "VARCHAR(20) DEFAULT ''",
+    phone: "VARCHAR(30) DEFAULT ''", sent_at: "VARCHAR(40) DEFAULT ''"
+  },
   // HR Reporting — biometric machine ke "Exception Statistic Report" Excel se
   // aayi attendance rows. location = store | office | karigar.
   HR_Attendance: {
@@ -1116,7 +1129,15 @@ const WA_CATCHUP_MIN = 120;   // (legacy) — ab catch-up slot-time se 7 PM tak 
 
 // Kya abhi koi slot due hai? Due ho to reminder pass chala do.
 // Interval se bhi call hota hai aur har HTTP request par bhi (throttled).
+// Automatic passes SIRF live server par. Local/dev par chalein to test karte
+// waqt asli logon ko messages chale jaate. Admin ka manual button (force=true)
+// har jagah kaam karta hai.
+function waAutoAllowed() {
+  return (process.env.NODE_ENV || '').toLowerCase() === 'production';
+}
+
 async function checkAndFireDueSlots() {
+  if (!waAutoAllowed()) return { skipped: 'not-production' };
   if (!WA.enabled || !WA.url || !WA.apiKey) return;
   const ist = new Date(Date.now() + 330 * 60000);
   if (ist.getUTCDay() === 1) return;                      // Monday skip
@@ -1204,6 +1225,10 @@ function whatsAppReminderScheduler() {
   setInterval(() => {
     checkAndFireDueSlots().catch(e => console.error('  WA scheduler tick error:', e.message));
   }, 60 * 1000);
+  // FMS auto-notifications — har 3 min sheet check karke naye matches par bhejo
+  setInterval(() => {
+    runFMSNotifications().catch(e => console.error('  FMS notify tick error:', e.message));
+  }, 3 * 60 * 1000);
   selfKeepAlive();   // app khud ko jagati rahegi
   console.log(`  WhatsApp reminder scheduler started (daily ${label} IST, Monday skip, catch-up till 7PM)`);
 }
@@ -3513,6 +3538,241 @@ app.get('/api/fms-tasks/:fmsId/steps/:stepId/rows', requireAuth, async (req, res
     if (msg.includes('404')) msg = 'Sheet not found — FMS config mein Sheet ID/Tab check karo';
     res.status(500).json({ error: msg });
   }
+});
+
+// ══════════════════════════════════════════════════════
+// FMS AUTO-NOTIFICATIONS
+// ══════════════════════════════════════════════════════
+// Rule: "jab COLUMN me ye VALUE ho, to us bande ko WhatsApp bhejo".
+// Message me {D} jaise placeholder us row ke us column ki value se badal
+// jaate hain — isliye naya rule banane ke liye code chhedna nahi padta.
+// Har row par ek hi baar jaata hai (FMS_Notify_Log se dedup).
+
+// "Hello {name}, ghat to be ordered — Bill No: {D}" -> asli values bhar do
+function fmsFillTemplate(tpl, row, person) {
+  return String(tpl || '').replace(/\{([A-Za-z]{1,3}|name)\}/g, (m, key) => {
+    if (String(key).toLowerCase() === 'name') return person || '';
+    const idx = colLetterToIdx(key);
+    if (idx < 0) return m;
+    return String(row[idx] == null ? '' : row[idx]).trim();
+  }).trim();
+}
+
+// Rule ka match. Value khali ho to "kuch bhi bhara ho" maana jaata hai.
+// Sheet me aksar poora vakya hota hai — "YES > Vendor Name, bappi ji" —
+// isliye sirf exact match kaafi nahi. Cell us value se SHURU hota ho to bhi
+// match maante hain, par sirf tab jab aage koi alag cheez ho (space, >, comma)
+// taaki "YES" wala rule "YESTERDAY" par galti se na chale.
+function fmsRuleMatches(cellRaw, matchValue) {
+  const cell = String(cellRaw == null ? '' : cellRaw).trim();
+  if (!cell || cell.toUpperCase() === 'FALSE') return false;
+  const want = String(matchValue || '').trim();
+  if (!want) return true;                                  // koi bhi value chalegi
+  const c = cell.toLowerCase(), w = want.toLowerCase();
+  if (c === w) return true;                                // bilkul wahi
+  // Poora shabd kahin bhi mile to match — "YES", "yes", "YES > Vendor Name",
+  // "(Yes)", "ok yes" sab chalenge. Par "YESTERDAY" nahi, kyunki wo alag shabd
+  // nahi hai. Regex me user ki value ke special characters escape karte hain.
+  const esc = w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(^|[^a-z0-9])${esc}([^a-z0-9]|$)`, 'i').test(c);
+}
+
+// Usi Google Sheet me "Notification Log" tab — har bheje hue message ka
+// record (bill no, kisko, kab, gaya ya nahi). Tab na ho to bana deta hai.
+const FMS_LOG_TAB = 'Notification Log';
+const FMS_LOG_HEADERS = ['Sent At (IST)', 'Bill No', 'To', 'Phone', 'Rule', 'Status', 'Message', 'Sheet Row'];
+
+async function ensureNotifyLogTab(d, spreadsheetId) {
+  try {
+    const meta = await withRetry(() => d.sheets.spreadsheets.get({
+      spreadsheetId, fields: 'sheets(properties(title))'
+    }));
+    const exists = (meta.data.sheets || []).some(s => s.properties.title === FMS_LOG_TAB);
+    if (exists) return true;
+    await withRetry(() => d.sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: { requests: [{ addSheet: { properties: { title: FMS_LOG_TAB } } }] }
+    }));
+    await withRetry(() => d.sheets.spreadsheets.values.update({
+      spreadsheetId, range: `${FMS_LOG_TAB}!A1:H1`,
+      valueInputOption: 'USER_ENTERED', requestBody: { values: [FMS_LOG_HEADERS] }
+    }));
+    return true;
+  } catch (e) {
+    console.error('  Notification Log tab banane me dikkat:', e.message);
+    return false;
+  }
+}
+
+async function appendNotifyLog(d, spreadsheetId, rows) {
+  if (!rows.length) return;
+  try {
+    await ensureNotifyLogTab(d, spreadsheetId);
+    await withRetry(() => d.sheets.spreadsheets.values.append({
+      spreadsheetId, range: `${FMS_LOG_TAB}!A:H`,
+      valueInputOption: 'USER_ENTERED', insertDataOption: 'INSERT_ROWS',
+      requestBody: { values: rows }
+    }));
+  } catch (e) {
+    console.error('  Notification Log likhne me dikkat:', e.message);
+  }
+}
+
+let _fmsNotifyRunning = false;
+async function runFMSNotifications(force) {
+  // Apne aap sirf live server par; admin ka "Abhi chala kar dekho" har jagah
+  if (!force && !waAutoAllowed()) return { skipped: 'not-production' };
+  if (!WA.enabled || !WA.url || !WA.apiKey) return { skipped: 'wa-not-configured' };
+  if (_fmsNotifyRunning) return { skipped: 'already-running' };
+  // Time ki koi rok nahi — sheet me value aate hi message jaata hai, chahe
+  // jo bhi time ho (daily reminders wala 10:15/5:00 rule ispar lagu nahi).
+
+  _fmsNotifyRunning = true;
+  try {
+    const d = await getDB();
+    const rules = (await d.findAll('FMS_Notify_Rules')).filter(r => String(r.enabled) !== '0');
+    if (!rules.length) return { rules: 0 };
+
+    const sentLog = await d.findAll('FMS_Notify_Log');
+    const already = new Set(sentLog.map(l => `${l.rule_id}|${l.sheet_row}`));
+    const byFms = {};
+    for (const r of rules) (byFms[String(r.fms_id)] = byFms[String(r.fms_id)] || []).push(r);
+
+    let sent = 0, failed = 0;
+    for (const fmsId of Object.keys(byFms)) {
+      const fmsRow = await d.findOne('FMS_Config', { id: String(fmsId) });
+      if (!fmsRow) continue;
+      const fms = parseFMSRow(fmsRow);
+      let allRows;
+      try {
+        const resp = await withRetry(() => d.sheets.spreadsheets.values.get({
+          spreadsheetId: extractSheetId(fms.sheet_id), range: `${fms.sheet_name}!A1:ZZ`
+        }));
+        allRows = resp.data.values || [];
+      } catch (e) { console.error('  FMS notify — sheet read failed:', fms.sheet_name, e.message); continue; }
+
+      const headerRow = parseInt(fms.header_row) || 1;
+      const dataRows = allRows.slice(headerRow);
+      const sheetLogRows = [];   // isi sheet ke "Notification Log" tab ke liye
+
+      for (const rule of byFms[fmsId]) {
+        const colIdx = colLetterToIdx(rule.watch_col || '');
+        if (colIdx < 0) continue;
+        const phone = normalizePhone(rule.phone);
+        if (!phone) continue;
+        const billIdx = colLetterToIdx(rule.bill_col || 'D');
+
+        for (let i = 0; i < dataRows.length; i++) {
+          const row = dataRows[i] || [];
+          const sheetRow = headerRow + i + 1;
+          if (!fmsRuleMatches(row[colIdx], rule.match_value)) continue;
+          const key = `${rule.id}|${sheetRow}`;
+          if (already.has(key)) continue;                  // is row par bhej chuke
+
+          const text = fmsFillTemplate(rule.message, row, rule.person);
+          if (!text) continue;
+          // Log PEHLE likho — bhejte waqt app restart ho jaye to bhi duplicate
+          // na jaaye (ek missed message duplicate se behtar hai)
+          already.add(key);
+          const nowIst = new Date(Date.now() + 330 * 60000).toISOString().replace('T', ' ').slice(0, 19);
+          await d.insert('FMS_Notify_Log', {
+            rule_id: String(rule.id), sheet_row: String(sheetRow), phone,
+            sent_at: nowIst
+          });
+          const r = await sendWhatsApp(phone, text);
+          const ok = !!(r && r.ok);
+          if (ok) sent++;
+          else { failed++; console.error(`  FMS notify failed — ${rule.person} (${phone}) row ${sheetRow}: ${(r && (r.error || r.status)) || 'unknown'}`); }
+          sheetLogRows.push([
+            nowIst,
+            billIdx >= 0 ? String(row[billIdx] == null ? '' : row[billIdx]).trim() : '',
+            rule.person || '',
+            phone,
+            `COL ${rule.watch_col} = ${rule.match_value || '(kuch bhi)'}`,
+            ok ? '✅ Sent' : `❌ Failed — ${(r && (r.error || r.skipped || r.status)) || 'unknown'}`,
+            text,
+            String(sheetRow)
+          ]);
+        }
+      }
+      // Sab bhejne ke baad ek hi baar sheet me likho (har message par nahi)
+      await appendNotifyLog(d, extractSheetId(fms.sheet_id), sheetLogRows);
+    }
+    if (sent || failed) console.log(`  FMS notifications: ${sent} sent, ${failed} failed`);
+    return { sent, failed, rules: rules.length };
+  } catch (err) {
+    console.error('  runFMSNotifications error:', err.message);
+    return { error: err.message };
+  } finally {
+    _fmsNotifyRunning = false;
+  }
+}
+
+// ── Rules CRUD (admin) ──
+app.get('/api/fms-notify/:fmsId', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const d = await getDB();
+    const rules = (await d.findAll('FMS_Notify_Rules'))
+      .filter(r => String(r.fms_id) === String(req.params.fmsId))
+      .map(r => ({
+        id: parseInt(r.id), watchCol: r.watch_col, matchValue: r.match_value,
+        person: r.person, phone: r.phone, message: r.message,
+        billCol: r.bill_col || 'D',
+        enabled: String(r.enabled) !== '0'
+      }));
+    const log = await d.findAll('FMS_Notify_Log');
+    const counts = {};
+    for (const l of log) counts[l.rule_id] = (counts[l.rule_id] || 0) + 1;
+    rules.forEach(r => { r.sentCount = counts[String(r.id)] || 0; });
+    res.json({ rules });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/fms-notify/:fmsId', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { watchCol, matchValue, person, phone, message, billCol } = req.body || {};
+    if (!String(watchCol || '').trim()) return res.status(400).json({ error: 'Column chahiye (jaise Z)' });
+    if (!normalizePhone(phone)) return res.status(400).json({ error: 'Sahi phone number daalo' });
+    if (!String(message || '').trim()) return res.status(400).json({ error: 'Message likho' });
+    const d = await getDB();
+    const saved = await d.insert('FMS_Notify_Rules', {
+      fms_id: String(req.params.fmsId), watch_col: String(watchCol).trim().toUpperCase(),
+      match_value: String(matchValue || '').trim(), person: String(person || '').trim(),
+      phone: String(phone).trim(), message: String(message).trim(),
+      bill_col: String(billCol || 'D').trim().toUpperCase() || 'D', enabled: '1',
+      created_at: new Date().toISOString().replace('T', ' ').split('.')[0]
+    });
+    res.json({ success: true, id: parseInt(saved.id) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/fms-notify/rule/:id', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const d = await getDB();
+    const upd = {};
+    if (req.body.enabled !== undefined) upd.enabled = req.body.enabled ? '1' : '0';
+    ['watchCol', 'matchValue', 'person', 'phone', 'message', 'billCol'].forEach(k => {
+      if (req.body[k] === undefined) return;
+      const col = { watchCol: 'watch_col', matchValue: 'match_value', person: 'person', phone: 'phone', message: 'message', billCol: 'bill_col' }[k];
+      upd[col] = (k === 'watchCol' || k === 'billCol') ? String(req.body[k]).trim().toUpperCase() : String(req.body[k]).trim();
+    });
+    if (Object.keys(upd).length) await d.update('FMS_Notify_Rules', req.params.id, upd);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/fms-notify/rule/:id', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const d = await getDB();
+    await d.delete('FMS_Notify_Rules', req.params.id);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Abhi chala kar dekho (admin) — kitne gaye, kitne fail
+app.post('/api/fms-notify/run', requireAuth, requireAdmin, async (req, res) => {
+  const r = await runFMSNotifications(true);   // manual — dev par bhi chale
+  res.json(r || {});
 });
 
 // GET /api/fms-tracking/:fmsId — har data row ka poora safar: kaunse step tak

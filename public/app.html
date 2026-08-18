@@ -1208,6 +1208,45 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       <button class="btn btn-outline btn-sm" onclick="ftClearFilters()">✕ Clear Filters</button>
     </div>
 
+    <!-- Auto WhatsApp notifications — "jab is column me ye ho to us bande ko bhejo" -->
+    <div id="ftNotifyCard" style="display:none;background:#fff;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:16px;overflow:hidden">
+      <div onclick="ftToggleNotify()" style="padding:12px 18px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;background:#f8fafc">
+        <div style="font-size:14px;font-weight:700;color:#1e293b">🔔 Auto WhatsApp Notifications <span id="ftNotifyCount" style="font-size:11px;font-weight:600;color:#64748b"></span></div>
+        <span id="ftNotifyArrow" style="color:#64748b">▶</span>
+      </div>
+      <div id="ftNotifyBody" style="display:none;padding:14px 18px;border-top:1px solid #f1f5f9">
+        <div style="font-size:12px;color:#64748b;margin-bottom:12px">
+          Rule banao: <b>jab kisi column me koi value aaye, to us bande ko WhatsApp chala jaye</b>.
+          Message me <code style="background:#f1f5f9;padding:1px 5px;border-radius:4px">{D}</code> jaisa likho to us row ke column D ki value apne aap bhar jayegi
+          (<code style="background:#f1f5f9;padding:1px 5px;border-radius:4px">{name}</code> = bande ka naam). Har row par message ek hi baar jaata hai.
+        </div>
+        <div id="ftNotifyList" style="margin-bottom:12px"></div>
+        <div style="background:#f8fafc;border:1px dashed #cbd5e1;border-radius:10px;padding:12px">
+          <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:8px">➕ Naya Rule</div>
+          <div style="display:grid;grid-template-columns:80px 1fr 1fr 130px 90px;gap:8px;margin-bottom:8px">
+            <div><div style="font-size:10px;font-weight:600;color:#94a3b8;margin-bottom:2px">COLUMN</div>
+              <input type="text" id="ftnCol" placeholder="Z" maxlength="3" style="width:100%;padding:7px 9px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:13px;outline:none;box-sizing:border-box;text-transform:uppercase"/></div>
+            <div><div style="font-size:10px;font-weight:600;color:#94a3b8;margin-bottom:2px">VALUE (khali = kuch bhi bhara ho)</div>
+              <input type="text" id="ftnVal" placeholder="Yes" style="width:100%;padding:7px 9px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:13px;outline:none;box-sizing:border-box"/></div>
+            <div><div style="font-size:10px;font-weight:600;color:#94a3b8;margin-bottom:2px">KISKO — NAAM</div>
+              <input type="text" id="ftnPerson" placeholder="PM" style="width:100%;padding:7px 9px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:13px;outline:none;box-sizing:border-box"/></div>
+            <div><div style="font-size:10px;font-weight:600;color:#94a3b8;margin-bottom:2px">PHONE</div>
+              <input type="text" id="ftnPhone" placeholder="9516896449" style="width:100%;padding:7px 9px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:13px;outline:none;box-sizing:border-box"/></div>
+            <div><div style="font-size:10px;font-weight:600;color:#94a3b8;margin-bottom:2px">BILL COL</div>
+              <input type="text" id="ftnBill" value="D" maxlength="3" title="Log me kaunsa column Bill No ke roop me likhna hai" style="width:100%;padding:7px 9px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:13px;outline:none;box-sizing:border-box;text-transform:uppercase"/></div>
+          </div>
+          <div style="font-size:10px;font-weight:600;color:#94a3b8;margin-bottom:2px">MESSAGE</div>
+          <textarea id="ftnMsg" rows="2" placeholder="Hello {name}, ghat to be ordered — Bill No: {D}"
+            style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:13px;font-family:'Inter',sans-serif;outline:none;resize:vertical;box-sizing:border-box"></textarea>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+            <button class="btn btn-primary btn-sm" onclick="ftAddNotify()">➕ Add Rule</button>
+            <button class="btn btn-outline btn-sm" onclick="ftRunNotify()">▶ Abhi chala kar dekho</button>
+            <span id="ftnStatus" style="font-size:12px;color:#64748b"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div style="margin-bottom:14px">
       <input type="search" id="ftSearch" oninput="ftRender()" placeholder="🔍 Search anything — client name, phone, bill no, step, doer…"
         autocomplete="off" style="width:100%;padding:11px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:14px;font-family:'Inter',sans-serif;outline:none;box-sizing:border-box;background:#fff"/>
@@ -4583,6 +4622,12 @@ async function ftFetch() {
     return;
   }
   _ftData = r;
+  // Notification rules ka card sirf admin ko
+  const nCard = document.getElementById('ftNotifyCard');
+  if (nCard) {
+    nCard.style.display = ME.role === 'admin' ? 'block' : 'none';
+    if (ME.role === 'admin' && document.getElementById('ftNotifyBody').style.display !== 'none') ftLoadNotify();
+  }
   // Doer aur Step ke filter isi data se bhar dete hain
   const doers = [...new Set((r.steps || []).flatMap(s => s.doers))].sort((a, b) => a.localeCompare(b));
   const dSel = document.getElementById('ftDoer'), keepD = dSel.value;
@@ -4707,6 +4752,89 @@ function ftRender() {
   foot.textContent = `${rows.length} of ${all.length} entries` +
     (_ftView !== 'all' ? ` · showing ${_ftView === 'done' ? 'completed' : 'in progress'}` : '') +
     (q ? ` · search "${q}"` : '');
+}
+
+// ── Auto WhatsApp notification rules ──
+function ftToggleNotify() {
+  const body = document.getElementById('ftNotifyBody');
+  const open = body.style.display === 'none';
+  body.style.display = open ? 'block' : 'none';
+  document.getElementById('ftNotifyArrow').textContent = open ? '▼' : '▶';
+  if (open) ftLoadNotify();
+}
+
+async function ftLoadNotify() {
+  const id = document.getElementById('ftFms').value;
+  const list = document.getElementById('ftNotifyList');
+  if (!id) { list.innerHTML = '<div style="font-size:12px;color:#94a3b8">Pehle upar se FMS chuno</div>'; return; }
+  list.innerHTML = '<div style="font-size:12px;color:#94a3b8">⏳ Loading…</div>';
+  const r = await api(`/api/fms-notify/${id}`);
+  if (r && r.error) { list.innerHTML = `<div style="font-size:12px;color:#ef4444">⚠️ ${r.error}</div>`; return; }
+  const rules = (r && r.rules) || [];
+  document.getElementById('ftNotifyCount').textContent = rules.length ? `· ${rules.length} rule(s)` : '· koi rule nahi';
+  if (!rules.length) { list.innerHTML = '<div style="font-size:12px;color:#94a3b8">Abhi koi rule nahi — neeche se banao</div>'; return; }
+  list.innerHTML = `<table style="width:100%;font-size:12.5px">
+    <thead><tr style="text-align:left;color:#94a3b8;font-size:10px;text-transform:uppercase">
+      <th style="padding:4px">When</th><th style="padding:4px">Kisko</th><th style="padding:4px">Message</th><th style="padding:4px">Sent</th><th style="padding:4px"></th>
+    </tr></thead>
+    <tbody>${rules.map(x => `<tr style="border-top:1px solid #f1f5f9;${x.enabled ? '' : 'opacity:.5'}">
+      <td style="padding:6px 4px;white-space:nowrap"><b>COL ${x.watchCol}</b> = ${x.matchValue || '<i>kuch bhi</i>'}</td>
+      <td style="padding:6px 4px;white-space:nowrap">${x.person || '—'}<br><span style="color:#94a3b8;font-size:11px">${x.phone}</span></td>
+      <td style="padding:6px 4px;color:#475569">${x.message}</td>
+      <td style="padding:6px 4px;color:#64748b">${x.sentCount}</td>
+      <td style="padding:6px 4px;white-space:nowrap">
+        <button class="action-btn" style="padding:3px 8px;font-size:11px;background:${x.enabled ? '#fef3c7' : '#dcfce7'};color:${x.enabled ? '#92400e' : '#15803d'}"
+          onclick="ftToggleRule(${x.id},${x.enabled ? 0 : 1})">${x.enabled ? 'Pause' : 'Resume'}</button>
+        <button class="action-btn delete" style="padding:3px 8px;font-size:11px;margin-left:4px" onclick="ftDeleteRule(${x.id})">🗑</button>
+      </td></tr>`).join('')}</tbody></table>`;
+}
+
+async function ftAddNotify() {
+  const id = document.getElementById('ftFms').value;
+  const status = document.getElementById('ftnStatus');
+  if (!id) { showToast('Pehle upar se FMS chuno', 'error'); return; }
+  const body = {
+    watchCol: document.getElementById('ftnCol').value.trim(),
+    matchValue: document.getElementById('ftnVal').value.trim(),
+    person: document.getElementById('ftnPerson').value.trim(),
+    phone: document.getElementById('ftnPhone').value.trim(),
+    message: document.getElementById('ftnMsg').value.trim(),
+    billCol: document.getElementById('ftnBill').value.trim() || 'D'
+  };
+  status.textContent = '⏳ Saving…';
+  const r = await api(`/api/fms-notify/${id}`, 'POST', body);
+  if (r && r.error) { status.innerHTML = `<span style="color:#ef4444">⚠️ ${r.error}</span>`; return; }
+  status.innerHTML = '<span style="color:#16a34a">✅ Rule add ho gaya</span>';
+  ['ftnCol', 'ftnVal', 'ftnPerson', 'ftnPhone', 'ftnMsg'].forEach(k => document.getElementById(k).value = '');
+  document.getElementById('ftnBill').value = 'D';
+  ftLoadNotify();
+}
+
+async function ftToggleRule(ruleId, enable) {
+  const r = await api(`/api/fms-notify/rule/${ruleId}`, 'PUT', { enabled: !!enable });
+  if (r && r.error) { showToast('Failed: ' + r.error, 'error'); return; }
+  ftLoadNotify();
+}
+
+async function ftDeleteRule(ruleId) {
+  if (!confirm('Ye rule delete karein? Aage se is condition par message nahi jayega.')) return;
+  const r = await api(`/api/fms-notify/rule/${ruleId}`, 'DELETE');
+  if (r && r.error) { showToast('Failed: ' + r.error, 'error'); return; }
+  showToast('🗑 Rule delete ho gaya');
+  ftLoadNotify();
+}
+
+async function ftRunNotify() {
+  const status = document.getElementById('ftnStatus');
+  status.textContent = '⏳ Sheet check kar rahe hain…';
+  const r = await api('/api/fms-notify/run', 'POST');
+  if (r && r.error) { status.innerHTML = `<span style="color:#ef4444">⚠️ ${r.error}</span>`; return; }
+  if (r && r.skipped) {
+    status.innerHTML = `<span style="color:#d97706">Nahi chala: ${r.skipped === 'wa-not-configured' ? 'WhatsApp API set nahi hai' : r.skipped}</span>`;
+    return;
+  }
+  status.innerHTML = `<span style="color:#16a34a">✅ ${r.sent || 0} message bheje${r.failed ? `, ${r.failed} fail` : ''}</span>`;
+  ftLoadNotify();
 }
 
 // Kisi bhi row par click — us entry ki poori detail + step-by-step safar
