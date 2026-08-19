@@ -522,6 +522,7 @@ const MYSQL_SCHEMA = {
     kind: "VARCHAR(30) DEFAULT ''", ref: "VARCHAR(60) DEFAULT ''",
     person: "VARCHAR(120) DEFAULT ''", status: "VARCHAR(20) DEFAULT 'pending'",
     attempts: "VARCHAR(10) DEFAULT '0'", last_error: "TEXT",
+    revivals: "VARCHAR(10) DEFAULT '0'",
     created_at: "VARCHAR(40) DEFAULT ''", sent_at: "VARCHAR(40) DEFAULT ''"
   },
   // FMS auto-notifications — "jab is column me ye likha ho to us bande ko
@@ -987,6 +988,42 @@ async function sendNowThenSettle(d, row) {
   await d.update('WA_Outbox', row.id, patch).catch(() => {});
 }
 
+// Jo message koshish poori karke 'failed' ho gaye — Harsh ka niyam hai ki
+// message kuch bhi ho jaye jana chahiye. Aumpfy aksar thodi der ke liye
+// baith jaata hai (502 / timeout), phir theek ho jaata hai. Isliye failed
+// message ko thodi-thodi der baad phir mauka dete hain — har mauke me EK
+// koshish, zyada se zyada 3 mauke. Na message chhootta hai, na kisi ko 10
+// copy milti hain.
+const WA_OUTBOX_MAX_REVIVALS = 3;
+async function reviveFailedOutbox() {
+  try {
+    if (!WA.enabled || !WA.url || !WA.apiKey) return { skipped: 'wa-not-configured' };
+    const d = await getDB();
+    const rows = await d.findAll('WA_Outbox');
+    const dayAgo = new Date(Date.now() - 24 * 3600 * 1000).toISOString().replace('T', ' ').split('.')[0];
+    let revived = 0;
+    for (const r of rows) {
+      if (r.status !== 'failed') continue;
+      if (String(r.created_at || '') < dayAgo) continue;        // 24 ghante purana — ab rehne do
+      const n = parseInt(r.revivals) || 0;
+      if (n >= WA_OUTBOX_MAX_REVIVALS) continue;
+      // attempts MAX-1 par — yaani is mauke me theek EK koshish milegi
+      await d.update('WA_Outbox', r.id, {
+        status: 'pending', attempts: String(WA_OUTBOX_MAX_ATTEMPTS - 1), revivals: String(n + 1)
+      }).catch(() => {});
+      revived++;
+    }
+    if (revived) {
+      console.log(`  WA outbox: ${revived} fail hue message ko phir mauka`);
+      drainWhatsAppOutbox().catch(() => {});
+    }
+    return { revived };
+  } catch (e) {
+    console.error('  reviveFailedOutbox error:', e.message);
+    return { error: e.message };
+  }
+}
+
 let _outboxRunning = false;
 let _outboxLastError = '';   // aakhri wajah — bina login diagnose ke liye
 async function drainWhatsAppOutbox() {
@@ -1380,6 +1417,13 @@ function whatsAppReminderScheduler() {
     // hota hai — isliye kisi ko message chhutta nahi
     drainWhatsAppOutbox().catch(e => console.error('  WA outbox tick error:', e.message));
   }, 60 * 1000);
+
+  // Har 20 min: jo fail ho gaye the unhe phir mauka — tab tak Aumpfy aksar
+  // theek ho chuka hota hai. Harsh ko koi button nahi dabana padta.
+  setInterval(() => {
+    reviveFailedOutbox().catch(e => console.error('  WA revive tick error:', e.message));
+  }, 20 * 60 * 1000);
+  setTimeout(() => reviveFailedOutbox().catch(() => {}), 90 * 1000);
   // FMS auto-notifications — pehle default rules seed karo, phir har 3 min
   // sheet check karke naye matches par bhejo
   setTimeout(() => {
