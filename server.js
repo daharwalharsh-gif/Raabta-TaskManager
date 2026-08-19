@@ -521,6 +521,7 @@ const MYSQL_SCHEMA = {
     match_value: "VARCHAR(120) DEFAULT ''", person: "VARCHAR(120) DEFAULT ''",
     phone: "VARCHAR(30) DEFAULT ''", message: "TEXT",
     bill_col: "VARCHAR(10) DEFAULT 'D'",
+    person_col: "VARCHAR(10) DEFAULT ''",
     enabled: "VARCHAR(5) DEFAULT '1'", created_at: "VARCHAR(40) DEFAULT ''"
   },
   FMS_Notify_Log: {
@@ -3574,13 +3575,16 @@ function fmsRuleMatches(cellRaw, matchValue) {
   if (!cell || cell.toUpperCase() === 'FALSE') return false;
   const want = String(matchValue || '').trim();
   if (!want) return true;                                  // koi bhi value chalegi
-  const c = cell.toLowerCase(), w = want.toLowerCase();
-  if (c === w) return true;                                // bilkul wahi
-  // Poora shabd kahin bhi mile to match — "YES", "yes", "YES > Vendor Name",
-  // "(Yes)", "ok yes" sab chalenge. Par "YESTERDAY" nahi, kyunki wo alag shabd
-  // nahi hai. Regex me user ki value ke special characters escape karte hain.
-  const esc = w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`(^|[^a-z0-9])${esc}([^a-z0-9]|$)`, 'i').test(c);
+  const c = cell.toLowerCase();
+  // "Kavita|yes" jaisa likho to in me se koi bhi mile to match
+  return want.split('|').map(x => x.trim()).filter(Boolean).some(one => {
+    const w = one.toLowerCase();
+    if (c === w) return true;                              // bilkul wahi
+    // Poora shabd kahin bhi mile to match — "YES", "YES > Vendor Name",
+    // "(Yes)", "ok yes" sab chalenge. Par "YESTERDAY" nahi (alag shabd hai).
+    const esc = w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(^|[^a-z0-9])${esc}([^a-z0-9]|$)`, 'i').test(c);
+  });
 }
 
 // Usi Google Sheet me "Notification Log" tab — har bheje hue message ka
@@ -3686,10 +3690,11 @@ async function runFMSNotifications(force) {
       for (const rule of byFms[fmsId]) {
         const colIdx = colLetterToIdx(rule.watch_col || '');
         if (colIdx < 0) continue;
-        // Sheet me naam mile to wahi number, warna rule me saved number
-        const phone = dir[String(rule.person || '').trim().toLowerCase()] || normalizePhone(rule.phone);
-        if (!phone) continue;
         const billIdx = colLetterToIdx(rule.bill_col || 'D');
+        // person_col set ho to har row me alag banda — us column me jiska naam
+        // likha hoga usi ko message jayega (jaise beads wala: AB me Mona/Monu/
+        // Shivam me se jo bhi likha ho). Warna rule ka fixed person.
+        const personIdx = colLetterToIdx(rule.person_col || '');
 
         for (let i = 0; i < dataRows.length; i++) {
           const row = dataRows[i] || [];
@@ -3698,7 +3703,16 @@ async function runFMSNotifications(force) {
           const key = `${rule.id}|${sheetRow}`;
           if (already.has(key)) continue;                  // is row par bhej chuke
 
-          const text = fmsFillTemplate(rule.message, row, rule.person);
+          const person = personIdx >= 0
+            ? String(row[personIdx] || '').trim()
+            : String(rule.person || '').trim();
+          if (!person) continue;                           // kiska naam hi nahi
+          // Number hamesha sheet ke Notification tab se; fixed-person rule me
+          // naam na mile to rule ka saved number fallback
+          const phone = dir[person.toLowerCase()] || (personIdx >= 0 ? '' : normalizePhone(rule.phone));
+          if (!phone) continue;                            // is naam ka number nahi mila
+
+          const text = fmsFillTemplate(rule.message, row, person);
           if (!text) continue;
           // Log PEHLE likho — bhejte waqt app restart ho jaye to bhi duplicate
           // na jaaye (ek missed message duplicate se behtar hai)
@@ -3715,7 +3729,7 @@ async function runFMSNotifications(force) {
           sheetLogRows.push([
             nowIst,
             billIdx >= 0 ? String(row[billIdx] == null ? '' : row[billIdx]).trim() : '',
-            rule.person || '',
+            person,
             phone,
             `COL ${rule.watch_col} = ${rule.match_value || '(kuch bhi)'}`,
             ok ? '✅ Sent' : `❌ Failed — ${(r && (r.error || r.skipped || r.status)) || 'unknown'}`,
@@ -3755,7 +3769,24 @@ const FMS_SEED_RULES = [
     message: 'Hello {name}, Cad/ Cam makeing — Bill No: {D}' },
   { fmsName: 'pms', watch_col: 'AC', match_value: 'Ravi Kant', person: 'Ravi Kant',
     phone: '9217414222', bill_col: 'D',
-    message: 'Hello {name}, Cad/ Cam makeing — Bill No: {D}' }
+    message: 'Hello {name}, Cad/ Cam makeing — Bill No: {D}' },
+  // AK = Vendor — koi bhi naam ho to Bappi ko, vendor ka naam bhi saath me
+  { fmsName: 'pms', watch_col: 'AK', match_value: '', person: 'Bappi',
+    phone: '8076802603', bill_col: 'D',
+    message: 'Hello {name}, vendor: {AK} — Bill No: {D}' },
+  // AG = CHOODA COVER — "Kavita" ya "yes", dono me se kuch bhi ho
+  { fmsName: 'pms', watch_col: 'AG', match_value: 'Kavita|yes', person: 'Kavita',
+    phone: '9211567771', bill_col: 'D',
+    message: 'Hello {name}, Chooda / chooda cover plz order — Bill No: {D}' },
+  // AA = BEAD CHANGES me "No" -> AB (STOCK OF BEADS) me jiska naam likha ho
+  // usi ko jaata hai (Mona / Monu / Ravi bhaiya piroi / Shivam)
+  { fmsName: 'pms', watch_col: 'AA', match_value: 'No', person: '', person_col: 'AB',
+    phone: '', bill_col: 'D',
+    message: 'Hello {name}, plz check beads are availabe or not if not available so plz order by Ashok Sn and also change the bead of this order — Bill No: {D}' },
+  // DA = Step-18 ka Actual — date aate hi (step 18 done) Bajji ko shoot ka
+  { fmsName: 'pms', watch_col: 'DA', match_value: '', person: 'Bajji',
+    phone: '8595738403', bill_col: 'D',
+    message: 'Hello {name}, plz shoot for this order — Bill No: {D}' }
 ];
 
 async function seedFMSNotifyRules() {
@@ -3772,12 +3803,12 @@ async function seedFMSNotifyRules() {
       const dup = existing.some(r =>
         String(r.fms_id) === String(fms.id) &&
         String(r.watch_col || '').toUpperCase() === seed.watch_col &&
-        normalizePhone(r.phone) === normalizePhone(seed.phone));
+        String(r.match_value || '') === String(seed.match_value || ''));
       if (dup) continue;
       await d.insert('FMS_Notify_Rules', {
         fms_id: String(fms.id), watch_col: seed.watch_col, match_value: seed.match_value,
         person: seed.person, phone: seed.phone, message: seed.message,
-        bill_col: seed.bill_col, enabled: '1',
+        bill_col: seed.bill_col, person_col: seed.person_col || '', enabled: '1',
         created_at: new Date().toISOString().replace('T', ' ').split('.')[0]
       });
       console.log(`  Notify rule seeded: ${fms.fms_name || fms.sheet_name} COL ${seed.watch_col}=${seed.match_value} -> ${seed.person}`);
@@ -3796,7 +3827,7 @@ app.get('/api/fms-notify/:fmsId', requireAuth, requireAdmin, async (req, res) =>
       .map(r => ({
         id: parseInt(r.id), watchCol: r.watch_col, matchValue: r.match_value,
         person: r.person, phone: r.phone, message: r.message,
-        billCol: r.bill_col || 'D',
+        billCol: r.bill_col || 'D', personCol: r.person_col || '',
         enabled: String(r.enabled) !== '0'
       }));
     const log = await d.findAll('FMS_Notify_Log');
@@ -3809,7 +3840,7 @@ app.get('/api/fms-notify/:fmsId', requireAuth, requireAdmin, async (req, res) =>
 
 app.post('/api/fms-notify/:fmsId', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const { watchCol, matchValue, person, phone, message, billCol } = req.body || {};
+    const { watchCol, matchValue, person, phone, message, billCol, personCol } = req.body || {};
     if (!String(watchCol || '').trim()) return res.status(400).json({ error: 'Column chahiye (jaise Z)' });
     if (!normalizePhone(phone)) return res.status(400).json({ error: 'Sahi phone number daalo' });
     if (!String(message || '').trim()) return res.status(400).json({ error: 'Message likho' });
@@ -3818,7 +3849,8 @@ app.post('/api/fms-notify/:fmsId', requireAuth, requireAdmin, async (req, res) =
       fms_id: String(req.params.fmsId), watch_col: String(watchCol).trim().toUpperCase(),
       match_value: String(matchValue || '').trim(), person: String(person || '').trim(),
       phone: String(phone).trim(), message: String(message).trim(),
-      bill_col: String(billCol || 'D').trim().toUpperCase() || 'D', enabled: '1',
+      bill_col: String(billCol || 'D').trim().toUpperCase() || 'D',
+      person_col: String(personCol || '').trim().toUpperCase(), enabled: '1',
       created_at: new Date().toISOString().replace('T', ' ').split('.')[0]
     });
     res.json({ success: true, id: parseInt(saved.id) });
@@ -3830,10 +3862,10 @@ app.put('/api/fms-notify/rule/:id', requireAuth, requireAdmin, async (req, res) 
     const d = await getDB();
     const upd = {};
     if (req.body.enabled !== undefined) upd.enabled = req.body.enabled ? '1' : '0';
-    ['watchCol', 'matchValue', 'person', 'phone', 'message', 'billCol'].forEach(k => {
+    ['watchCol', 'matchValue', 'person', 'phone', 'message', 'billCol', 'personCol'].forEach(k => {
       if (req.body[k] === undefined) return;
-      const col = { watchCol: 'watch_col', matchValue: 'match_value', person: 'person', phone: 'phone', message: 'message', billCol: 'bill_col' }[k];
-      upd[col] = (k === 'watchCol' || k === 'billCol') ? String(req.body[k]).trim().toUpperCase() : String(req.body[k]).trim();
+      const col = { watchCol: 'watch_col', matchValue: 'match_value', person: 'person', phone: 'phone', message: 'message', billCol: 'bill_col', personCol: 'person_col' }[k];
+      upd[col] = ['watchCol','billCol','personCol'].includes(k) ? String(req.body[k]).trim().toUpperCase() : String(req.body[k]).trim();
     });
     if (Object.keys(upd).length) await d.update('FMS_Notify_Rules', req.params.id, upd);
     res.json({ success: true });
