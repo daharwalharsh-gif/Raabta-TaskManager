@@ -3786,7 +3786,12 @@ const FMS_SEED_RULES = [
   // DA = Step-18 ka Actual — date aate hi (step 18 done) Bajji ko shoot ka
   { fmsName: 'pms', watch_col: 'DA', match_value: '', person: 'Bajji',
     phone: '8595738403', bill_col: 'D',
-    message: 'Hello {name}, plz shoot for this order — Bill No: {D}' }
+    message: 'Hello {name}, plz shoot for this order — Bill No: {D}' },
+  // DL = "delivery status updated by sales person" — kuch bhi likhe to Naresh
+  // ko porter booking ka, poori details + contact (DM) + bill ke saath
+  { fmsName: 'pms', watch_col: 'DL', match_value: '', person: 'Naresh',
+    phone: '9810479397', bill_col: 'D',
+    message: 'Hello {name}, porter booking — {DL} | Contact: {DM} | Bill No: {D}' }
 ];
 
 async function seedFMSNotifyRules() {
