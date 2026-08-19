@@ -3624,6 +3624,26 @@ async function appendNotifyLog(d, spreadsheetId, rows) {
   }
 }
 
+// Usi sheet ke "Notification" tab se naam -> number ki list. Number badalna ho
+// to bas wahan badal do — code me kuch nahi karna. (A = Name, B = Number)
+const FMS_DIR_TAB = 'Notification';
+async function readNotifyDirectory(d, spreadsheetId) {
+  const dir = {};
+  try {
+    const resp = await withRetry(() => d.sheets.spreadsheets.values.get({
+      spreadsheetId, range: `${FMS_DIR_TAB}!A:B`
+    }));
+    for (const row of (resp.data.values || []).slice(1)) {   // pehli row heading
+      const name = String((row && row[0]) || '').trim().toLowerCase();
+      const phone = normalizePhone((row && row[1]) || '');
+      if (name && phone) dir[name] = phone;
+    }
+  } catch (e) {
+    console.error(`  "${FMS_DIR_TAB}" tab padhne me dikkat:`, e.message);
+  }
+  return dir;
+}
+
 let _fmsNotifyRunning = false;
 async function runFMSNotifications(force) {
   // Apne aap sirf live server par; admin ka "Abhi chala kar dekho" har jagah
@@ -3660,11 +3680,14 @@ async function runFMSNotifications(force) {
       const headerRow = parseInt(fms.header_row) || 1;
       const dataRows = allRows.slice(headerRow);
       const sheetLogRows = [];   // isi sheet ke "Notification Log" tab ke liye
+      // Number hamesha sheet ke Notification tab se — wahan badla to yahan bhi
+      const dir = await readNotifyDirectory(d, extractSheetId(fms.sheet_id));
 
       for (const rule of byFms[fmsId]) {
         const colIdx = colLetterToIdx(rule.watch_col || '');
         if (colIdx < 0) continue;
-        const phone = normalizePhone(rule.phone);
+        // Sheet me naam mile to wahi number, warna rule me saved number
+        const phone = dir[String(rule.person || '').trim().toLowerCase()] || normalizePhone(rule.phone);
         if (!phone) continue;
         const billIdx = colLetterToIdx(rule.bill_col || 'D');
 
