@@ -946,7 +946,7 @@ const WA_OUTBOX_MAX_ATTEMPTS = 3;
 const WA_OUTBOX_SEND_TIMEOUT = 150000;   // lambe message me Aumpfy 60s se zyada leta hai
 const WA_OUTBOX_PER_RUN = 8;             // ek tick me itne hi — lock kabhi na atke
 
-async function queueWhatsApp(phone, message, kind, ref, person) {
+async function queueWhatsApp(phone, message, kind, ref, person, opts) {
   const to = normalizePhone(phone);
   if (!to || !message) return null;
   try {
@@ -960,7 +960,10 @@ async function queueWhatsApp(phone, message, kind, ref, person) {
     // purane message bhej raha ho. Warna task assign karne wale ka alert
     // backfill/reminder ke peeche 20-30 min atak jaata tha.
     // Row 'sending' kar dete hain taaki drain ise saath me dobara na bhej de.
-    sendNowThenSettle(d, row).catch(() => {});
+    // Daily reminder me 46 log hote hain — sabko ek saath bhejna wahi purani
+    // galti hai. Wahan se immediate:false aata hai, to sirf kataar me lagta hai
+    // aur drain ek-ek karke bhejta hai.
+    if (!opts || opts.immediate !== false) sendNowThenSettle(d, row).catch(() => {});
     return row;
   } catch (e) {
     console.error('  queueWhatsApp failed, seedha bhej rahe hain:', e.message);
@@ -1267,7 +1270,6 @@ async function runWhatsAppReminders(slotKey, force) {
     // lagte the, aur Hostinger par app utni der me restart ho jaati thi, isliye
     // aadhe logon ko message milta hi nahi tha (marker "bhej diya" bol deta tha).
     // Batches me poora pass ab kuch minute me khatam ho jaata hai.
-    const BATCH = 8;
     const recipients = [];
     let noPhone = 0;
     for (const uid of Object.keys(byUser)) {
@@ -1278,21 +1280,21 @@ async function runWhatsAppReminders(slotKey, force) {
       recipients.push({ phone, name: user.name, tasks });
     }
 
-    let sent = 0, failed = 0;
-    for (let i = 0; i < recipients.length; i += BATCH) {
-      const batch = recipients.slice(i, i + BATCH);
-      const results = await Promise.all(batch.map(r =>
-        sendWhatsApp(r.phone, waReminderMsg(r.name, r.tasks, todayStr))
-          .catch(e => ({ ok: false, error: e.message }))
-      ));
-      results.forEach((r, j) => {
-        if (r && r.ok) sent++;
-        else { failed++; console.error(`  WA reminder failed — ${batch[j].name} (${batch[j].phone}): ${(r && (r.error || r.status)) || 'unknown'}`); }
-      });
+    // Reminder ab OUTBOX se jaate hain — pehle DB me likhe jaate hain, phir
+    // drain unhe EK-EK karke bhejta hai. Pehle 8 ek saath jaate the aur Aumpfy
+    // un sabko timeout kar deta tha; marker "bhej diya" bol deta tha aur
+    // message hamesha ke liye gum ho jaate the. Ab fail ho to retry hota hai.
+    let queued = 0;
+    for (const r of recipients) {
+      const row = await queueWhatsApp(
+        r.phone, waReminderMsg(r.name, r.tasks, todayStr),
+        'daily-reminder', marker, r.name, { immediate: false }
+      );
+      if (row) queued++;
     }
-    const skipped = noPhone + failed;
-    console.log(`  WhatsApp reminder pass @ ${todayStr}: ${recipients.length} recipients — ${sent} sent, ${failed} failed, ${noPhone} without phone`);
-    return { sent, failed, noPhone, skipped, recipients: recipients.length };
+    drainWhatsAppOutbox().catch(() => {});
+    console.log(`  WhatsApp reminder pass @ ${todayStr}: ${recipients.length} recipients — ${queued} outbox me daale, ${noPhone} bina phone`);
+    return { queued, noPhone, recipients: recipients.length };
   } catch (err) {
     console.error('  runWhatsAppReminders error:', err.message);
     return { error: err.message };
@@ -2284,6 +2286,39 @@ async function resetTimedOutOutbox() {
     drainWhatsAppOutbox().catch(() => {});
   } catch (e) {
     console.error('  Outbox reset error (agli baar retry hogi):', e.message);
+  }
+}
+
+// Aaj (19 Aug) 5 baje ka pass purane tareeke se chala tha — 8 message ek
+// saath, Aumpfy ne sabko timeout kar diya, aur marker "bhej diya" bol kar
+// baith gaya. Wo reminder kisi ko mile hi nahi. Ek baar dobara chalate hain,
+// ab naye outbox raste se (ek-ek karke + retry).
+async function refireTodays5pmReminder() {
+  const MARKER = 'wa_refire_1700_20260819_v1';
+  try {
+    if (!waAutoAllowed()) return;
+    if (!WA.enabled || !WA.url || !WA.apiKey) return;
+    const d = await getDB();
+    await ensureAppStateTab(d);
+    const already = await d.findWhere('App_State', { key_name: MARKER });
+    if (already && already.length) return;
+
+    // Sirf usi din ke liye jiske liye ye banaya tha
+    const ist = new Date(Date.now() + 330 * 60000);
+    if (ist.toISOString().split('T')[0] !== '2026-08-19') {
+      await d.insert('App_State', { key_name: MARKER, value: 'din nikal gaya, skip',
+        updated_at: new Date().toISOString().replace('T', ' ').split('.')[0] });
+      return;
+    }
+
+    await d.insert('App_State', {
+      key_name: MARKER, value: 'refired',
+      updated_at: new Date().toISOString().replace('T', ' ').split('.')[0]
+    });
+    const r = await runWhatsAppReminders('1700', true);   // force — marker ignore
+    console.log('  ✅ 5 baje ka reminder dobara:', JSON.stringify(r));
+  } catch (e) {
+    console.error('  refireTodays5pmReminder error:', e.message);
   }
 }
 
@@ -5243,6 +5278,7 @@ async function seedAdminIfNeeded() {
       // Outbox aane se pehle jo assign-alert gum ho gaye — ek baar bhej do
       .then(() => setTimeout(() => backfillMissedAssignAlerts().catch(() => {}), 45 * 1000))
       .then(() => setTimeout(() => resetTimedOutOutbox().catch(() => {}), 55 * 1000))
+      .then(() => setTimeout(() => refireTodays5pmReminder().catch(() => {}), 70 * 1000))
       .catch(err => console.error('  Background DB connection failed (will retry on demand):', err.message));
 
     // SMTP verify (non-blocking)
