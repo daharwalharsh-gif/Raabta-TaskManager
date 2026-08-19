@@ -960,6 +960,7 @@ async function queueWhatsApp(phone, message, kind, ref, person) {
 }
 
 let _outboxRunning = false;
+let _outboxLastError = '';   // aakhri wajah — bina login diagnose ke liye
 async function drainWhatsAppOutbox() {
   if (_outboxRunning) return { skipped: 'already-running' };
   if (!WA.enabled || !WA.url || !WA.apiKey) return { skipped: 'wa-not-configured' };
@@ -971,26 +972,45 @@ async function drainWhatsAppOutbox() {
     if (!pending.length) return { pending: 0 };
 
     let sent = 0, failed = 0;
-    // 5-5 ke batch me — ek-ek karke bhejne me bahut der lagti hai
+    // Har row ki attempts PEHLE badha do. Agar ye likhai fail ho jaye to bhejo
+    // hi mat — warna row hamesha 'pending' rehti hai aur har tick wahi rows
+    // dobara-dobara ghoomti hain (kabhi aage nahi badhti, kabhi fail bhi nahi
+    // hoti). Yahi wajah thi ki outbox 2 sent / 18 pending par atak gaya tha.
     for (let i = 0; i < pending.length; i += 5) {
       const batch = pending.slice(i, i + 5);
       await Promise.all(batch.map(async row => {
         const attempts = (parseInt(row.attempts) || 0) + 1;
+        try {
+          await d.update('WA_Outbox', row.id, { attempts: String(attempts) });
+        } catch (e) {
+          _outboxLastError = `attempts likhna fail (id=${row.id}): ${e.message}`;
+          console.error('  WA outbox — ' + _outboxLastError);
+          return;   // gin nahi paaye to bhejo mat, warna duplicate jaayenge
+        }
         const r = await sendWhatsApp(row.phone, row.message).catch(e => ({ ok: false, error: e.message }));
         if (r && r.ok) {
           sent++;
-          await d.update('WA_Outbox', row.id, {
-            status: 'sent', attempts: String(attempts),
-            sent_at: new Date().toISOString().replace('T', ' ').split('.')[0]
-          }).catch(() => {});
+          try {
+            await d.update('WA_Outbox', row.id, {
+              status: 'sent',
+              sent_at: new Date().toISOString().replace('T', ' ').split('.')[0]
+            });
+          } catch (e) {
+            _outboxLastError = `sent likhna fail (id=${row.id}): ${e.message}`;
+            console.error('  WA outbox — ' + _outboxLastError);
+          }
         } else {
           failed++;
           const err = (r && (r.error || r.skipped || r.status)) || 'unknown';
+          _outboxLastError = String(err);
           const giveUp = attempts >= WA_OUTBOX_MAX_ATTEMPTS;
-          await d.update('WA_Outbox', row.id, {
-            status: giveUp ? 'failed' : 'pending',
-            attempts: String(attempts), last_error: String(err)
-          }).catch(() => {});
+          try {
+            await d.update('WA_Outbox', row.id, {
+              status: giveUp ? 'failed' : 'pending', last_error: String(err)
+            });
+          } catch (e) {
+            console.error('  WA outbox — status likhna fail:', e.message);
+          }
           console.error(`  WA outbox ${giveUp ? 'GAVE UP' : 'retry'} (${attempts}/${WA_OUTBOX_MAX_ATTEMPTS}) — ${row.person || row.phone}: ${err}`);
         }
       }));
@@ -4820,6 +4840,13 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
       const rows = await d.findAll('WA_Outbox');
       outbox = { sent: 0, pending: 0, failed: 0 };
       rows.forEach(r => { outbox[r.status] = (outbox[r.status] || 0) + 1; });
+      // Atke kyun hain — attempts kitni baar ho chuki aur aakhri wajah kya thi
+      const stuck = rows.filter(r => r.status === 'pending');
+      if (stuck.length) {
+        outbox.attempts = stuck.map(r => parseInt(r.attempts) || 0).join(',');
+        outbox.lastError = (stuck.find(r => r.last_error) || {}).last_error || _outboxLastError || '(koi error record nahi)';
+      }
+      outbox.running = _outboxRunning;
     } catch { /* table abhi bani nahi — koi baat nahi */ }
     // Backfill chala ya nahi — bina login diagnose ke liye
     let backfill = null;
