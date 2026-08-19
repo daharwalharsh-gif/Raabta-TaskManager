@@ -943,8 +943,14 @@ async function sendWhatsApp(rawPhone, message, timeoutMs) {
 // aur message pahunch bhi chuka ho sakta hai. Isliye kam baar dohrate hain,
 // warna banda ko wahi message 4-5 baar mil jaata hai.
 const WA_OUTBOX_MAX_ATTEMPTS = 3;
-const WA_OUTBOX_SEND_TIMEOUT = 150000;   // lambe message me Aumpfy 60s se zyada leta hai
-const WA_OUTBOX_PER_RUN = 8;             // ek tick me itne hi — lock kabhi na atke
+// Aumpfy healthy ho to ~50s me jawab de deta hai. 90s tak na de to wo message
+// waise bhi nahi ja raha — 150s intezaar sirf kataar ko slow karta tha.
+const WA_OUTBOX_SEND_TIMEOUT = 90000;
+const WA_OUTBOX_PER_RUN = 30;            // ek run me itne — 46 log ka pass 2 run me
+// 8 saath bhejne par Aumpfy sabko timeout kar deta hai (aaj dekha), aur ek-ek
+// karke 29 message me ~25 min lagte hain. 3 dono se bacha leta hai — teen guna
+// tez, aur Aumpfy par itna bojh nahi ki wo baith jaye.
+const WA_OUTBOX_CONCURRENCY = 3;
 
 async function queueWhatsApp(phone, message, kind, ref, person, opts) {
   const to = normalizePhone(phone);
@@ -1065,10 +1071,10 @@ async function drainWhatsAppOutbox() {
     // hi mat — warna row hamesha 'pending' rehti hai aur har tick wahi rows
     // dobara-dobara ghoomti hain (kabhi aage nahi badhti, kabhi fail bhi nahi
     // hoti). Yahi wajah thi ki outbox 2 sent / 18 pending par atak gaya tha.
-    // EK-EK karke. 5 saath bhejne par Aumpfy queue kar deta hai aur sabhi
-    // timeout ho jaate the — 2 ke baad kuch nahi ja raha tha.
-    for (const row of pending) {
-      await (async () => {
+    // 3-3 ke chhote batch me — 8 saath par Aumpfy baith jaata hai, ek-ek karke
+    // bahut der lagti hai.
+    for (let i = 0; i < pending.length; i += WA_OUTBOX_CONCURRENCY) {
+      await Promise.all(pending.slice(i, i + WA_OUTBOX_CONCURRENCY).map(async row => {
         const attempts = (parseInt(row.attempts) || 0) + 1;
         try {
           await d.update('WA_Outbox', row.id, { attempts: String(attempts) });
@@ -1104,7 +1110,7 @@ async function drainWhatsAppOutbox() {
           }
           console.error(`  WA outbox ${giveUp ? 'GAVE UP' : 'retry'} (${attempts}/${WA_OUTBOX_MAX_ATTEMPTS}) — ${row.person || row.phone}: ${err}`);
         }
-      })();
+      }));
     }
     if (sent || failed) console.log(`  WA outbox: ${sent} sent, ${failed} retry/failed`);
     return { sent, failed };
