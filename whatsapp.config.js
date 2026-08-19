@@ -1,7 +1,8 @@
 // ══════════════════════════════════════════════════════
 // WhatsApp API config (Aumpfy) — YEH AAPKI LIVE SETTINGS HAI
 // ══════════════════════════════════════════════════════
-// Ye file GitHub par NAHI jaati (gitignored). Apni API yahin manage karo.
+// DHYAN DO: ye file git me TRACKED hai aur repo PUBLIC hai — yahan likhi key
+// GitHub par sabko dikhti hai. Surakshit tareeka: key .env / Hostinger panel me.
 // API change ho to niche  url / apiKey  (aur zaroorat ho to format) badlo,
 // phir app RESTART karo. Bas.
 // ══════════════════════════════════════════════════════

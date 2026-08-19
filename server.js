@@ -2196,7 +2196,8 @@ async function backfillMissedAssignAlerts() {
     }
 
     await d.insert('App_State', {
-      key_name: MARKER, value: `queued ${queued} for ${fresh.length} task(s)`,
+      key_name: MARKER,
+      value: `queued ${queued} | recent ${fresh.length} (delg ${delg.length}, chk ${chk.length}) | days ${days.join(',')}`,
       updated_at: new Date().toISOString().replace('T', ' ').split('.')[0]
     });
     console.log(`  ✅ Backfill: ${fresh.length} naye task, ${queued} bande ko alert queue hua`);
@@ -4820,6 +4821,13 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
       outbox = { sent: 0, pending: 0, failed: 0 };
       rows.forEach(r => { outbox[r.status] = (outbox[r.status] || 0) + 1; });
     } catch { /* table abhi bani nahi — koi baat nahi */ }
+    // Backfill chala ya nahi — bina login diagnose ke liye
+    let backfill = null;
+    try {
+      const d = await getDB();
+      const rows = await d.findWhere('App_State', { key_name: 'wa_backfill_missed_assign_v1' });
+      backfill = (rows && rows.length) ? (rows[0].value || 'done') : 'abhi nahi chala';
+    } catch { /* koi baat nahi */ }
     // Atke hue message ab bhej do
     drainWhatsAppOutbox().catch(() => {});
 
@@ -4830,6 +4838,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
       slot: slot ? `${slot.h}:${String(slot.m || 0).padStart(2, '0')}` : null,
       sentToday,
       outbox,
+      backfill,
       status: slot
         ? (sentToday ? 'is slot ka reminder aaj ja chuka hai' : 'slot-window-me-hai (pass chal raha)')
         : 'outside-slot-window',
