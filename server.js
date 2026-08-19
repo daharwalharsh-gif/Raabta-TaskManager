@@ -955,13 +955,36 @@ async function queueWhatsApp(phone, message, kind, ref, person) {
       person: String(person || ''), status: 'pending', attempts: '0', last_error: '',
       created_at: new Date().toISOString().replace('T', ' ').split('.')[0], sent_at: ''
     });
-    // Turant ek koshish — na chale to tick uthayega
-    drainWhatsAppOutbox().catch(() => {});
+    // Naya message LINE ME NAHI lagta — turant khud bhejte hain, chahe outbox
+    // purane message bhej raha ho. Warna task assign karne wale ka alert
+    // backfill/reminder ke peeche 20-30 min atak jaata tha.
+    // Row 'sending' kar dete hain taaki drain ise saath me dobara na bhej de.
+    sendNowThenSettle(d, row).catch(() => {});
     return row;
   } catch (e) {
     console.error('  queueWhatsApp failed, seedha bhej rahe hain:', e.message);
     return sendWhatsApp(to, message);   // DB na chale to purana tareeka
   }
+}
+
+// Ek message ABHI bhejo (outbox ke lock ka intezaar kiye bina). Row ko pehle
+// 'sending' likh dete hain taaki drain isi ko saath me dobara na bhej de.
+// Na chale to wapas 'pending' — phir tick apna kaam karega.
+async function sendNowThenSettle(d, row) {
+  if (!row || !row.id) return;
+  try {
+    await d.update('WA_Outbox', row.id, { status: 'sending', attempts: '1' });
+  } catch (e) {
+    console.error('  WA outbox — sending likhna fail:', e.message);
+    return;   // drain baad me uthayega
+  }
+  const r = await sendWhatsApp(row.phone, row.message, WA_OUTBOX_SEND_TIMEOUT)
+    .catch(e => ({ ok: false, error: e.message }));
+  const patch = (r && r.ok)
+    ? { status: 'sent', sent_at: new Date().toISOString().replace('T', ' ').split('.')[0] }
+    : { status: 'pending', last_error: String((r && (r.error || r.status)) || 'unknown') };
+  if (!(r && r.ok)) _outboxLastError = patch.last_error;
+  await d.update('WA_Outbox', row.id, patch).catch(() => {});
 }
 
 let _outboxRunning = false;
@@ -976,6 +999,15 @@ async function drainWhatsAppOutbox() {
 
     // Safai: jo koshish poori kar chuke hain wo 'pending' me pade na rahein,
     // warna hamesha "atka hua" dikhte rehte hain
+    // App beech me band ho gayi to koi row 'sending' me atak sakti hai —
+    // 10 min purani ho to wapas kataar me daal do
+    const staleBefore = new Date(Date.now() - 10 * 60000).toISOString().replace('T', ' ').split('.')[0];
+    for (const r of all) {
+      if (r.status === 'sending' && String(r.created_at || '') < staleBefore) {
+        await d.update('WA_Outbox', r.id, { status: 'pending' }).catch(() => {});
+        r.status = 'pending';
+      }
+    }
     for (const r of all) {
       if (r.status === 'pending' && (parseInt(r.attempts) || 0) >= WA_OUTBOX_MAX_ATTEMPTS) {
         await d.update('WA_Outbox', r.id, { status: 'failed' }).catch(() => {});
@@ -4886,7 +4918,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
     try {
       const d = await getDB();
       const rows = await d.findAll('WA_Outbox');
-      outbox = { sent: 0, pending: 0, failed: 0 };
+      outbox = { sent: 0, pending: 0, failed: 0, sending: 0 };
       rows.forEach(r => { outbox[r.status] = (outbox[r.status] || 0) + 1; });
       // Atke kyun hain — attempts kitni baar ho chuki aur aakhri wajah kya thi
       const stuck = rows.filter(r => r.status === 'pending');
