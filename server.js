@@ -952,6 +952,39 @@ const WA_OUTBOX_PER_RUN = 30;            // ek run me itne — 46 log ka pass 2 
 // tez, aur Aumpfy par itna bojh nahi ki wo baith jaye.
 const WA_OUTBOX_CONCURRENCY = 3;
 
+// ── Aumpfy band ho to message ki koshish MAT jalao ──
+// Aaj (19 Aug) Aumpfy ghanton latka raha — sahi payload par 180s tak koi jawab
+// nahi. Aise me har koshish 90s jala kar fail hoti hai; 3 koshish + 3 mauke
+// milakar har message ~1 ghante me hamesha ke liye 'failed' ho jaata. Yaani
+// upstream ki kharabi hamare message kha jaati.
+//
+// Isliye: fail ki do kism alag karte hain.
+//   upstream kharab (timeout / 502 / 503 / 504 / network) -> koshish WAPAS kar do,
+//     message ki budget nahi katti. Aur thodi der ke liye kataar rok do.
+//   message/config kharab (400 / 401 / 404) -> yahi koshish gini jayegi.
+// Isse Aumpfy chahe 5 ghante band rahe, message theek hote hi chala jayega.
+function isUpstreamDown(err) {
+  const e = String(err == null ? '' : err).toLowerCase();
+  return e.includes('timeout') || e.includes('aborted') || e.includes('abort')
+    || e.includes('econn') || e.includes('enotfound') || e.includes('socket')
+    || e.includes('network') || e.includes('fetch failed')
+    || e === '502' || e === '503' || e === '504' || e === '500';
+}
+const WA_BREAKER_TRIP_AFTER = 3;       // lagatar itne upstream-fail par ruk jao
+const WA_BREAKER_COOLDOWN_MS = 10 * 60 * 1000;   // itni der ruko, phir ek probe
+let _waFailStreak = 0;
+let _waBreakerUntil = 0;
+function waBreakerOpen() { return Date.now() < _waBreakerUntil; }
+function waNoteSendResult(ok, err) {
+  if (ok) { _waFailStreak = 0; _waBreakerUntil = 0; return; }
+  if (!isUpstreamDown(err)) return;              // message ki apni dikkat — streak mat badhao
+  _waFailStreak++;
+  if (_waFailStreak >= WA_BREAKER_TRIP_AFTER && !waBreakerOpen()) {
+    _waBreakerUntil = Date.now() + WA_BREAKER_COOLDOWN_MS;
+    console.error(`  WA breaker: Aumpfy jawab nahi de raha — ${WA_BREAKER_COOLDOWN_MS / 60000} min ruk rahe hain, message surakshit hain`);
+  }
+}
+
 async function queueWhatsApp(phone, message, kind, ref, person, opts) {
   const to = normalizePhone(phone);
   if (!to || !message) return null;
@@ -990,10 +1023,14 @@ async function sendNowThenSettle(d, row) {
   }
   const r = await sendWhatsApp(row.phone, row.message, WA_OUTBOX_SEND_TIMEOUT)
     .catch(e => ({ ok: false, error: e.message }));
-  const patch = (r && r.ok)
+  const ok = !!(r && r.ok);
+  const err = String((r && (r.error || r.status)) || 'unknown');
+  waNoteSendResult(ok, err);
+  // Aumpfy ki kharabi ho to koshish wapas 0 — drain poori budget ke saath uthayega
+  const patch = ok
     ? { status: 'sent', sent_at: new Date().toISOString().replace('T', ' ').split('.')[0] }
-    : { status: 'pending', last_error: String((r && (r.error || r.status)) || 'unknown') };
-  if (!(r && r.ok)) _outboxLastError = patch.last_error;
+    : { status: 'pending', attempts: isUpstreamDown(err) ? '0' : '1', last_error: err };
+  if (!ok) _outboxLastError = err;
   await d.update('WA_Outbox', row.id, patch).catch(() => {});
 }
 
@@ -1066,6 +1103,13 @@ async function drainWhatsAppOutbox() {
       .slice(0, WA_OUTBOX_PER_RUN);
     if (!pending.length) return { pending: 0 };
 
+    // Aumpfy band hai — koshish jalane ka koi fayda nahi. Message pade rahenge,
+    // wo theek hote hi apne aap chale jayenge.
+    if (waBreakerOpen()) {
+      return { skipped: 'aumpfy-down', waiting: pending.length,
+               retryAfterSec: Math.round((_waBreakerUntil - Date.now()) / 1000) };
+    }
+
     let sent = 0, failed = 0;
     // Har row ki attempts PEHLE badha do. Agar ye likhai fail ho jaye to bhejo
     // hi mat — warna row hamesha 'pending' rehti hai aur har tick wahi rows
@@ -1100,15 +1144,20 @@ async function drainWhatsAppOutbox() {
           failed++;
           const err = (r && (r.error || r.skipped || r.status)) || 'unknown';
           _outboxLastError = String(err);
-          const giveUp = attempts >= WA_OUTBOX_MAX_ATTEMPTS;
+          waNoteSendResult(false, err);
+          // Aumpfy ki kharabi ho to koshish wapas — message ki budget nahi katti
+          const down = isUpstreamDown(err);
+          const keptAttempts = down ? String(attempts - 1) : String(attempts);
+          const giveUp = !down && attempts >= WA_OUTBOX_MAX_ATTEMPTS;
           try {
             await d.update('WA_Outbox', row.id, {
-              status: giveUp ? 'failed' : 'pending', last_error: String(err)
+              status: giveUp ? 'failed' : 'pending',
+              attempts: keptAttempts, last_error: String(err)
             });
           } catch (e) {
             console.error('  WA outbox — status likhna fail:', e.message);
           }
-          console.error(`  WA outbox ${giveUp ? 'GAVE UP' : 'retry'} (${attempts}/${WA_OUTBOX_MAX_ATTEMPTS}) — ${row.person || row.phone}: ${err}`);
+          console.error(`  WA outbox ${giveUp ? 'GAVE UP' : (down ? 'aumpfy-down, koshish nahi gini' : 'retry')} (${keptAttempts}/${WA_OUTBOX_MAX_ATTEMPTS}) — ${row.person || row.phone}: ${err}`);
         }
       }));
     }
@@ -5015,6 +5064,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
         outbox.lastError = (stuck.find(r => r.last_error) || {}).last_error || _outboxLastError || '(koi error record nahi)';
       }
       outbox.running = _outboxRunning;
+      if (waBreakerOpen()) outbox.aumpfyDown = `haan — ${Math.round((_waBreakerUntil - Date.now()) / 1000)}s baad phir koshish`;
     } catch { /* table abhi bani nahi — koi baat nahi */ }
     // Backfill chala ya nahi — bina login diagnose ke liye
     let backfill = null;
