@@ -4056,17 +4056,20 @@ async function runFMSNotifications(force) {
             rule_id: String(rule.id), sheet_row: String(sheetRow), phone,
             sent_at: nowIst
           });
-          const r = await sendWhatsApp(phone, text);
-          const ok = !!(r && r.ok);
+          // Outbox se — pehle seedha bhejte the, to Aumpfy fail karta to message
+          // hamesha ke liye gum ho jaata tha aur dobara koshish bhi nahi hoti thi.
+          // Ab fail ho to apne aap retry hota hai.
+          const r = await queueWhatsApp(phone, text, 'fms-notify', `${rule.id}:${sheetRow}`, person);
+          const ok = !!r;
           if (ok) sent++;
-          else { failed++; console.error(`  FMS notify failed — ${rule.person} (${phone}) row ${sheetRow}: ${(r && (r.error || r.status)) || 'unknown'}`); }
+          else { failed++; console.error(`  FMS notify queue fail — ${person} (${phone}) row ${sheetRow}`); }
           sheetLogRows.push([
             nowIst,
             billIdx >= 0 ? String(row[billIdx] == null ? '' : row[billIdx]).trim() : '',
             person,
             phone,
             `COL ${rule.watch_col} = ${rule.match_value || '(kuch bhi)'}`,
-            ok ? '✅ Sent' : `❌ Failed — ${(r && (r.error || r.skipped || r.status)) || 'unknown'}`,
+            ok ? '✅ Sent' : '❌ Failed',
             text,
             String(sheetRow)
           ]);
