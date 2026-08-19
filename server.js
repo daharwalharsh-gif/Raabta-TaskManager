@@ -910,7 +910,7 @@ function normalizePhone(raw) {
 }
 
 // Fire-and-forget WhatsApp send. Never throws — logs and returns a status object.
-async function sendWhatsApp(rawPhone, message) {
+async function sendWhatsApp(rawPhone, message, timeoutMs) {
   if (!WA.enabled) return { skipped: 'disabled' };
   const phone = normalizePhone(rawPhone);
   if (!phone) return { skipped: 'no-phone' };
@@ -920,7 +920,7 @@ async function sendWhatsApp(rawPhone, message) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', [WA.authHeader || 'x-api-key']: WA.apiKey },
       body: JSON.stringify({ [WA.phoneField || 'to']: phone, [WA.messageField || 'text']: message }),
-      signal: AbortSignal.timeout(WA.timeoutMs || 20000)
+      signal: AbortSignal.timeout(timeoutMs || WA.timeoutMs || 20000)
     });
     const body = await resp.text();
     if (!resp.ok) {
@@ -938,7 +938,12 @@ async function sendWhatsApp(rawPhone, message) {
 // ── WhatsApp OUTBOX ──
 // Pehle DB me likho, phir bhejo. Fail ho / app restart ho jaye to agla tick
 // dobara koshish karta hai. Isse "aadhe logon ko message nahi gaya" khatam.
-const WA_OUTBOX_MAX_ATTEMPTS = 5;
+// Timeout ka matlab ye NAHI ki message gaya hi nahi — Aumpfy dheere jawab de
+// aur message pahunch bhi chuka ho sakta hai. Isliye kam baar dohrate hain,
+// warna banda ko wahi message 4-5 baar mil jaata hai.
+const WA_OUTBOX_MAX_ATTEMPTS = 3;
+const WA_OUTBOX_SEND_TIMEOUT = 150000;   // lambe message me Aumpfy 60s se zyada leta hai
+const WA_OUTBOX_PER_RUN = 8;             // ek tick me itne hi — lock kabhi na atke
 
 async function queueWhatsApp(phone, message, kind, ref, person) {
   const to = normalizePhone(phone);
@@ -967,8 +972,20 @@ async function drainWhatsAppOutbox() {
   _outboxRunning = true;
   try {
     const d = await getDB();
-    const pending = (await d.findAll('WA_Outbox'))
-      .filter(r => r.status === 'pending' && (parseInt(r.attempts) || 0) < WA_OUTBOX_MAX_ATTEMPTS);
+    const all = await d.findAll('WA_Outbox');
+
+    // Safai: jo koshish poori kar chuke hain wo 'pending' me pade na rahein,
+    // warna hamesha "atka hua" dikhte rehte hain
+    for (const r of all) {
+      if (r.status === 'pending' && (parseInt(r.attempts) || 0) >= WA_OUTBOX_MAX_ATTEMPTS) {
+        await d.update('WA_Outbox', r.id, { status: 'failed' }).catch(() => {});
+        r.status = 'failed';
+      }
+    }
+
+    const pending = all
+      .filter(r => r.status === 'pending' && (parseInt(r.attempts) || 0) < WA_OUTBOX_MAX_ATTEMPTS)
+      .slice(0, WA_OUTBOX_PER_RUN);
     if (!pending.length) return { pending: 0 };
 
     let sent = 0, failed = 0;
@@ -976,9 +993,10 @@ async function drainWhatsAppOutbox() {
     // hi mat — warna row hamesha 'pending' rehti hai aur har tick wahi rows
     // dobara-dobara ghoomti hain (kabhi aage nahi badhti, kabhi fail bhi nahi
     // hoti). Yahi wajah thi ki outbox 2 sent / 18 pending par atak gaya tha.
-    for (let i = 0; i < pending.length; i += 5) {
-      const batch = pending.slice(i, i + 5);
-      await Promise.all(batch.map(async row => {
+    // EK-EK karke. 5 saath bhejne par Aumpfy queue kar deta hai aur sabhi
+    // timeout ho jaate the — 2 ke baad kuch nahi ja raha tha.
+    for (const row of pending) {
+      await (async () => {
         const attempts = (parseInt(row.attempts) || 0) + 1;
         try {
           await d.update('WA_Outbox', row.id, { attempts: String(attempts) });
@@ -987,7 +1005,8 @@ async function drainWhatsAppOutbox() {
           console.error('  WA outbox — ' + _outboxLastError);
           return;   // gin nahi paaye to bhejo mat, warna duplicate jaayenge
         }
-        const r = await sendWhatsApp(row.phone, row.message).catch(e => ({ ok: false, error: e.message }));
+        const r = await sendWhatsApp(row.phone, row.message, WA_OUTBOX_SEND_TIMEOUT)
+          .catch(e => ({ ok: false, error: e.message }));
         if (r && r.ok) {
           sent++;
           try {
@@ -1013,7 +1032,7 @@ async function drainWhatsAppOutbox() {
           }
           console.error(`  WA outbox ${giveUp ? 'GAVE UP' : 'retry'} (${attempts}/${WA_OUTBOX_MAX_ATTEMPTS}) — ${row.person || row.phone}: ${err}`);
         }
-      }));
+      })();
     }
     if (sent || failed) console.log(`  WA outbox: ${sent} sent, ${failed} retry/failed`);
     return { sent, failed };
@@ -2163,6 +2182,35 @@ async function runOneTimeMigrations() {
 // nahi — warna jinko pehle mil chuka tha unko spam lagta).
 // App_State marker se sirf EK BAAR chalta hai.
 // ══════════════════════════════════════════════════════
+// Ek baar ka sudhaar: jo message purane (5 saath-saath wale) tareeke se
+// timeout ho gaye the, unki ginti zero karke naya mauka do — ab ek-ek karke
+// aur 150s intezaar ke saath jayenge. Harsh ka niyam: message chhootna nahi
+// chahiye, bhale ek-aadh ko dobara mil jaye.
+async function resetTimedOutOutbox() {
+  const MARKER = 'wa_outbox_reset_after_serial_fix_v1';
+  try {
+    if (!waAutoAllowed()) return;
+    const d = await getDB();
+    await ensureAppStateTab(d);
+    const already = await d.findWhere('App_State', { key_name: MARKER });
+    if (already && already.length) return;
+
+    const rows = await d.findAll('WA_Outbox');
+    const stuck = rows.filter(r => r.status !== 'sent');
+    for (const r of stuck) {
+      await d.update('WA_Outbox', r.id, { status: 'pending', attempts: '0', last_error: '' }).catch(() => {});
+    }
+    await d.insert('App_State', {
+      key_name: MARKER, value: `reset ${stuck.length}`,
+      updated_at: new Date().toISOString().replace('T', ' ').split('.')[0]
+    });
+    console.log(`  ✅ Outbox reset: ${stuck.length} message ko naya mauka`);
+    drainWhatsAppOutbox().catch(() => {});
+  } catch (e) {
+    console.error('  Outbox reset error (agli baar retry hogi):', e.message);
+  }
+}
+
 async function backfillMissedAssignAlerts() {
   const MARKER = 'wa_backfill_missed_assign_v1';
   try {
@@ -5118,6 +5166,7 @@ async function seedAdminIfNeeded() {
       .then(() => runOneTimeMigrations())
       // Outbox aane se pehle jo assign-alert gum ho gaye — ek baar bhej do
       .then(() => setTimeout(() => backfillMissedAssignAlerts().catch(() => {}), 45 * 1000))
+      .then(() => setTimeout(() => resetTimedOutOutbox().catch(() => {}), 55 * 1000))
       .catch(err => console.error('  Background DB connection failed (will retry on demand):', err.message));
 
     // SMTP verify (non-blocking)
