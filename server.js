@@ -514,6 +514,16 @@ const MYSQL_SCHEMA = {
     to_date: "VARCHAR(40) DEFAULT ''", reason: "TEXT",
     status: "VARCHAR(20) DEFAULT 'pending'", note: "TEXT", created_at: "VARCHAR(40) DEFAULT ''"
   },
+  // WhatsApp outbox — assign-time messages pehle yahan likhe jaate hain, phir
+  // bheje jaate hain. Fail ho ya app restart ho jaye to agla tick dobara
+  // koshish karta hai — isliye koi message chupchap gum nahi hota.
+  WA_Outbox: {
+    phone: "VARCHAR(30) DEFAULT ''", message: "TEXT",
+    kind: "VARCHAR(30) DEFAULT ''", ref: "VARCHAR(60) DEFAULT ''",
+    person: "VARCHAR(120) DEFAULT ''", status: "VARCHAR(20) DEFAULT 'pending'",
+    attempts: "VARCHAR(10) DEFAULT '0'", last_error: "TEXT",
+    created_at: "VARCHAR(40) DEFAULT ''", sent_at: "VARCHAR(40) DEFAULT ''"
+  },
   // FMS auto-notifications — "jab is column me ye likha ho to us bande ko
   // WhatsApp bhejo". Rules yahan, aur kis row par bhej chuke wo Log me.
   FMS_Notify_Rules: {
@@ -925,6 +935,76 @@ async function sendWhatsApp(rawPhone, message) {
   }
 }
 
+// ── WhatsApp OUTBOX ──
+// Pehle DB me likho, phir bhejo. Fail ho / app restart ho jaye to agla tick
+// dobara koshish karta hai. Isse "aadhe logon ko message nahi gaya" khatam.
+const WA_OUTBOX_MAX_ATTEMPTS = 5;
+
+async function queueWhatsApp(phone, message, kind, ref, person) {
+  const to = normalizePhone(phone);
+  if (!to || !message) return null;
+  try {
+    const d = await getDB();
+    const row = await d.insert('WA_Outbox', {
+      phone: to, message: String(message), kind: kind || '', ref: String(ref || ''),
+      person: String(person || ''), status: 'pending', attempts: '0', last_error: '',
+      created_at: new Date().toISOString().replace('T', ' ').split('.')[0], sent_at: ''
+    });
+    // Turant ek koshish — na chale to tick uthayega
+    drainWhatsAppOutbox().catch(() => {});
+    return row;
+  } catch (e) {
+    console.error('  queueWhatsApp failed, seedha bhej rahe hain:', e.message);
+    return sendWhatsApp(to, message);   // DB na chale to purana tareeka
+  }
+}
+
+let _outboxRunning = false;
+async function drainWhatsAppOutbox() {
+  if (_outboxRunning) return { skipped: 'already-running' };
+  if (!WA.enabled || !WA.url || !WA.apiKey) return { skipped: 'wa-not-configured' };
+  _outboxRunning = true;
+  try {
+    const d = await getDB();
+    const pending = (await d.findAll('WA_Outbox'))
+      .filter(r => r.status === 'pending' && (parseInt(r.attempts) || 0) < WA_OUTBOX_MAX_ATTEMPTS);
+    if (!pending.length) return { pending: 0 };
+
+    let sent = 0, failed = 0;
+    // 5-5 ke batch me — ek-ek karke bhejne me bahut der lagti hai
+    for (let i = 0; i < pending.length; i += 5) {
+      const batch = pending.slice(i, i + 5);
+      await Promise.all(batch.map(async row => {
+        const attempts = (parseInt(row.attempts) || 0) + 1;
+        const r = await sendWhatsApp(row.phone, row.message).catch(e => ({ ok: false, error: e.message }));
+        if (r && r.ok) {
+          sent++;
+          await d.update('WA_Outbox', row.id, {
+            status: 'sent', attempts: String(attempts),
+            sent_at: new Date().toISOString().replace('T', ' ').split('.')[0]
+          }).catch(() => {});
+        } else {
+          failed++;
+          const err = (r && (r.error || r.skipped || r.status)) || 'unknown';
+          const giveUp = attempts >= WA_OUTBOX_MAX_ATTEMPTS;
+          await d.update('WA_Outbox', row.id, {
+            status: giveUp ? 'failed' : 'pending',
+            attempts: String(attempts), last_error: String(err)
+          }).catch(() => {});
+          console.error(`  WA outbox ${giveUp ? 'GAVE UP' : 'retry'} (${attempts}/${WA_OUTBOX_MAX_ATTEMPTS}) — ${row.person || row.phone}: ${err}`);
+        }
+      }));
+    }
+    if (sent || failed) console.log(`  WA outbox: ${sent} sent, ${failed} retry/failed`);
+    return { sent, failed };
+  } catch (err) {
+    console.error('  drainWhatsAppOutbox error:', err.message);
+    return { error: err.message };
+  } finally {
+    _outboxRunning = false;
+  }
+}
+
 // Resolve a user's WhatsApp target ({ name, phone }) or null if no usable phone.
 async function getWhatsAppTarget(userId) {
   try {
@@ -1225,6 +1305,9 @@ function whatsAppReminderScheduler() {
   const label = waSlots().map(s => `${s.h}:${String(s.m || 0).padStart(2, '0')}`).join(' & ');
   setInterval(() => {
     checkAndFireDueSlots().catch(e => console.error('  WA scheduler tick error:', e.message));
+    // Outbox: jo assign-time message pehli baar me nahi gaya, wo yahan retry
+    // hota hai — isliye kisi ko message chhutta nahi
+    drainWhatsAppOutbox().catch(e => console.error('  WA outbox tick error:', e.message));
   }, 60 * 1000);
   // FMS auto-notifications — pehle default rules seed karo, phir har 3 min
   // sheet check karke naye matches par bhejo
@@ -1700,11 +1783,11 @@ app.post('/api/tasks', requireAuth, async (req, res) => {
         // (WA.notifyOnAssign false ho to assign-time message bilkul nahi jaata)
         if (WA.notifyOnAssign) getWhatsAppTarget(parseInt(targetUser)).then(waTarget => {
           if (!waTarget) return;
-          return sendWhatsApp(waTarget.phone, waDelegationMsg({
+          return queueWhatsApp(waTarget.phone, waDelegationMsg({
             assigneeName: waTarget.name, assignerName,
             desc, dueDate: date,
             priority: priority || 'low', approval: approval || 'no', remarks: remarks || ''
-          }));
+          }), 'assign-delegation', '', waTarget.name);
         }).catch(e => console.error('  WA notify error:', e.message));
         // Email — in parallel
         getNotifyTarget(parseInt(targetUser)).then(target => {
@@ -1730,9 +1813,9 @@ app.post('/api/tasks', requireAuth, async (req, res) => {
       if (WA.notifyOnAssign) (async () => {
         const waTarget = await getWhatsAppTarget(parseInt(targetUser));
         if (waTarget) {
-          await sendWhatsApp(waTarget.phone, waChecklistMsg({
+          await queueWhatsApp(waTarget.phone, waChecklistMsg({
             assigneeName: waTarget.name, desc, dueText: date, count: 1
-          }));
+          }), 'assign-checklist', '', waTarget.name);
         }
       })();
     }
@@ -1763,9 +1846,9 @@ app.post('/api/tasks/bulk-checklist', requireAuth, requireAdmin, async (req, res
       const dueText = dates.length > 1
         ? `${dates.length} dates (${sorted[0]} … ${sorted[sorted.length - 1]})`
         : sorted[0];
-      await sendWhatsApp(waTarget.phone, waChecklistMsg({
+      await queueWhatsApp(waTarget.phone, waChecklistMsg({
         assigneeName: waTarget.name, desc, dueText, count: dates.length
-      }));
+      }), 'assign-checklist-bulk', '', waTarget.name);
     })();
     res.json({ success: true, count: dates.length });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -2151,11 +2234,11 @@ app.put('/api/approvals/:id', requireAuth, async (req, res) => {
           const assigner = await db.findOne('Users', { id: String(task.assigned_by) });
           const waTarget = await getWhatsAppTarget(parseInt(task.assigned_to));
           if (waTarget) {
-            await sendWhatsApp(waTarget.phone, waDelegationMsg({
+            await queueWhatsApp(waTarget.phone, waDelegationMsg({
               assigneeName: waTarget.name, assignerName: assigner?.name || 'Admin',
               desc: task.description, dueDate: task.due_date,
               priority: task.priority || 'low', approval: task.approval || 'no', remarks: task.remarks || ''
-            }));
+            }), 'assign-approved', String(appr.task_id || ''), waTarget.name);
           }
         })().catch(e => console.error('  WA approve notify error:', e.message));
       }
@@ -4693,6 +4776,36 @@ app.post('/api/admin/run-wa-reminders', requireAuth, requireAdmin, async (req, r
     .then(r => console.log('  WA reminders (manual):', JSON.stringify(r)))
     .catch(e => console.error('  WA reminders (manual) error:', e.message));
   res.json({ started: true });
+});
+
+// GET /api/admin/wa-outbox — assign-time messages ka hisaab: kitne gaye,
+// kitne atke, aur jo fail hue unki wajah. ?retry=1 se failed dobara try.
+app.get('/api/admin/wa-outbox', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const d = await getDB();
+    let rows = await d.findAll('WA_Outbox');
+    if (String(req.query.retry || '') === '1') {
+      // Give-up ho chuke messages ko dobara mauka do
+      const failed = rows.filter(r => r.status === 'failed');
+      for (const r of failed) await d.update('WA_Outbox', r.id, { status: 'pending', attempts: '0', last_error: '' });
+      drainWhatsAppOutbox().catch(() => {});
+      rows = await d.findAll('WA_Outbox');
+    }
+    const counts = { sent: 0, pending: 0, failed: 0 };
+    rows.forEach(r => { counts[r.status] = (counts[r.status] || 0) + 1; });
+    const recent = rows
+      .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
+      .slice(0, 40)
+      .map(r => ({
+        person: r.person, phone: r.phone, kind: r.kind, status: r.status,
+        attempts: parseInt(r.attempts) || 0, error: r.last_error || '',
+        createdAt: r.created_at, sentAt: r.sent_at || ''
+      }));
+    res.json({
+      counts, total: rows.length, recent,
+      note: counts.failed ? 'Failed wale dobara bhejne ke liye is URL me ?retry=1 lagao' : 'Sab theek'
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // GET /api/admin/wa-diagnose?phone=9516896449
