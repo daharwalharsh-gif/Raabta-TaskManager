@@ -2135,6 +2135,77 @@ async function runOneTimeMigrations() {
   }
 }
 
+
+// ══════════════════════════════════════════════════════
+// BACKFILL — Outbox aane se PEHLE jo assign-alert gum ho gaye (18-19 Aug),
+// unke liye ek baar ka sudhaar. Har bande ko EK hi message jaata hai jisme
+// uske pichhle 2 din ke saare naye task ginaye hote hain (N alag message
+// nahi — warna jinko pehle mil chuka tha unko spam lagta).
+// App_State marker se sirf EK BAAR chalta hai.
+// ══════════════════════════════════════════════════════
+async function backfillMissedAssignAlerts() {
+  const MARKER = 'wa_backfill_missed_assign_v1';
+  try {
+    if (!waAutoAllowed()) return;                  // sirf production
+    if (!WA.enabled || !WA.url || !WA.apiKey) return;
+    const d = await getDB();
+    await ensureAppStateTab(d);
+    const already = await d.findWhere('App_State', { key_name: MARKER });
+    if (already && already.length) return;         // ho chuka
+
+    // Pichhle 2 din (IST) me bane tasks
+    const ist = new Date(Date.now() + 330 * 60000);
+    const days = [0, 1].map(n => new Date(ist.getTime() - n * 86400000).toISOString().split('T')[0]);
+    const isRecent = t => days.some(day => String(t.created_at || '').startsWith(day));
+
+    const [delg, chk] = await Promise.all([
+      d.findAll('Delegation_Tasks'), d.findAll('Checklist_Tasks')
+    ]);
+    const fresh = [
+      ...delg.filter(isRecent).map(t => ({ ...t, kind: 'Delegation' })),
+      ...chk.filter(isRecent).map(t => ({ ...t, kind: 'Checklist' }))
+    ];
+
+    // Bande ke hisaab se ikattha karo
+    const byUser = {};
+    for (const t of fresh) {
+      const uid = String(t.assigned_to || '');
+      if (!uid) continue;
+      (byUser[uid] = byUser[uid] || []).push(t);
+    }
+
+    let queued = 0;
+    for (const [uid, tasks] of Object.entries(byUser)) {
+      const target = await getWhatsAppTarget(parseInt(uid));
+      if (!target) continue;
+      const lines = [
+        '*Raabta Task Manager*', '',
+        `Hello ${target.name || 'there'},`,
+        `Here are the *${tasks.length} task(s)* assigned to you recently:`, ''
+      ];
+      tasks.slice(0, 15).forEach((t, i) => {
+        lines.push(`${i + 1}. ${t.description || ''}`);
+        lines.push(`   Due: ${t.due_date || '-'} | ${t.kind} | Priority: ${t.priority || 'low'}`);
+      });
+      if (tasks.length > 15) lines.push(`...aur ${tasks.length - 15} more`);
+      lines.push('', 'Please complete them and mark as Done in the app.');
+      const appUrl = process.env.APP_URL || '';
+      if (appUrl) lines.push(`Open: ${appUrl}`);
+      await queueWhatsApp(target.phone, lines.join('\n'), 'assign-backfill', '', target.name);
+      queued++;
+    }
+
+    await d.insert('App_State', {
+      key_name: MARKER, value: `queued ${queued} for ${fresh.length} task(s)`,
+      updated_at: new Date().toISOString().replace('T', ' ').split('.')[0]
+    });
+    console.log(`  ✅ Backfill: ${fresh.length} naye task, ${queued} bande ko alert queue hua`);
+    drainWhatsAppOutbox().catch(() => {});
+  } catch (e) {
+    console.error('  Backfill error (agli baar retry hogi):', e.message);
+  }
+}
+
 // ── General /:id routes AFTER all specific routes ──
 
 app.delete('/api/tasks/:id', requireAuth, requireAdmin, async (req, res) => {
@@ -4740,12 +4811,25 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
       const mk = `wa_pass_${ist.toISOString().split('T')[0]}_${slot.h}${String(slot.m || 0).padStart(2, '0')}`;
       sentToday = await _waSlotDone(mk);
     }
+    // Outbox ka haal — assign-time message atke to yahan dikh jayega
+    // (sirf ginti, message ka text kabhi expose nahi hota)
+    let outbox = null;
+    try {
+      const d = await getDB();
+      const rows = await d.findAll('WA_Outbox');
+      outbox = { sent: 0, pending: 0, failed: 0 };
+      rows.forEach(r => { outbox[r.status] = (outbox[r.status] || 0) + 1; });
+    } catch { /* table abhi bani nahi — koi baat nahi */ }
+    // Atke hue message ab bhej do
+    drainWhatsAppOutbox().catch(() => {});
+
     // Config diagnose (key masked — poori key kabhi expose nahi hoti)
     const k = String(WA.apiKey || '');
     res.json({
       now: istTime,
       slot: slot ? `${slot.h}:${String(slot.m || 0).padStart(2, '0')}` : null,
       sentToday,
+      outbox,
       status: slot
         ? (sentToday ? 'is slot ka reminder aaj ja chuka hai' : 'slot-window-me-hai (pass chal raha)')
         : 'outside-slot-window',
@@ -4996,6 +5080,8 @@ async function seedAdminIfNeeded() {
     // Start background DB connection
     getDB()
       .then(() => runOneTimeMigrations())
+      // Outbox aane se pehle jo assign-alert gum ho gaye — ek baar bhej do
+      .then(() => setTimeout(() => backfillMissedAssignAlerts().catch(() => {}), 45 * 1000))
       .catch(err => console.error('  Background DB connection failed (will retry on demand):', err.message));
 
     // SMTP verify (non-blocking)
