@@ -523,6 +523,7 @@ const MYSQL_SCHEMA = {
     person: "VARCHAR(120) DEFAULT ''", status: "VARCHAR(20) DEFAULT 'pending'",
     attempts: "VARCHAR(10) DEFAULT '0'", last_error: "TEXT",
     revivals: "VARCHAR(10) DEFAULT '0'",
+    posts: "VARCHAR(10) DEFAULT '0'",
     created_at: "VARCHAR(40) DEFAULT ''", sent_at: "VARCHAR(40) DEFAULT ''"
   },
   // FMS auto-notifications — "jab is column me ye likha ho to us bande ko
@@ -962,6 +963,13 @@ const WA_OUTBOX_PER_RUN = 30;            // ek run me itne — 46 log ka pass 2 
 // karke 29 message me ~25 min lagte hain. 3 dono se bacha leta hai — teen guna
 // tez, aur Aumpfy par itna bojh nahi ki wo baith jaye.
 const WA_OUTBOX_CONCURRENCY = 3;
+// Ek message ko zyada se zyada itni baar POST karenge — jawab chahe kuch bhi
+// aaye. Timeout ka matlab ye NAHI ki message gaya hi nahi; Aumpfy use pahuncha
+// bhi chuka ho sakta hai. Isliye bar-bar POST karna = banda ko wahi message
+// kai baar. 20 Aug ko Varun ko daily reminder DO BAAR gaya, wajah yahi thi.
+// 2 = ek koshish + ek dobara. Isse zyada se zyada 2 copy, aur delivery ka
+// achha mauka bhi.
+const WA_OUTBOX_MAX_POSTS = 2;
 
 // ── Aumpfy band ho to message ki koshish MAT jalao ──
 // Aaj (19 Aug) Aumpfy ghanton latka raha — sahi payload par 180s tak koi jawab
@@ -1008,18 +1016,20 @@ function waNoteSendResult(ok, err, name) {
 // padha rehta hai, koshish jalti nahi (isUpstreamDown), aur API theek hote hi
 // apne aap chala jaata hai. Kabhi zarurat pade to config me allowApiFallback
 // true kar dena — tab doosri chalu API se bhi jaane lagega.
-function waOtherApi(name) {
-  if (!WA.allowApiFallback) return null;          // Harsh: apni hi API se
+function waOtherApi(name, kind) {
+  // PAKKI ROK: delegation / checklist / daily reminder KABHI pms number
+  // (919711718322) se nahi jayenge. 20 Aug ko maine fallback daala tha aur
+  // Varun/Ashok Sn ko reminder pms number se chala gaya — Harsh ne saaf mana
+  // kiya. Ye rok config se nahi, code se hai, taaki galti se bhi na ho.
+  if (String(kind || '') !== 'fms-notify') return null;
+  if (!WA.allowApiFallback) return null;
   if (name === 'pms') return { url: WA.url, apiKey: WA.apiKey, name: 'default' };
-  if (WA.pms && WA.pms.url && WA.pms.apiKey) {
-    return { url: WA.pms.url, apiKey: WA.pms.apiKey, name: 'pms' };
-  }
   return null;
 }
 
 async function sendWhatsAppSure(rawPhone, message, timeoutMs, kind) {
   const primary = waApiFor(kind);
-  const backup = waOtherApi(primary.name);
+  const backup = waOtherApi(primary.name, kind);
   const order = (backup && waBreakerOpen(primary.name)) ? [backup, primary] : [primary, backup];
 
   let last = null;
@@ -1073,7 +1083,7 @@ async function queueWhatsApp(phone, message, kind, ref, person, opts) {
 async function sendNowThenSettle(d, row) {
   if (!row || !row.id) return;
   try {
-    await d.update('WA_Outbox', row.id, { status: 'sending', attempts: '1' });
+    await d.update('WA_Outbox', row.id, { status: 'sending', attempts: '1', posts: '1' });
   } catch (e) {
     console.error('  WA outbox — sending likhna fail:', e.message);
     return;   // drain baad me uthayega
@@ -1191,12 +1201,17 @@ async function drainWhatsAppOutbox() {
       .slice(0, WA_OUTBOX_PER_RUN);
     if (!pending.length) return { pending: 0 };
 
-    // Aumpfy band hai — koshish jalane ka koi fayda nahi. Message pade rahenge,
-    // wo theek hote hi apne aap chale jayenge.
-    if (waBreakerOpen('default') && waBreakerOpen('pms')) {
-      return { skipped: 'aumpfy-down', waiting: pending.length,
-               retryAfterSec: Math.round((_waBreakerUntil - Date.now()) / 1000) };
+    // Jis API baithi hai, uske message ABHI mat bhejo. Pehle ye check dono API
+    // band hone par lagta tha — pms chalu tha isliye kabhi laga hi nahi, aur
+    // band padi purani API par wahi message bar-bar POST hota raha. Aumpfy
+    // jawab nahi deta tha par message pahuncha deta tha — isliye logon ko
+    // duplicate mile. Ab har message apni API ka breaker dekhta hai.
+    const ready = pending.filter(r => !waBreakerOpen(waApiFor(r.kind).name));
+    const held = pending.length - ready.length;
+    if (!ready.length) {
+      return { skipped: 'aumpfy-down', waiting: held };
     }
+    if (held) console.log(`  WA outbox: ${held} message ruke hain (unki API band hai)`);
 
     let sent = 0, failed = 0;
     // Har row ki attempts PEHLE badha do. Agar ye likhai fail ho jaye to bhejo
@@ -1205,11 +1220,21 @@ async function drainWhatsAppOutbox() {
     // hoti). Yahi wajah thi ki outbox 2 sent / 18 pending par atak gaya tha.
     // 3-3 ke chhote batch me — 8 saath par Aumpfy baith jaata hai, ek-ek karke
     // bahut der lagti hai.
-    for (let i = 0; i < pending.length; i += WA_OUTBOX_CONCURRENCY) {
-      await Promise.all(pending.slice(i, i + WA_OUTBOX_CONCURRENCY).map(async row => {
+    for (let i = 0; i < ready.length; i += WA_OUTBOX_CONCURRENCY) {
+      await Promise.all(ready.slice(i, i + WA_OUTBOX_CONCURRENCY).map(async row => {
         const attempts = (parseInt(row.attempts) || 0) + 1;
+        const posts = (parseInt(row.posts) || 0) + 1;
+        if (posts > WA_OUTBOX_MAX_POSTS) {
+          // Itni baar POST kar chuke aur Aumpfy ne kabhi haan nahi kaha. Aur
+          // bhejna matlab bande ko wahi message teesri-chauthi baar. Isliye
+          // rok dete hain aur sach likh dete hain — 'sent' nahi bolenge.
+          await d.update('WA_Outbox', row.id, {
+            status: 'unknown', last_error: `${WA_OUTBOX_MAX_POSTS} baar bheja, Aumpfy ne jawab nahi diya`
+          }).catch(() => {});
+          return;
+        }
         try {
-          await d.update('WA_Outbox', row.id, { attempts: String(attempts) });
+          await d.update('WA_Outbox', row.id, { attempts: String(attempts), posts: String(posts) });
         } catch (e) {
           _outboxLastError = `attempts likhna fail (id=${row.id}): ${e.message}`;
           console.error('  WA outbox — ' + _outboxLastError);
@@ -5193,7 +5218,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
     try {
       const d = await getDB();
       const rows = await d.findAll('WA_Outbox');
-      outbox = { sent: 0, pending: 0, failed: 0, sending: 0 };
+      outbox = { sent: 0, pending: 0, failed: 0, sending: 0, unknown: 0 };
       rows.forEach(r => { outbox[r.status] = (outbox[r.status] || 0) + 1; });
       // Atke kyun hain — attempts kitni baar ho chuki aur aakhri wajah kya thi
       const stuck = rows.filter(r => r.status === 'pending');
@@ -5203,7 +5228,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
       }
       outbox.running = _outboxRunning;
       const dn = ['default', 'pms'].filter(n => waBreakerOpen(n));
-      if (dn.length) outbox.aumpfyDown = dn.join(' + ') + ' band';
+      if (dn.length) outbox.aumpfyDown = dn.join(' + ') + ' band — unke message ruke hain (POST nahi ho rahe)';
     } catch { /* table abhi bani nahi — koi baat nahi */ }
     // Backfill chala ya nahi — bina login diagnose ke liye
     let backfill = null;
