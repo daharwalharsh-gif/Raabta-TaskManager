@@ -4235,6 +4235,12 @@ async function readNotifyDirectory(d, spreadsheetId) {
 
 let _fmsNotifyRunning = false;
 async function runFMSNotifications(force) {
+  // ⛔ ROKA HUA (Harsh, 20 Aug 2026): "PMS vala sheet vala message stop kr do
+  // jab me bolunga tab bhejna." Delegation/checklist alert aur daily reminder
+  // ispar bilkul asar nahi — wo alag flag (WA.enabled) se chalte hain, chalte
+  // rahenge. Sirf sheet-based FMS/PMS notification rukega, jab tak
+  // whatsapp.config.js me fmsNotifyEnabled wapas true na ho.
+  if (!force && WA.fmsNotifyEnabled === false) return { skipped: 'fms-paused-by-harsh' };
   // Apne aap sirf live server par; admin ka "Abhi chala kar dekho" har jagah
   if (!force && !waAutoAllowed()) return { skipped: 'not-production' };
   if (!WA.enabled || !WA.url || !WA.apiKey) return { skipped: 'wa-not-configured' };

@@ -34,6 +34,13 @@ module.exports = {
     apiKey: 'sl_ae88d0d5e8e084c46ac9faeedc2993c15d374ba03fdb7e9d470e77d31975bd47'
   },
 
+  // ⛔ PMS/FMS SHEET NOTIFICATION ROKI HUI (Harsh, 20 Aug 2026): "jab me
+  // bolunga tab bhejna." Ye SIRF sheet-based PMS/FMS message rokta hai —
+  // delegation/checklist assign-time alert aur subah-shaam daily reminder
+  // ispar bilkul asar nahi, wo alag `enabled` flag se chalte hain aur chalte
+  // rahenge. Resume karne ke liye ye wapas true karo.
+  fmsNotifyEnabled: false,
+
   // Ek API baithi ho to message doosri (chalu) API se bhej dun? Default false
   // — delegation/checklist/reminder hamesha apni API se, PMS hamesha apni se,
   // kabhi cross nahi. true karoge to atkane par doosri se jaayega, par bande
