@@ -999,13 +999,17 @@ function waNoteSendResult(ok, err, name) {
 }
 
 // ── "Kuch bhi ho jaye, turant chala jaana chahiye" ──
-// Harsh ka niyam: task delegate karte hi alert jaana chahiye. Ek API baithi ho
-// to message rukna nahi chahiye — doosri chalu API se bhej do. Number thoda
-// alag dikhega, par message pahunchega. Na pahunchne se behtar hai.
+// Har message apni hi API se jaata hai: reminder/checklist/delegation purani
+// (default) wali se, PMS/FMS sheet wale naye pms trigger se. Harsh ne 20 Aug ko
+// saaf kaha — "purani API se hi jana chahiye" — isliye doosri API se bhejna
+// BAND hai (whatsapp.config.js me allowApiFallback: false).
 //
-// Jab pehli API pehle se hi band pata ho, to uspar samay bilkul mat jalao —
-// seedha chalu wali se bhejo (isse "turant" sach me turant rehta hai).
+// Message phir bhi gum nahi hota: apni API baithi ho to wo kataar me surakshit
+// padha rehta hai, koshish jalti nahi (isUpstreamDown), aur API theek hote hi
+// apne aap chala jaata hai. Kabhi zarurat pade to config me allowApiFallback
+// true kar dena — tab doosri chalu API se bhi jaane lagega.
 function waOtherApi(name) {
+  if (!WA.allowApiFallback) return null;          // Harsh: apni hi API se
   if (name === 'pms') return { url: WA.url, apiKey: WA.apiKey, name: 'default' };
   if (WA.pms && WA.pms.url && WA.pms.apiKey) {
     return { url: WA.pms.url, apiKey: WA.pms.apiKey, name: 'pms' };

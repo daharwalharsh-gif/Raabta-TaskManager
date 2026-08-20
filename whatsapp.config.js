@@ -27,6 +27,13 @@ module.exports = {
     apiKey: 'sl_ae88d0d5e8e084c46ac9faeedc2993c15d374ba03fdb7e9d470e77d31975bd47'
   },
 
+  // Ek API baithi ho to message doosri (chalu) API se bhej dun?
+  // Harsh ne 20 Aug ko saaf mana kiya — "purani API se hi jana chahiye".
+  // Message tab bhi gum nahi hota: apni hi API ka intezaar karta hai aur wo
+  // theek hote hi chala jaata hai. true karoge to doosri se bhi jaane lagega,
+  // par bande ko number alag dikhega.
+  allowApiFallback: false,
+
   // ── Baaki settings ──
   countryCode:  '91',
   // Daily reminder times (IST). Add/remove entries to change kab reminder jaye.
