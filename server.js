@@ -1418,6 +1418,24 @@ async function _waMarkSlotDone(marker) {
   } catch (e) { /* marker na likh paye to bhi pass chalta rahe */ }
 }
 
+// DIN-BHAR KA HARD CAP: reminder ek din me zyada se zyada itni baar hi
+// jaayega jitne slot configured hain (aam taur par 2 — subah + shaam). Agar
+// reminderTimes din ke beech me badal di jaaye (10:15 -> 10:00 jaisa), to har
+// naya h:m apna NAYA marker banata hai — aur bina is cap ke system use "aaj
+// abhi tak nahi gaya" samajh kar dobara bhej deta. 20 Aug ko yahi hua tha:
+// 4 alag time try kiye gaye = 4 alag marker = ek bande ko 4 reminder. Ab
+// chahe time kitni baar badlo, EK DIN me kul passes kabhi is se zyada nahi
+// honge.
+async function _waPassesToday(dateStr) {
+  try {
+    const d = await getDB();
+    await ensureAppStateTab(d);
+    const rows = await d.findAll('App_State');
+    const prefix = `wa_pass_${dateStr}_`;
+    return rows.filter(r => String(r.key_name || '').startsWith(prefix)).length;
+  } catch (e) { return 0; }
+}
+
 async function runWhatsAppReminders(slotKey, force) {
   if (!WA.enabled) return { skipped: 'disabled' };
   // OFFICE HOURS GUARD (hard rule): reminders subah ke pehle slot se pehle
@@ -1450,10 +1468,21 @@ async function runWhatsAppReminders(slotKey, force) {
     // Marker SLOT ke naam se banta hai (current hour se nahi) — warna 17:00 ka
     // pass agar catch-up me 18:10 pe chale to alag marker banta aur duplicate
     // messages ja sakte the.
-    const marker = `wa_pass_${ist.toISOString().split('T')[0]}_${slotKey || istHour}`;
+    const dateStr = ist.toISOString().split('T')[0];
+    const marker = `wa_pass_${dateStr}_${slotKey || istHour}`;
     if (!force && await _waSlotDone(marker)) {
       console.log(`  WhatsApp reminders already sent for ${marker} — skipped`);
       return { skipped: 'already-sent-today' };
+    }
+    // Din-bhar ka hard cap — configured slots se zyada passes kabhi nahi,
+    // chahe beech me time kitni baar badal jaaye (dekho upar ka comment)
+    if (!force) {
+      const maxPerDay = Math.max(1, waSlots().length);
+      const already = await _waPassesToday(dateStr);
+      if (already >= maxPerDay) {
+        console.log(`  WhatsApp reminders — aaj ${already}/${maxPerDay} pass ho chuke, ${marker} ROKA (din ka cap)`);
+        return { skipped: 'daily-cap-reached', already, maxPerDay };
+      }
     }
     await _waMarkSlotDone(marker);
     const todayStr = new Date().toISOString().split('T')[0];
