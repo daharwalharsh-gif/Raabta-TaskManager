@@ -18,6 +18,15 @@ module.exports = {
   phoneField:   'to',
   messageField: 'text',
 
+  // ── PMS / FMS sheet ke message ALAG API se jaate hain ──
+  // Ye apni alag WhatsApp session (pms wala phone) use karta hai. Delegation,
+  // checklist aur daily reminder upar wale (default) API se hi jaate hain —
+  // unhe yahan se koi farak nahi padta.
+  pms: {
+    url:    'https://api.aumpfy.com/api/apis/trigger/pms-08a73f',
+    apiKey: 'sl_ae88d0d5e8e084c46ac9faeedc2993c15d374ba03fdb7e9d470e77d31975bd47'
+  },
+
   // ── Baaki settings ──
   countryCode:  '91',
   // Daily reminder times (IST). Add/remove entries to change kab reminder jaye.

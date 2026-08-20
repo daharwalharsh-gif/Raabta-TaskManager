@@ -911,24 +911,35 @@ function normalizePhone(raw) {
 }
 
 // Fire-and-forget WhatsApp send. Never throws — logs and returns a status object.
-async function sendWhatsApp(rawPhone, message, timeoutMs) {
+// Kis message ke liye kaunsa API. PMS/FMS sheet wale message alag session
+// (pms phone) se jaate hain — Harsh ne alag trigger diya hai. Delegation,
+// checklist aur daily reminder default wale se hi jaate hain.
+function waApiFor(kind) {
+  if (String(kind || '') === 'fms-notify' && WA.pms && WA.pms.url && WA.pms.apiKey) {
+    return { url: WA.pms.url, apiKey: WA.pms.apiKey, name: 'pms' };
+  }
+  return { url: WA.url, apiKey: WA.apiKey, name: 'default' };
+}
+
+async function sendWhatsApp(rawPhone, message, timeoutMs, kind) {
   if (!WA.enabled) return { skipped: 'disabled' };
   const phone = normalizePhone(rawPhone);
   if (!phone) return { skipped: 'no-phone' };
-  if (!WA.url || !WA.apiKey) return { skipped: 'not-configured' };
+  const api = waApiFor(kind);
+  if (!api.url || !api.apiKey) return { skipped: 'not-configured' };
   try {
-    const resp = await fetch(WA.url, {
+    const resp = await fetch(api.url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', [WA.authHeader || 'x-api-key']: WA.apiKey },
+      headers: { 'Content-Type': 'application/json', [WA.authHeader || 'x-api-key']: api.apiKey },
       body: JSON.stringify({ [WA.phoneField || 'to']: phone, [WA.messageField || 'text']: message }),
       signal: AbortSignal.timeout(timeoutMs || WA.timeoutMs || 20000)
     });
     const body = await resp.text();
     if (!resp.ok) {
-      console.error(`  WhatsApp failed (${phone}) [${resp.status}]: ${body.slice(0, 200)}`);
+      console.error(`  WhatsApp failed (${phone}) [${api.name} ${resp.status}]: ${body.slice(0, 200)}`);
       return { ok: false, status: resp.status, body };
     }
-    console.log(`  WhatsApp sent to ${phone}`);
+    console.log(`  WhatsApp sent to ${phone} (${api.name})`);
     return { ok: true, status: resp.status, body };
   } catch (err) {
     console.error(`  WhatsApp error (${phone}): ${err.message}`);
@@ -1021,7 +1032,7 @@ async function sendNowThenSettle(d, row) {
     console.error('  WA outbox — sending likhna fail:', e.message);
     return;   // drain baad me uthayega
   }
-  const r = await sendWhatsApp(row.phone, row.message, WA_OUTBOX_SEND_TIMEOUT)
+  const r = await sendWhatsApp(row.phone, row.message, WA_OUTBOX_SEND_TIMEOUT, row.kind)
     .catch(e => ({ ok: false, error: e.message }));
   const ok = !!(r && r.ok);
   const err = String((r && (r.error || r.status)) || 'unknown');
@@ -1041,6 +1052,36 @@ async function sendNowThenSettle(d, row) {
 // koshish, zyada se zyada 3 mauke. Na message chhootta hai, na kisi ko 10
 // copy milti hain.
 const WA_OUTBOX_MAX_REVIVALS = 3;
+// 19-20 Aug ko purana session baitha hua tha, isliye kai message 'failed' ho
+// gaye. Ab PMS ka naya API laga hai aur upstream-fail par koshish jalti bhi
+// nahi. Ek baar sabko saaf naya mauka de dete hain.
+async function resetFailedAfterApiSwitch() {
+  const MARKER = 'wa_reset_after_pms_api_v1';
+  try {
+    if (!waAutoAllowed()) return;
+    const d = await getDB();
+    await ensureAppStateTab(d);
+    const done = await d.findWhere('App_State', { key_name: MARKER });
+    if (done && done.length) return;
+
+    const rows = await d.findAll('WA_Outbox');
+    const stuck = rows.filter(r => r.status !== 'sent');
+    for (const r of stuck) {
+      await d.update('WA_Outbox', r.id, {
+        status: 'pending', attempts: '0', revivals: '0', last_error: ''
+      }).catch(() => {});
+    }
+    await d.insert('App_State', {
+      key_name: MARKER, value: `reset ${stuck.length}`,
+      updated_at: new Date().toISOString().replace('T', ' ').split('.')[0]
+    });
+    if (stuck.length) console.log(`  ✅ ${stuck.length} atke message ko naya mauka (naya PMS API ke baad)`);
+    drainWhatsAppOutbox().catch(() => {});
+  } catch (e) {
+    console.error('  resetFailedAfterApiSwitch error:', e.message);
+  }
+}
+
 async function reviveFailedOutbox() {
   try {
     if (!WA.enabled || !WA.url || !WA.apiKey) return { skipped: 'wa-not-configured' };
@@ -1127,7 +1168,7 @@ async function drainWhatsAppOutbox() {
           console.error('  WA outbox — ' + _outboxLastError);
           return;   // gin nahi paaye to bhejo mat, warna duplicate jaayenge
         }
-        const r = await sendWhatsApp(row.phone, row.message, WA_OUTBOX_SEND_TIMEOUT)
+        const r = await sendWhatsApp(row.phone, row.message, WA_OUTBOX_SEND_TIMEOUT, row.kind)
           .catch(e => ({ ok: false, error: e.message }));
         if (r && r.ok) {
           sent++;
@@ -3945,6 +3986,17 @@ app.get('/api/fms-tasks/:fmsId/steps/:stepId/rows', requireAuth, async (req, res
 // Har row par ek hi baar jaata hai (FMS_Notify_Log se dedup).
 
 // "Hello {name}, ghat to be ordered — Bill No: {D}" -> asli values bhar do
+// Ek cell me kai naam — dropdown me jitne tick kiye ("shivam, mona, monu
+// bhaiya"). Comma / slash / newline / semicolon se todte hain. Space se NAHI,
+// warna "Ravi bhaiya piroi" tut jaata.
+function fmsSplitNames(raw) {
+  const SEP = new RegExp('[,;/|\r\n]+');
+  return String(raw == null ? '' : raw)
+    .split(SEP)
+    .map(x => x.trim())
+    .filter(x => x && x.toUpperCase() !== 'FALSE');
+}
+
 function fmsFillTemplate(tpl, row, person) {
   return String(tpl || '').replace(/\{([A-Za-z]{1,3}|name)\}/g, (m, key) => {
     if (String(key).toLowerCase() === 'name') return person || '';
@@ -4053,7 +4105,10 @@ async function runFMSNotifications(force) {
     if (!rules.length) return { rules: 0 };
 
     const sentLog = await d.findAll('FMS_Notify_Log');
-    const already = new Set(sentLog.map(l => `${l.rule_id}|${l.sheet_row}`));
+    // Dedup ab HAR BANDE ka alag — ek hi row se kai logon ko message ja sakta
+    // hai (jaise BEAD CHANGES: AB me jitne naam select honge, sabko jayega).
+    // Purani entries me phone hai hi, isliye ye peeche se bhi theek chalta hai.
+    const already = new Set(sentLog.map(l => `${l.rule_id}|${l.sheet_row}|${l.phone}`));
     const byFms = {};
     for (const r of rules) (byFms[String(r.fms_id)] = byFms[String(r.fms_id)] || []).push(r);
 
@@ -4089,45 +4144,53 @@ async function runFMSNotifications(force) {
           const row = dataRows[i] || [];
           const sheetRow = headerRow + i + 1;
           if (!fmsRuleMatches(row[colIdx], rule.match_value)) continue;
-          const key = `${rule.id}|${sheetRow}`;
-          if (already.has(key)) continue;                  // is row par bhej chuke
 
-          const person = personIdx >= 0
+          // Ek cell me KAI naam ho sakte hain — dropdown me jitne tick kiye,
+          // sab comma/slash se alag hokar aate hain (jaise "shivam, mona").
+          // Sabko alag-alag message jayega.
+          const rawPerson = personIdx >= 0
             ? String(row[personIdx] || '').trim()
             : String(rule.person || '').trim();
-          if (!person) continue;                           // kiska naam hi nahi
-          // Number hamesha sheet ke Notification tab se; fixed-person rule me
-          // naam na mile to rule ka saved number fallback
-          const phone = dir[person.toLowerCase()] || (personIdx >= 0 ? '' : normalizePhone(rule.phone));
-          if (!phone) continue;                            // is naam ka number nahi mila
+          if (!rawPerson) continue;                        // kiska naam hi nahi
+          const people = fmsSplitNames(rawPerson);
+          if (!people.length) continue;
 
-          const text = fmsFillTemplate(rule.message, row, person);
-          if (!text) continue;
-          // Log PEHLE likho — bhejte waqt app restart ho jaye to bhi duplicate
-          // na jaaye (ek missed message duplicate se behtar hai)
-          already.add(key);
-          const nowIst = new Date(Date.now() + 330 * 60000).toISOString().replace('T', ' ').slice(0, 19);
-          await d.insert('FMS_Notify_Log', {
-            rule_id: String(rule.id), sheet_row: String(sheetRow), phone,
-            sent_at: nowIst
-          });
-          // Outbox se — pehle seedha bhejte the, to Aumpfy fail karta to message
-          // hamesha ke liye gum ho jaata tha aur dobara koshish bhi nahi hoti thi.
-          // Ab fail ho to apne aap retry hota hai.
-          const r = await queueWhatsApp(phone, text, 'fms-notify', `${rule.id}:${sheetRow}`, person);
-          const ok = !!r;
-          if (ok) sent++;
-          else { failed++; console.error(`  FMS notify queue fail — ${person} (${phone}) row ${sheetRow}`); }
-          sheetLogRows.push([
-            nowIst,
-            billIdx >= 0 ? String(row[billIdx] == null ? '' : row[billIdx]).trim() : '',
-            person,
-            phone,
-            `COL ${rule.watch_col} = ${rule.match_value || '(kuch bhi)'}`,
-            ok ? '✅ Sent' : '❌ Failed',
-            text,
-            String(sheetRow)
-          ]);
+          for (const person of people) {
+            // Number hamesha sheet ke Notification tab se; fixed-person rule me
+            // naam na mile to rule ka saved number fallback
+            const phone = dir[person.toLowerCase()] || (personIdx >= 0 ? '' : normalizePhone(rule.phone));
+            if (!phone) continue;                          // is naam ka number nahi mila
+            const perKey = `${rule.id}|${sheetRow}|${phone}`;
+            if (already.has(perKey)) continue;             // is bande ko bhej chuke
+
+            const text = fmsFillTemplate(rule.message, row, person);
+            if (!text) continue;
+            // Log PEHLE likho — bhejte waqt app restart ho jaye to bhi duplicate
+            // na jaaye (ek missed message duplicate se behtar hai)
+            already.add(perKey);
+            const nowIst = new Date(Date.now() + 330 * 60000).toISOString().replace('T', ' ').slice(0, 19);
+            await d.insert('FMS_Notify_Log', {
+              rule_id: String(rule.id), sheet_row: String(sheetRow), phone,
+              sent_at: nowIst
+            });
+            // Outbox se — pehle seedha bhejte the, to Aumpfy fail karta to message
+            // hamesha ke liye gum ho jaata tha aur dobara koshish bhi nahi hoti thi.
+            // Ab fail ho to apne aap retry hota hai.
+            const r = await queueWhatsApp(phone, text, 'fms-notify', `${rule.id}:${sheetRow}`, person);
+            const ok = !!r;
+            if (ok) sent++;
+            else { failed++; console.error(`  FMS notify queue fail — ${person} (${phone}) row ${sheetRow}`); }
+            sheetLogRows.push([
+              nowIst,
+              billIdx >= 0 ? String(row[billIdx] == null ? '' : row[billIdx]).trim() : '',
+              person,
+              phone,
+              `COL ${rule.watch_col} = ${rule.match_value || '(kuch bhi)'}`,
+              ok ? '✅ Sent' : '❌ Failed',
+              text,
+              String(sheetRow)
+            ]);
+          }
         }
       }
       // Sab bhejne ke baad ek hi baar sheet me likho (har message par nahi)
@@ -4170,9 +4233,9 @@ const FMS_SEED_RULES = [
   { fmsName: 'pms', watch_col: 'AG', match_value: 'Kavita|yes', person: 'Kavita',
     phone: '9211567771', bill_col: 'D',
     message: 'Hello {name}, Chooda / chooda cover plz order — Bill No: {D}' },
-  // AA = BEAD CHANGES me "No" -> AB (STOCK OF BEADS) me jiska naam likha ho
-  // usi ko jaata hai (Mona / Monu / Ravi bhaiya piroi / Shivam)
-  { fmsName: 'pms', watch_col: 'AA', match_value: 'No', person: '', person_col: 'AB',
+  // AA = BEAD CHANGES me "Yes" -> AB (STOCK OF BEADS) me jitne naam tick kiye
+  // hon, UN SABKO jaata hai (Mona / Monu / Ravi bhaiya piroi / Shivam)
+  { fmsName: 'pms', watch_col: 'AA', match_value: 'Yes', person: '', person_col: 'AB',
     phone: '', bill_col: 'D',
     message: 'Hello {name}, plz check beads are availabe or not if not available so plz order by Ashok Sn and also change the bead of this order — Bill No: {D}' },
   // DA = Step-18 ka Actual — date aate hi (step 18 done) Bajji ko shoot ka
@@ -4185,6 +4248,35 @@ const FMS_SEED_RULES = [
     phone: '9810479397', bill_col: 'D',
     message: 'Hello {name}, porter booking — {DL} | Contact: {DM} | Bill No: {D}' }
 ];
+
+// AA (BEAD CHANGES) ka rule pehle "No" par tha; Harsh ne 20 Aug ko badla —
+// ab "Yes" par jaana hai. Seeding sirf naye rule banati hai, purane ko haath
+// nahi lagati, isliye yahan seedha update karte hain.
+async function fixBeadRuleToYes() {
+  const MARKER = 'fms_bead_rule_no_to_yes_v1';
+  try {
+    const d = await getDB();
+    await ensureAppStateTab(d);
+    const done = await d.findWhere('App_State', { key_name: MARKER });
+    if (done && done.length) return;
+
+    const rules = await d.findAll('FMS_Notify_Rules').catch(() => []);
+    let fixed = 0;
+    for (const r of rules) {
+      if (String(r.watch_col || '').toUpperCase() !== 'AA') continue;
+      if (String(r.match_value || '').trim().toLowerCase() !== 'no') continue;
+      await d.update('FMS_Notify_Rules', r.id, { match_value: 'Yes', person_col: 'AB', person: '' });
+      fixed++;
+    }
+    await d.insert('App_State', {
+      key_name: MARKER, value: `fixed ${fixed}`,
+      updated_at: new Date().toISOString().replace('T', ' ').split('.')[0]
+    });
+    if (fixed) console.log(`  ✅ BEAD CHANGES rule ab "Yes" par (${fixed} rule)`);
+  } catch (e) {
+    console.error('  fixBeadRuleToYes error:', e.message);
+  }
+}
 
 async function seedFMSNotifyRules() {
   try {
@@ -5338,6 +5430,8 @@ async function seedAdminIfNeeded() {
       .then(() => setTimeout(() => backfillMissedAssignAlerts().catch(() => {}), 45 * 1000))
       .then(() => setTimeout(() => resetTimedOutOutbox().catch(() => {}), 55 * 1000))
       .then(() => setTimeout(() => refireTodays5pmReminder().catch(() => {}), 70 * 1000))
+      .then(() => fixBeadRuleToYes().catch(() => {}))
+      .then(() => setTimeout(() => resetFailedAfterApiSwitch().catch(() => {}), 80 * 1000))
       .catch(err => console.error('  Background DB connection failed (will retry on demand):', err.message));
 
     // SMTP verify (non-blocking)
