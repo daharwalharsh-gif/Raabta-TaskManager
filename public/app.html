@@ -3136,7 +3136,19 @@ function renderDashTable(tasks, type) {
     ].join(' ').toLowerCase().includes(dashSearchQuery));
   }
   // Apply date sort
-  if (_dashDateSortState === 1) {
+  if (_dashDateSortState === 0) {
+    // Default: AAJ ke task sabse upar, phir aage ki date, aur purani date niche.
+    // Sabse purana sabse aakhir me. (Date par click karke ye badal sakte ho.)
+    const todayStr = new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
+      .toISOString().split('T')[0];
+    const dOf = t => String(t.due_date || t.date || '');
+    allPending = [...allPending].sort((a, b) => {
+      const da = dOf(a), db = dOf(b);
+      const aToday = da === todayStr, bToday = db === todayStr;
+      if (aToday !== bToday) return aToday ? -1 : 1;   // aaj wale sabse upar
+      return db.localeCompare(da);                      // baaki: nayi date upar, purani niche
+    });
+  } else if (_dashDateSortState === 1) {
     // Ascending: oldest (earliest) date first — aaj ki pehle aaye
     allPending = [...allPending].sort((a,b) => (a.due_date||a.date||'').localeCompare(b.due_date||b.date||''));
   } else if (_dashDateSortState === 2) {
