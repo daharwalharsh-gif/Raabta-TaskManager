@@ -921,11 +921,11 @@ function waApiFor(kind) {
   return { url: WA.url, apiKey: WA.apiKey, name: 'default' };
 }
 
-async function sendWhatsApp(rawPhone, message, timeoutMs, kind) {
+async function sendWhatsApp(rawPhone, message, timeoutMs, kind, apiOverride) {
   if (!WA.enabled) return { skipped: 'disabled' };
   const phone = normalizePhone(rawPhone);
   if (!phone) return { skipped: 'no-phone' };
-  const api = waApiFor(kind);
+  const api = apiOverride || waApiFor(kind);
   if (!api.url || !api.apiKey) return { skipped: 'not-configured' };
   try {
     const resp = await fetch(api.url, {
@@ -983,17 +983,59 @@ function isUpstreamDown(err) {
 }
 const WA_BREAKER_TRIP_AFTER = 3;       // lagatar itne upstream-fail par ruk jao
 const WA_BREAKER_COOLDOWN_MS = 10 * 60 * 1000;   // itni der ruko, phir ek probe
-let _waFailStreak = 0;
-let _waBreakerUntil = 0;
-function waBreakerOpen() { return Date.now() < _waBreakerUntil; }
-function waNoteSendResult(ok, err) {
-  if (ok) { _waFailStreak = 0; _waBreakerUntil = 0; return; }
+// Breaker har API ka ALAG — ek band ho to doosre par asar na pade
+const _waBreaker = {};   // { apiName: { streak, until } }
+function _brk(name) { return (_waBreaker[name] = _waBreaker[name] || { streak: 0, until: 0 }); }
+function waBreakerOpen(name) { return Date.now() < _brk(name || 'default').until; }
+function waNoteSendResult(ok, err, name) {
+  const b = _brk(name || 'default');
+  if (ok) { b.streak = 0; b.until = 0; return; }
   if (!isUpstreamDown(err)) return;              // message ki apni dikkat — streak mat badhao
-  _waFailStreak++;
-  if (_waFailStreak >= WA_BREAKER_TRIP_AFTER && !waBreakerOpen()) {
-    _waBreakerUntil = Date.now() + WA_BREAKER_COOLDOWN_MS;
-    console.error(`  WA breaker: Aumpfy jawab nahi de raha — ${WA_BREAKER_COOLDOWN_MS / 60000} min ruk rahe hain, message surakshit hain`);
+  b.streak++;
+  if (b.streak >= WA_BREAKER_TRIP_AFTER && Date.now() >= b.until) {
+    b.until = Date.now() + WA_BREAKER_COOLDOWN_MS;
+    console.error(`  WA breaker [${name}]: jawab nahi de raha — ${WA_BREAKER_COOLDOWN_MS / 60000} min ruk rahe hain, message surakshit hain`);
   }
+}
+
+// ── "Kuch bhi ho jaye, turant chala jaana chahiye" ──
+// Harsh ka niyam: task delegate karte hi alert jaana chahiye. Ek API baithi ho
+// to message rukna nahi chahiye — doosri chalu API se bhej do. Number thoda
+// alag dikhega, par message pahunchega. Na pahunchne se behtar hai.
+//
+// Jab pehli API pehle se hi band pata ho, to uspar samay bilkul mat jalao —
+// seedha chalu wali se bhejo (isse "turant" sach me turant rehta hai).
+function waOtherApi(name) {
+  if (name === 'pms') return { url: WA.url, apiKey: WA.apiKey, name: 'default' };
+  if (WA.pms && WA.pms.url && WA.pms.apiKey) {
+    return { url: WA.pms.url, apiKey: WA.pms.apiKey, name: 'pms' };
+  }
+  return null;
+}
+
+async function sendWhatsAppSure(rawPhone, message, timeoutMs, kind) {
+  const primary = waApiFor(kind);
+  const backup = waOtherApi(primary.name);
+  const order = (backup && waBreakerOpen(primary.name)) ? [backup, primary] : [primary, backup];
+
+  let last = null;
+  for (const api of order) {
+    if (!api) continue;
+    const r = await sendWhatsApp(rawPhone, message, timeoutMs, kind, api)
+      .catch(e => ({ ok: false, error: e.message }));
+    waNoteSendResult(!!(r && r.ok), (r && (r.error || r.status)) || '', api.name);
+    if (r && r.ok) {
+      if (api.name !== primary.name) {
+        console.log(`  WA: ${primary.name} band tha, message ${api.name} se bhej diya`);
+      }
+      return r;
+    }
+    last = r;
+    // Sirf tab doosri koshish jab pehli API hi baithi ho. Galat number ya galat
+    // key par doosri API bhi wahi galti degi — bekaar do baar mat bhejo.
+    if (!isUpstreamDown((r && (r.error || r.status)) || '')) return r;
+  }
+  return last || { ok: false, error: 'no-api' };
 }
 
 async function queueWhatsApp(phone, message, kind, ref, person, opts) {
@@ -1032,11 +1074,12 @@ async function sendNowThenSettle(d, row) {
     console.error('  WA outbox — sending likhna fail:', e.message);
     return;   // drain baad me uthayega
   }
-  const r = await sendWhatsApp(row.phone, row.message, WA_OUTBOX_SEND_TIMEOUT, row.kind)
+  // Assign-time alert — "kuch bhi ho jaye turant jaana chahiye". Ek API baithi
+  // ho to doosri chalu wali se chala jaata hai.
+  const r = await sendWhatsAppSure(row.phone, row.message, WA_OUTBOX_SEND_TIMEOUT, row.kind)
     .catch(e => ({ ok: false, error: e.message }));
   const ok = !!(r && r.ok);
   const err = String((r && (r.error || r.status)) || 'unknown');
-  waNoteSendResult(ok, err);
   // Aumpfy ki kharabi ho to koshish wapas 0 — drain poori budget ke saath uthayega
   const patch = ok
     ? { status: 'sent', sent_at: new Date().toISOString().replace('T', ' ').split('.')[0] }
@@ -1146,7 +1189,7 @@ async function drainWhatsAppOutbox() {
 
     // Aumpfy band hai — koshish jalane ka koi fayda nahi. Message pade rahenge,
     // wo theek hote hi apne aap chale jayenge.
-    if (waBreakerOpen()) {
+    if (waBreakerOpen('default') && waBreakerOpen('pms')) {
       return { skipped: 'aumpfy-down', waiting: pending.length,
                retryAfterSec: Math.round((_waBreakerUntil - Date.now()) / 1000) };
     }
@@ -1168,7 +1211,7 @@ async function drainWhatsAppOutbox() {
           console.error('  WA outbox — ' + _outboxLastError);
           return;   // gin nahi paaye to bhejo mat, warna duplicate jaayenge
         }
-        const r = await sendWhatsApp(row.phone, row.message, WA_OUTBOX_SEND_TIMEOUT, row.kind)
+        const r = await sendWhatsAppSure(row.phone, row.message, WA_OUTBOX_SEND_TIMEOUT, row.kind)
           .catch(e => ({ ok: false, error: e.message }));
         if (r && r.ok) {
           sent++;
@@ -1185,7 +1228,6 @@ async function drainWhatsAppOutbox() {
           failed++;
           const err = (r && (r.error || r.skipped || r.status)) || 'unknown';
           _outboxLastError = String(err);
-          waNoteSendResult(false, err);
           // Aumpfy ki kharabi ho to koshish wapas — message ki budget nahi katti
           const down = isUpstreamDown(err);
           const keptAttempts = down ? String(attempts - 1) : String(attempts);
@@ -5156,7 +5198,8 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
         outbox.lastError = (stuck.find(r => r.last_error) || {}).last_error || _outboxLastError || '(koi error record nahi)';
       }
       outbox.running = _outboxRunning;
-      if (waBreakerOpen()) outbox.aumpfyDown = `haan — ${Math.round((_waBreakerUntil - Date.now()) / 1000)}s baad phir koshish`;
+      const dn = ['default', 'pms'].filter(n => waBreakerOpen(n));
+      if (dn.length) outbox.aumpfyDown = dn.join(' + ') + ' band';
     } catch { /* table abhi bani nahi — koi baat nahi */ }
     // Backfill chala ya nahi — bina login diagnose ke liye
     let backfill = null;
