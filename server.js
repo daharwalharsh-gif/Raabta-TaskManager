@@ -1000,6 +1000,25 @@ function isUpstreamDown(err) {
     || e.includes('network') || e.includes('fetch failed')
     || e === '502' || e === '503' || e === '504' || e === '500';
 }
+
+// Galti ki teen kism — inka farak SABSE zaroori hai (20 Aug ko Nishant ko ek
+// reminder 6 baar gaya, isi farak ko na samajhne ki wajah se):
+//
+//  a) CONNECT hi nahi hua (ECONNREFUSED/ENOTFOUND/fetch failed) — request
+//     Aumpfy tak pahunchi hi nahi => message PAKKA nahi gaya => dobara
+//     bhejna 100% safe.
+//  b) AMBIGUOUS (timeout / 502-504) — request nikal gayi, jawab nahi aaya.
+//     Aumpfy AKSAR aise me message pahuncha chuka hota hai (logs me dikha).
+//     => dobara bhejna = bande ko wahi message phir se. KABHI auto-resend
+//     nahi — row 'unknown' hokar wahin rukti hai.
+//  c) CONFIG/MESSAGE kharab (400/401/404) — bheja, Aumpfy ne mana kar diya
+//     => message nahi gaya, par dobara bhejne se bhi wahi hoga. Ginti ke
+//     saath 2-3 koshish, phir 'failed'.
+function isConnectError(err) {
+  const e = String(err == null ? '' : err).toLowerCase();
+  return e.includes('econnrefused') || e.includes('enotfound')
+    || e.includes('eai_again') || e.includes('fetch failed');
+}
 const WA_BREAKER_TRIP_AFTER = 3;
 const WA_BREAKER_COOLDOWN_MS = 10 * 60 * 1000;
 const _waBreaker = {};   // { apiName: { streak, until } }
@@ -1115,9 +1134,19 @@ async function sendNowThenSettle(d, row) {
     .catch(e => ({ ok: false, error: e.message }));
   const ok = !!(r && r.ok);
   const err = String((r && (r.error || r.status)) || 'unknown');
-  const patch = ok
-    ? { status: 'sent', sent_at: new Date().toISOString().replace('T', ' ').split('.')[0] }
-    : { status: 'pending', attempts: isUpstreamDown(err) ? '0' : '1', last_error: err };
+  let patch;
+  if (ok) {
+    patch = { status: 'sent', sent_at: new Date().toISOString().replace('T', ' ').split('.')[0] };
+  } else if (isConnectError(err)) {
+    // Request nikli hi nahi — retry 100% safe
+    patch = { status: 'pending', attempts: '0', posts: '0', last_error: err };
+  } else if (isUpstreamDown(err)) {
+    // Jawab nahi mila — message pahuncha ho sakta hai. Duplicate se bachne ke
+    // liye FINAL 'unknown', koi auto-resend nahi.
+    patch = { status: 'unknown', last_error: `jawab nahi mila (${err}) — pahuncha ho sakta hai, dobara NAHI bhejenge` };
+  } else {
+    patch = { status: 'pending', attempts: '1', last_error: err };
+  }
   if (!ok) _outboxLastError = err;
   await d.update('WA_Outbox', row.id, patch).catch(() => {});
 }
@@ -1193,16 +1222,18 @@ async function reviveFailedOutbox() {
     const dayAgo = new Date(Date.now() - 24 * 3600 * 1000).toISOString().replace('T', ' ').split('.')[0];
     let revived = 0;
     for (const r of rows) {
-      // 'failed' = koshish poori karke haar maani. 'unknown' = MAX_POSTS baar
-      // POST kiya par Aumpfy ne kabhi jawab hi nahi diya — dono ko phir mauka
-      // do, warna 'unknown' hamesha ke liye orphan reh jaata (Harsh ka niyam:
-      // message kabhi hamesha ke liye ruka na rahe).
-      if (r.status !== 'failed' && r.status !== 'unknown') continue;
+      // SIRF 'failed' (config/message kharabi wale). 'unknown' ko KABHI nahi —
+      // unknown ka matlab hai "pahuncha ho sakta hai": revive karne se Nishant
+      // ko 20 Aug ko ek reminder 6 baar gaya tha (har 20-min tick unhe naya
+      // mauka de raha tha aur Aumpfy har baar pahuncha bhi raha tha). Unknown
+      // manually hi bheje ja sakte hain: /api/admin/wa-outbox?retry=1
+      if (r.status !== 'failed') continue;
       if (String(r.created_at || '') < dayAgo) continue;
       const n = parseInt(r.revivals) || 0;
       if (n >= WA_OUTBOX_MAX_REVIVALS) continue;
+      // posts RESET NAHI hota — POST ki kul ginti hamesha aage badhti hai
       await d.update('WA_Outbox', r.id, {
-        status: 'pending', attempts: String(WA_OUTBOX_MAX_ATTEMPTS - 1), posts: '0', revivals: String(n + 1)
+        status: 'pending', attempts: String(WA_OUTBOX_MAX_ATTEMPTS - 1), revivals: String(n + 1)
       }).catch(() => {});
       revived++;
     }
@@ -1296,19 +1327,30 @@ async function drainWhatsAppOutbox() {
           failed++;
           const err = (r && (r.error || r.skipped || r.status)) || 'unknown';
           _outboxLastError = String(err);
-          // Aumpfy ki kharabi ho to koshish wapas — message ki budget nahi katti
-          const down = isUpstreamDown(err);
-          const keptAttempts = down ? String(attempts - 1) : String(attempts);
-          const giveUp = !down && attempts >= WA_OUTBOX_MAX_ATTEMPTS;
+          let patch, label;
+          if (isConnectError(err)) {
+            // Request nikli hi nahi — message pakka nahi gaya, refund + retry safe
+            patch = { status: 'pending', attempts: String(attempts - 1), posts: String(posts - 1), last_error: String(err) };
+            label = 'connect-fail, dobara jayega';
+          } else if (isUpstreamDown(err)) {
+            // AMBIGUOUS: Aumpfy ne jawab nahi diya par message pahuncha chuka ho
+            // sakta hai. Dobara bhejna = duplicate (Nishant ko 6x isi se gaya).
+            // FINAL 'unknown' — koi auto-resend nahi. Manually:
+            // /api/admin/wa-outbox?retry=1
+            patch = { status: 'unknown', last_error: `jawab nahi mila (${err}) — pahuncha ho sakta hai, isliye dobara NAHI bhejenge` };
+            label = 'jawab nahi mila — duplicate se bachne ke liye yahin ruke';
+          } else {
+            // Config/message kharab (401/400/404) — ginti ke saath retry, phir failed
+            const giveUp = attempts >= WA_OUTBOX_MAX_ATTEMPTS;
+            patch = { status: giveUp ? 'failed' : 'pending', attempts: String(attempts), last_error: String(err) };
+            label = giveUp ? 'GAVE UP' : 'retry';
+          }
           try {
-            await d.update('WA_Outbox', row.id, {
-              status: giveUp ? 'failed' : 'pending',
-              attempts: keptAttempts, last_error: String(err)
-            });
+            await d.update('WA_Outbox', row.id, patch);
           } catch (e) {
             console.error('  WA outbox — status likhna fail:', e.message);
           }
-          console.error(`  WA outbox ${giveUp ? 'GAVE UP' : (down ? 'aumpfy-down, koshish nahi gini' : 'retry')} (${keptAttempts}/${WA_OUTBOX_MAX_ATTEMPTS}) — ${row.person || row.phone}: ${err}`);
+          console.error(`  WA outbox ${label} (${attempts}/${WA_OUTBOX_MAX_ATTEMPTS}) — ${row.person || row.phone}: ${err}`);
         }
       }));
     }
@@ -1524,14 +1566,33 @@ async function runWhatsAppReminders(slotKey, force) {
     // drain unhe EK-EK karke bhejta hai. Pehle 8 ek saath jaate the aur Aumpfy
     // un sabko timeout kar deta tha; marker "bhej diya" bol deta tha aur
     // message hamesha ke liye gum ho jaate the. Ab fail ho to retry hota hai.
-    let queued = 0;
+    //
+    // PER-BANDA DEDUP (20 Aug — Ashish 4x / Nishant 6x ke baad): ek bande ko
+    // ek din me subah (AM) ka reminder EK hi baar ban sakta hai aur shaam
+    // (PM) ka EK hi baar — chahe pass kitni bhi baar chale (time-change se
+    // naya marker ban jaye, force ho, kuch bhi ho). Ref = rem_DATE_AM/PM,
+    // outbox me wahi ref + wahi phone pehle se ho to us bande ko skip.
+    const halfDay = (parseInt(String(slotKey || istHour).slice(0, 2), 10) < 13) ? 'AM' : 'PM';
+    const remRef = `rem_${dateStr}_${halfDay}`;
+    let alreadyQueued = new Set();
+    try {
+      const d = await getDB();
+      const rows = await d.findAll('WA_Outbox');
+      rows.forEach(r0 => {
+        if (r0.kind === 'daily-reminder' && r0.ref === remRef) alreadyQueued.add(r0.phone);
+      });
+    } catch (e) { /* dedup na ho paye to bhi pass rukna nahi chahiye */ }
+
+    let queued = 0, skippedDup = 0;
     for (const r of recipients) {
+      if (alreadyQueued.has(r.phone)) { skippedDup++; continue; }
       const row = await queueWhatsApp(
         r.phone, waReminderMsg(r.name, r.tasks, todayStr),
-        'daily-reminder', marker, r.name, { immediate: false }
+        'daily-reminder', remRef, r.name, { immediate: false }
       );
-      if (row) queued++;
+      if (row) { queued++; alreadyQueued.add(r.phone); }
     }
+    if (skippedDup) console.log(`  WA reminders: ${skippedDup} bande skip — aaj ${halfDay} ka reminder unke liye pehle hi ban chuka`);
     drainWhatsAppOutbox().catch(() => {});
     console.log(`  WhatsApp reminder pass @ ${todayStr}: ${recipients.length} recipients — ${queued} outbox me daale, ${noPhone} bina phone`);
     return { queued, noPhone, recipients: recipients.length };
