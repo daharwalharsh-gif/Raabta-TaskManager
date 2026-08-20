@@ -1059,7 +1059,10 @@ async function sendWhatsAppSure(rawPhone, message, timeoutMs, kind) {
 const WA_OUTBOX_MAX_ATTEMPTS = 3;    // asli galti (401/400) par itni baar koshish
 const WA_OUTBOX_SEND_TIMEOUT = 90000; // Aumpfy healthy ho to ~50s me jawab de deta hai
 const WA_OUTBOX_PER_RUN = 30;         // ek tick me itne message uthao
-const WA_OUTBOX_CONCURRENCY = 3;      // itne saath-saath (8 par Aumpfy baith jaata hai)
+// Ab EK hi session poora traffic (delegation+checklist+reminder+FMS) sambhalta
+// hai — 3 saath-saath bhejne par response time 5s se badhkar 57s tak chala
+// gaya (20 Aug, live dekha). Isliye 2 par le aaye — kam bojh, kam timeout.
+const WA_OUTBOX_CONCURRENCY = 2;
 const WA_OUTBOX_MAX_POSTS = 2;        // jawab chahe kuch bhi aaye, itni baar POST karke ruk jao
 const WA_OUTBOX_MAX_REVIVALS = 3;     // 'failed' ho chuke ko itni baar phir mauka
 
@@ -1144,12 +1147,16 @@ async function reviveFailedOutbox() {
     const dayAgo = new Date(Date.now() - 24 * 3600 * 1000).toISOString().replace('T', ' ').split('.')[0];
     let revived = 0;
     for (const r of rows) {
-      if (r.status !== 'failed') continue;
+      // 'failed' = koshish poori karke haar maani. 'unknown' = MAX_POSTS baar
+      // POST kiya par Aumpfy ne kabhi jawab hi nahi diya — dono ko phir mauka
+      // do, warna 'unknown' hamesha ke liye orphan reh jaata (Harsh ka niyam:
+      // message kabhi hamesha ke liye ruka na rahe).
+      if (r.status !== 'failed' && r.status !== 'unknown') continue;
       if (String(r.created_at || '') < dayAgo) continue;
       const n = parseInt(r.revivals) || 0;
       if (n >= WA_OUTBOX_MAX_REVIVALS) continue;
       await d.update('WA_Outbox', r.id, {
-        status: 'pending', attempts: String(WA_OUTBOX_MAX_ATTEMPTS - 1), revivals: String(n + 1)
+        status: 'pending', attempts: String(WA_OUTBOX_MAX_ATTEMPTS - 1), posts: '0', revivals: String(n + 1)
       }).catch(() => {});
       revived++;
     }
