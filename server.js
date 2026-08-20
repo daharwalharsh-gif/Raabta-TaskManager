@@ -887,12 +887,62 @@ function reminderScheduler() {
 // ══════════════════════════════════════════════════════
 // WHATSAPP  (Aumpfy custom trigger API)
 // ══════════════════════════════════════════════════════
-// Sends task alerts + daily reminders to each user's WhatsApp number.
-// Configure via .env — defaults below let it work out of the box.
-// Secrets come from .env only — never hardcode the API key/URL (repo may be public).
-// All WhatsApp API settings live in whatsapp.config.js (gitignored — edit that
-// file to change your API key / URL / payload format, then restart the app).
-// If it doesn't exist yet, fall back to the committed example (which reads env).
+// ════════════════════════════════════════════════════════════════════════
+// WHATSAPP — POORA SYSTEM EK JAGAH (rewrite: 20 Aug 2026)
+// ════════════════════════════════════════════════════════════════════════
+// Ye poora module ek hi kaam karta hai: WhatsApp message bhejna, bina kisi
+// ko kabhi chhoote. Yahan se 3 tarah ke message jaate hain — task assign
+// karte waqt ka alert, daily reminder (10:15 & 5PM), aur PMS/FMS sheet ke
+// notification. Teeno isi ek raste se guzarte hain.
+//
+// KAAM KAISE HOTA HAI (upar se neeche padho, yahi poora flow hai):
+//
+//  1. CONFIG — whatsapp.config.js se do API load hoti hain:
+//       WA          → default: delegation, checklist, daily reminder
+//       WA.pms      → PMS/FMS sheet ke notification
+//     `kind` string (jaise 'assign-delegation', 'daily-reminder',
+//     'fms-notify') decide karta hai kaunsi API use hogi — waApiFor() dekho.
+//
+//  2. QUEUE (queueWhatsApp) — koi bhi message bhejne se PEHLE DB (WA_Outbox)
+//     me likha jaata hai. App restart ho jaye, Aumpfy fail kare, kuch bhi ho
+//     — message DB me surakshit padha rehta hai. Isके baad turant bhejne ki
+//     koshish hoti hai (assign-time alert ke liye) — kataar me nahi lagta.
+//
+//  3. SEND (sendWhatsApp) — asli HTTP POST Aumpfy ko. Kabhi throw nahi karta,
+//     hamesha { ok, error/status } jaisa object deta hai.
+//
+//  4. BREAKER — agar Aumpfy khud hi jawab na de (timeout/502/503), to us
+//     galti ko "upstream ki kharabi" maana jaata hai — message ki koshish
+//     ginti nahi katti (isUpstreamDown). Lagatar 3 aisi galti par us API ka
+//     breaker 10 min ke liye "band" ho jaata hai — tab tak uske message POST
+//     hi nahi hote, taaki na Aumpfy par bojh pade na message bar-bar POST ho
+//     kar kisi ko duplicate mile.
+//
+//  5. DRAIN (drainWhatsAppOutbox) — har 60s tick par chalta hai. Jo message
+//     pending pade hain (aur jinki API band nahi hai) unhe 3-3 ke batch me
+//     bhejta hai. Har message zyada se zyada 3 baar koshish (asli galti par)
+//     aur zyada se zyada 2 baar POST (jawab chahe kuch bhi aaye — warna
+//     Aumpfy jawab na de kar bhi message pahuncha de to duplicate ho jaate).
+//
+//  6. REVIVE — 'failed' ho chuke message (24 ghante ke andar wale) ko har
+//     20 min me phir mauka milta hai, max 3 baar.
+//
+// HAMESHA YAAD RAKHNA (Harsh ke pakke niyam):
+//   - Message KABHI seedha sendWhatsApp() se mat bhejo. Hamesha
+//     queueWhatsApp() se — warna fail hone par gum ho jaata hai.
+//   - Ek API doosri ke liye kabhi fallback nahi karti (WA.allowApiFallback
+//     hamesha false rakhna) — delegation/checklist/reminder hamesha default
+//     API se hi, PMS/FMS hamesha pms API se hi. 20 Aug ko isi rule ko todne
+//     se logon ko pms number se reminder chala gaya tha — dobara mat karna.
+//   - Diagnose: GET /api/cron/wa-reminders ke JSON me `outbox` field —
+//     sent/pending/failed/sending/unknown ki ginti, aakhri galti, aur
+//     kaunsi API band hai (agar koi ho).
+// ════════════════════════════════════════════════════════════════════════
+
+// ── 1) CONFIG ──────────────────────────────────────────────────────────
+// whatsapp.config.js gitignored... nahi, ye file git-tracked hai (repo
+// public hai) — API settings badalne ke liye seedha wahi file edit karo,
+// phir app restart karo.
 let WA;
 try {
   WA = require('./whatsapp.config');
@@ -901,20 +951,20 @@ try {
   console.log('  whatsapp.config.js not found — using whatsapp.config.example.js (env-based). Copy it to whatsapp.config.js to set your API.');
 }
 
-// Turn any stored phone value into WhatsApp digits: country code + number, no +/spaces.
+// Koi bhi stored phone value -> WhatsApp ka digit format (country code +
+// number, koi +/space nahi).
 function normalizePhone(raw) {
   if (!raw) return '';
-  let d = String(raw).replace(/\D/g, '');   // keep digits only
+  let d = String(raw).replace(/\D/g, '');
   if (!d) return '';
-  d = d.replace(/^0+/, '');                  // drop leading zeros (e.g. 098765...)
-  if (d.length <= 10) d = WA.countryCode + d; // local number → prepend country code
+  d = d.replace(/^0+/, '');
+  if (d.length <= 10) d = WA.countryCode + d;
   return d;
 }
 
-// Fire-and-forget WhatsApp send. Never throws — logs and returns a status object.
-// Kis message ke liye kaunsa API. PMS/FMS sheet wale message alag session
-// (pms phone) se jaate hain — Harsh ne alag trigger diya hai. Delegation,
-// checklist aur daily reminder default wale se hi jaate hain.
+// ── 2) KIS MESSAGE KE LIYE KAUNSI API ─────────────────────────────────
+// PMS/FMS sheet ke notification alag session (pms) se jaate hain. Baaki
+// SAB (delegation, checklist, daily reminder) default se.
 function waApiFor(kind) {
   if (String(kind || '') === 'fms-notify' && WA.pms && WA.pms.url && WA.pms.apiKey) {
     return { url: WA.pms.url, apiKey: WA.pms.apiKey, name: 'pms' };
@@ -922,6 +972,45 @@ function waApiFor(kind) {
   return { url: WA.url, apiKey: WA.apiKey, name: 'default' };
 }
 
+// Doosri API se bhejna — SIRF tab jab whatsapp.config.js me
+// allowApiFallback:true ho, aur SIRF fms-notify ke liye. Harsh ne 20 Aug ko
+// saaf mana kiya ki delegation/checklist/reminder kabhi pms number se na
+// jaayein — isliye ye check hamesha null dega jab tak khud config na badlo.
+function waOtherApi(name, kind) {
+  if (String(kind || '') !== 'fms-notify') return null;
+  if (!WA.allowApiFallback) return null;
+  if (name === 'pms') return { url: WA.url, apiKey: WA.apiKey, name: 'default' };
+  return null;
+}
+
+// ── 3) CIRCUIT BREAKER (har API ka alag) ──────────────────────────────
+// Timeout/502/503/504/network jaisi galti "upstream ki kharabi" hai —
+// message ki apni galti nahi. Aisi galti par koshish ki ginti nahi katti,
+// aur lagatar 3 aisi galti par us API ke liye kataar 10 min ruk jaati hai.
+function isUpstreamDown(err) {
+  const e = String(err == null ? '' : err).toLowerCase();
+  return e.includes('timeout') || e.includes('aborted') || e.includes('abort')
+    || e.includes('econn') || e.includes('enotfound') || e.includes('socket')
+    || e.includes('network') || e.includes('fetch failed')
+    || e === '502' || e === '503' || e === '504' || e === '500';
+}
+const WA_BREAKER_TRIP_AFTER = 3;
+const WA_BREAKER_COOLDOWN_MS = 10 * 60 * 1000;
+const _waBreaker = {};   // { apiName: { streak, until } }
+function _brk(name) { return (_waBreaker[name] = _waBreaker[name] || { streak: 0, until: 0 }); }
+function waBreakerOpen(name) { return Date.now() < _brk(name || 'default').until; }
+function waNoteSendResult(ok, err, name) {
+  const b = _brk(name || 'default');
+  if (ok) { b.streak = 0; b.until = 0; return; }
+  if (!isUpstreamDown(err)) return;
+  b.streak++;
+  if (b.streak >= WA_BREAKER_TRIP_AFTER && Date.now() >= b.until) {
+    b.until = Date.now() + WA_BREAKER_COOLDOWN_MS;
+    console.error(`  WA breaker [${name}]: jawab nahi de raha — ${WA_BREAKER_COOLDOWN_MS / 60000} min ruk rahe hain, message surakshit hain`);
+  }
+}
+
+// ── 4) ASLI SEND — ek HTTP POST, kabhi throw nahi karta ───────────────
 async function sendWhatsApp(rawPhone, message, timeoutMs, kind, apiOverride) {
   if (!WA.enabled) return { skipped: 'disabled' };
   const phone = normalizePhone(rawPhone);
@@ -948,85 +1037,9 @@ async function sendWhatsApp(rawPhone, message, timeoutMs, kind, apiOverride) {
   }
 }
 
-// ── WhatsApp OUTBOX ──
-// Pehle DB me likho, phir bhejo. Fail ho / app restart ho jaye to agla tick
-// dobara koshish karta hai. Isse "aadhe logon ko message nahi gaya" khatam.
-// Timeout ka matlab ye NAHI ki message gaya hi nahi — Aumpfy dheere jawab de
-// aur message pahunch bhi chuka ho sakta hai. Isliye kam baar dohrate hain,
-// warna banda ko wahi message 4-5 baar mil jaata hai.
-const WA_OUTBOX_MAX_ATTEMPTS = 3;
-// Aumpfy healthy ho to ~50s me jawab de deta hai. 90s tak na de to wo message
-// waise bhi nahi ja raha — 150s intezaar sirf kataar ko slow karta tha.
-const WA_OUTBOX_SEND_TIMEOUT = 90000;
-const WA_OUTBOX_PER_RUN = 30;            // ek run me itne — 46 log ka pass 2 run me
-// 8 saath bhejne par Aumpfy sabko timeout kar deta hai (aaj dekha), aur ek-ek
-// karke 29 message me ~25 min lagte hain. 3 dono se bacha leta hai — teen guna
-// tez, aur Aumpfy par itna bojh nahi ki wo baith jaye.
-const WA_OUTBOX_CONCURRENCY = 3;
-// Ek message ko zyada se zyada itni baar POST karenge — jawab chahe kuch bhi
-// aaye. Timeout ka matlab ye NAHI ki message gaya hi nahi; Aumpfy use pahuncha
-// bhi chuka ho sakta hai. Isliye bar-bar POST karna = banda ko wahi message
-// kai baar. 20 Aug ko Varun ko daily reminder DO BAAR gaya, wajah yahi thi.
-// 2 = ek koshish + ek dobara. Isse zyada se zyada 2 copy, aur delivery ka
-// achha mauka bhi.
-const WA_OUTBOX_MAX_POSTS = 2;
-
-// ── Aumpfy band ho to message ki koshish MAT jalao ──
-// Aaj (19 Aug) Aumpfy ghanton latka raha — sahi payload par 180s tak koi jawab
-// nahi. Aise me har koshish 90s jala kar fail hoti hai; 3 koshish + 3 mauke
-// milakar har message ~1 ghante me hamesha ke liye 'failed' ho jaata. Yaani
-// upstream ki kharabi hamare message kha jaati.
-//
-// Isliye: fail ki do kism alag karte hain.
-//   upstream kharab (timeout / 502 / 503 / 504 / network) -> koshish WAPAS kar do,
-//     message ki budget nahi katti. Aur thodi der ke liye kataar rok do.
-//   message/config kharab (400 / 401 / 404) -> yahi koshish gini jayegi.
-// Isse Aumpfy chahe 5 ghante band rahe, message theek hote hi chala jayega.
-function isUpstreamDown(err) {
-  const e = String(err == null ? '' : err).toLowerCase();
-  return e.includes('timeout') || e.includes('aborted') || e.includes('abort')
-    || e.includes('econn') || e.includes('enotfound') || e.includes('socket')
-    || e.includes('network') || e.includes('fetch failed')
-    || e === '502' || e === '503' || e === '504' || e === '500';
-}
-const WA_BREAKER_TRIP_AFTER = 3;       // lagatar itne upstream-fail par ruk jao
-const WA_BREAKER_COOLDOWN_MS = 10 * 60 * 1000;   // itni der ruko, phir ek probe
-// Breaker har API ka ALAG — ek band ho to doosre par asar na pade
-const _waBreaker = {};   // { apiName: { streak, until } }
-function _brk(name) { return (_waBreaker[name] = _waBreaker[name] || { streak: 0, until: 0 }); }
-function waBreakerOpen(name) { return Date.now() < _brk(name || 'default').until; }
-function waNoteSendResult(ok, err, name) {
-  const b = _brk(name || 'default');
-  if (ok) { b.streak = 0; b.until = 0; return; }
-  if (!isUpstreamDown(err)) return;              // message ki apni dikkat — streak mat badhao
-  b.streak++;
-  if (b.streak >= WA_BREAKER_TRIP_AFTER && Date.now() >= b.until) {
-    b.until = Date.now() + WA_BREAKER_COOLDOWN_MS;
-    console.error(`  WA breaker [${name}]: jawab nahi de raha — ${WA_BREAKER_COOLDOWN_MS / 60000} min ruk rahe hain, message surakshit hain`);
-  }
-}
-
-// ── "Kuch bhi ho jaye, turant chala jaana chahiye" ──
-// Har message apni hi API se jaata hai: reminder/checklist/delegation purani
-// (default) wali se, PMS/FMS sheet wale naye pms trigger se. Harsh ne 20 Aug ko
-// saaf kaha — "purani API se hi jana chahiye" — isliye doosri API se bhejna
-// BAND hai (whatsapp.config.js me allowApiFallback: false).
-//
-// Message phir bhi gum nahi hota: apni API baithi ho to wo kataar me surakshit
-// padha rehta hai, koshish jalti nahi (isUpstreamDown), aur API theek hote hi
-// apne aap chala jaata hai. Kabhi zarurat pade to config me allowApiFallback
-// true kar dena — tab doosri chalu API se bhi jaane lagega.
-function waOtherApi(name, kind) {
-  // PAKKI ROK: delegation / checklist / daily reminder KABHI pms number
-  // (919711718322) se nahi jayenge. 20 Aug ko maine fallback daala tha aur
-  // Varun/Ashok Sn ko reminder pms number se chala gaya — Harsh ne saaf mana
-  // kiya. Ye rok config se nahi, code se hai, taaki galti se bhi na ho.
-  if (String(kind || '') !== 'fms-notify') return null;
-  if (!WA.allowApiFallback) return null;
-  if (name === 'pms') return { url: WA.url, apiKey: WA.apiKey, name: 'default' };
-  return null;
-}
-
+// Apni API + (agar allowed ho) fallback API try karta hai. Fallback SIRF
+// upstream-down par — galat number/key par dono API wahi galti dengi,
+// isliye bekaar do baar nahi bhejta.
 async function sendWhatsAppSure(rawPhone, message, timeoutMs, kind) {
   const primary = waApiFor(kind);
   const backup = waOtherApi(primary.name, kind);
@@ -1045,12 +1058,18 @@ async function sendWhatsAppSure(rawPhone, message, timeoutMs, kind) {
       return r;
     }
     last = r;
-    // Sirf tab doosri koshish jab pehli API hi baithi ho. Galat number ya galat
-    // key par doosri API bhi wahi galti degi — bekaar do baar mat bhejo.
     if (!isUpstreamDown((r && (r.error || r.status)) || '')) return r;
   }
   return last || { ok: false, error: 'no-api' };
 }
+
+// ── 5) OUTBOX — DB me pehle likho, phir bhejo ─────────────────────────
+const WA_OUTBOX_MAX_ATTEMPTS = 3;    // asli galti (401/400) par itni baar koshish
+const WA_OUTBOX_SEND_TIMEOUT = 90000; // Aumpfy healthy ho to ~50s me jawab de deta hai
+const WA_OUTBOX_PER_RUN = 30;         // ek tick me itne message uthao
+const WA_OUTBOX_CONCURRENCY = 3;      // itne saath-saath (8 par Aumpfy baith jaata hai)
+const WA_OUTBOX_MAX_POSTS = 2;        // jawab chahe kuch bhi aaye, itni baar POST karke ruk jao
+const WA_OUTBOX_MAX_REVIVALS = 3;     // 'failed' ho chuke ko itni baar phir mauka
 
 async function queueWhatsApp(phone, message, kind, ref, person, opts) {
   const to = normalizePhone(phone);
@@ -1062,13 +1081,9 @@ async function queueWhatsApp(phone, message, kind, ref, person, opts) {
       person: String(person || ''), status: 'pending', attempts: '0', last_error: '',
       created_at: new Date().toISOString().replace('T', ' ').split('.')[0], sent_at: ''
     });
-    // Naya message LINE ME NAHI lagta — turant khud bhejte hain, chahe outbox
-    // purane message bhej raha ho. Warna task assign karne wale ka alert
-    // backfill/reminder ke peeche 20-30 min atak jaata tha.
-    // Row 'sending' kar dete hain taaki drain ise saath me dobara na bhej de.
-    // Daily reminder me 46 log hote hain — sabko ek saath bhejna wahi purani
-    // galti hai. Wahan se immediate:false aata hai, to sirf kataar me lagta hai
-    // aur drain ek-ek karke bhejta hai.
+    // Naya message LINE ME NAHI lagta — turant bhejte hain (assign-time alert
+    // ke liye). Bade batch (daily reminder) me opts.immediate:false aata hai —
+    // wahan sirf kataar me lagta hai, drain use ek-ek karke bhejta hai.
     if (!opts || opts.immediate !== false) sendNowThenSettle(d, row).catch(() => {});
     return row;
   } catch (e) {
@@ -1077,9 +1092,8 @@ async function queueWhatsApp(phone, message, kind, ref, person, opts) {
   }
 }
 
-// Ek message ABHI bhejo (outbox ke lock ka intezaar kiye bina). Row ko pehle
-// 'sending' likh dete hain taaki drain isi ko saath me dobara na bhej de.
-// Na chale to wapas 'pending' — phir tick apna kaam karega.
+// Ek message ABHI bhejo, drain ke lock ka intezaar kiye bina. Row pehle
+// 'sending' hoti hai taaki drain isi ko saath me dobara na bhej de.
 async function sendNowThenSettle(d, row) {
   if (!row || !row.id) return;
   try {
@@ -1088,13 +1102,10 @@ async function sendNowThenSettle(d, row) {
     console.error('  WA outbox — sending likhna fail:', e.message);
     return;   // drain baad me uthayega
   }
-  // Assign-time alert — "kuch bhi ho jaye turant jaana chahiye". Ek API baithi
-  // ho to doosri chalu wali se chala jaata hai.
   const r = await sendWhatsAppSure(row.phone, row.message, WA_OUTBOX_SEND_TIMEOUT, row.kind)
     .catch(e => ({ ok: false, error: e.message }));
   const ok = !!(r && r.ok);
   const err = String((r && (r.error || r.status)) || 'unknown');
-  // Aumpfy ki kharabi ho to koshish wapas 0 — drain poori budget ke saath uthayega
   const patch = ok
     ? { status: 'sent', sent_at: new Date().toISOString().replace('T', ' ').split('.')[0] }
     : { status: 'pending', attempts: isUpstreamDown(err) ? '0' : '1', last_error: err };
@@ -1102,16 +1113,8 @@ async function sendNowThenSettle(d, row) {
   await d.update('WA_Outbox', row.id, patch).catch(() => {});
 }
 
-// Jo message koshish poori karke 'failed' ho gaye — Harsh ka niyam hai ki
-// message kuch bhi ho jaye jana chahiye. Aumpfy aksar thodi der ke liye
-// baith jaata hai (502 / timeout), phir theek ho jaata hai. Isliye failed
-// message ko thodi-thodi der baad phir mauka dete hain — har mauke me EK
-// koshish, zyada se zyada 3 mauke. Na message chhootta hai, na kisi ko 10
-// copy milti hain.
-const WA_OUTBOX_MAX_REVIVALS = 3;
-// 19-20 Aug ko purana session baitha hua tha, isliye kai message 'failed' ho
-// gaye. Ab PMS ka naya API laga hai aur upstream-fail par koshish jalti bhi
-// nahi. Ek baar sabko saaf naya mauka de dete hain.
+// 19-20 Aug ko purana session baitha tha, isliye kai message 'failed' ho
+// gaye the. Ek baar ke liye sabko saaf naya mauka.
 async function resetFailedAfterApiSwitch() {
   const MARKER = 'wa_reset_after_pms_api_v1';
   try {
@@ -1139,6 +1142,8 @@ async function resetFailedAfterApiSwitch() {
   }
 }
 
+// 'failed' ho chuke (24 ghante ke andar wale) ko har 20 min me phir mauka —
+// max 3 baar. Har mauke me theek EK koshish.
 async function reviveFailedOutbox() {
   try {
     if (!WA.enabled || !WA.url || !WA.apiKey) return { skipped: 'wa-not-configured' };
@@ -1148,10 +1153,9 @@ async function reviveFailedOutbox() {
     let revived = 0;
     for (const r of rows) {
       if (r.status !== 'failed') continue;
-      if (String(r.created_at || '') < dayAgo) continue;        // 24 ghante purana — ab rehne do
+      if (String(r.created_at || '') < dayAgo) continue;
       const n = parseInt(r.revivals) || 0;
       if (n >= WA_OUTBOX_MAX_REVIVALS) continue;
-      // attempts MAX-1 par — yaani is mauke me theek EK koshish milegi
       await d.update('WA_Outbox', r.id, {
         status: 'pending', attempts: String(WA_OUTBOX_MAX_ATTEMPTS - 1), revivals: String(n + 1)
       }).catch(() => {});
@@ -1168,8 +1172,10 @@ async function reviveFailedOutbox() {
   }
 }
 
+// ── 6) DRAIN — har 60s tick, poori kataar ka ek pass ──────────────────
 let _outboxRunning = false;
 let _outboxLastError = '';   // aakhri wajah — bina login diagnose ke liye
+
 async function drainWhatsAppOutbox() {
   if (_outboxRunning) return { skipped: 'already-running' };
   if (!WA.enabled || !WA.url || !WA.apiKey) return { skipped: 'wa-not-configured' };
@@ -1178,10 +1184,8 @@ async function drainWhatsAppOutbox() {
     const d = await getDB();
     const all = await d.findAll('WA_Outbox');
 
-    // Safai: jo koshish poori kar chuke hain wo 'pending' me pade na rahein,
-    // warna hamesha "atka hua" dikhte rehte hain
     // App beech me band ho gayi to koi row 'sending' me atak sakti hai —
-    // 10 min purani ho to wapas kataar me daal do
+    // 10 min purani ho to wapas kataar me
     const staleBefore = new Date(Date.now() - 10 * 60000).toISOString().replace('T', ' ').split('.')[0];
     for (const r of all) {
       if (r.status === 'sending' && String(r.created_at || '') < staleBefore) {
@@ -1189,6 +1193,7 @@ async function drainWhatsAppOutbox() {
         r.status = 'pending';
       }
     }
+    // Koshish poori kar chuke pending -> failed (revive inhe wapas layegi)
     for (const r of all) {
       if (r.status === 'pending' && (parseInt(r.attempts) || 0) >= WA_OUTBOX_MAX_ATTEMPTS) {
         await d.update('WA_Outbox', r.id, { status: 'failed' }).catch(() => {});
@@ -1201,44 +1206,34 @@ async function drainWhatsAppOutbox() {
       .slice(0, WA_OUTBOX_PER_RUN);
     if (!pending.length) return { pending: 0 };
 
-    // Jis API baithi hai, uske message ABHI mat bhejo. Pehle ye check dono API
-    // band hone par lagta tha — pms chalu tha isliye kabhi laga hi nahi, aur
-    // band padi purani API par wahi message bar-bar POST hota raha. Aumpfy
-    // jawab nahi deta tha par message pahuncha deta tha — isliye logon ko
-    // duplicate mile. Ab har message apni API ka breaker dekhta hai.
+    // Jis API baithi hai, uske message ABHI mat bhejo — har message apni API
+    // ka breaker dekhta hai (ek API baithi ho to doosri par asar nahi).
     const ready = pending.filter(r => !waBreakerOpen(waApiFor(r.kind).name));
     const held = pending.length - ready.length;
-    if (!ready.length) {
-      return { skipped: 'aumpfy-down', waiting: held };
-    }
+    if (!ready.length) return { skipped: 'aumpfy-down', waiting: held };
     if (held) console.log(`  WA outbox: ${held} message ruke hain (unki API band hai)`);
 
     let sent = 0, failed = 0;
-    // Har row ki attempts PEHLE badha do. Agar ye likhai fail ho jaye to bhejo
-    // hi mat — warna row hamesha 'pending' rehti hai aur har tick wahi rows
-    // dobara-dobara ghoomti hain (kabhi aage nahi badhti, kabhi fail bhi nahi
-    // hoti). Yahi wajah thi ki outbox 2 sent / 18 pending par atak gaya tha.
-    // 3-3 ke chhote batch me — 8 saath par Aumpfy baith jaata hai, ek-ek karke
-    // bahut der lagti hai.
     for (let i = 0; i < ready.length; i += WA_OUTBOX_CONCURRENCY) {
       await Promise.all(ready.slice(i, i + WA_OUTBOX_CONCURRENCY).map(async row => {
         const attempts = (parseInt(row.attempts) || 0) + 1;
         const posts = (parseInt(row.posts) || 0) + 1;
         if (posts > WA_OUTBOX_MAX_POSTS) {
-          // Itni baar POST kar chuke aur Aumpfy ne kabhi haan nahi kaha. Aur
-          // bhejna matlab bande ko wahi message teesri-chauthi baar. Isliye
-          // rok dete hain aur sach likh dete hain — 'sent' nahi bolenge.
+          // Itni baar POST kar chuke, Aumpfy ne kabhi jawab nahi diya. Aur
+          // bhejna = banda ko duplicate. Sach likh do — 'sent' nahi bolenge.
           await d.update('WA_Outbox', row.id, {
             status: 'unknown', last_error: `${WA_OUTBOX_MAX_POSTS} baar bheja, Aumpfy ne jawab nahi diya`
           }).catch(() => {});
           return;
         }
+        // Attempts PEHLE likho, phir bhejo — likhai fail ho to bhejo hi mat,
+        // warna row hamesha 'pending' reh kar duplicate bhej sakti hai.
         try {
           await d.update('WA_Outbox', row.id, { attempts: String(attempts), posts: String(posts) });
         } catch (e) {
           _outboxLastError = `attempts likhna fail (id=${row.id}): ${e.message}`;
           console.error('  WA outbox — ' + _outboxLastError);
-          return;   // gin nahi paaye to bhejo mat, warna duplicate jaayenge
+          return;
         }
         const r = await sendWhatsAppSure(row.phone, row.message, WA_OUTBOX_SEND_TIMEOUT, row.kind)
           .catch(e => ({ ok: false, error: e.message }));
@@ -1246,8 +1241,7 @@ async function drainWhatsAppOutbox() {
           sent++;
           try {
             await d.update('WA_Outbox', row.id, {
-              status: 'sent',
-              sent_at: new Date().toISOString().replace('T', ' ').split('.')[0]
+              status: 'sent', sent_at: new Date().toISOString().replace('T', ' ').split('.')[0]
             });
           } catch (e) {
             _outboxLastError = `sent likhna fail (id=${row.id}): ${e.message}`;
@@ -1282,6 +1276,7 @@ async function drainWhatsAppOutbox() {
     _outboxRunning = false;
   }
 }
+
 
 // Resolve a user's WhatsApp target ({ name, phone }) or null if no usable phone.
 async function getWhatsAppTarget(userId) {
