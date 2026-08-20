@@ -1108,6 +1108,38 @@ async function sendNowThenSettle(d, row) {
   await d.update('WA_Outbox', row.id, patch).catch(() => {});
 }
 
+// Harsh, 20 Aug shaam: "pending messages stop kardo clear kardo... abse new
+// hi jayege purana kuch nhi bejna." Session outage ke dauraan jamaa hua saara
+// PURANA backlog (pending/sending/failed/unknown) mita do — jo pehle se
+// 'sent' ho chuke unhe haath mat lagao (wo history hai). Ek hi baar chalta
+// hai; is marker ke baad bana koi bhi NAYA message normal tarike se jayega.
+async function clearOldOutboxBacklog() {
+  const MARKER = 'wa_backlog_cleared_20aug_v1';
+  try {
+    const d = await getDB();
+    await ensureAppStateTab(d);
+    const done = await d.findWhere('App_State', { key_name: MARKER });
+    if (done && done.length) return;
+
+    const rows = await d.findAll('WA_Outbox');
+    const stale = rows.filter(r => r.status !== 'sent');
+    if (stale.length) {
+      if (typeof d.batchDeleteByIds === 'function') {
+        await d.batchDeleteByIds('WA_Outbox', stale.map(r => r.id));
+      } else {
+        for (const r of stale) await d.delete('WA_Outbox', r.id).catch(() => {});
+      }
+    }
+    await d.insert('App_State', {
+      key_name: MARKER, value: `cleared ${stale.length}`,
+      updated_at: new Date().toISOString().replace('T', ' ').split('.')[0]
+    });
+    console.log(`  ✅ Outbox backlog saaf: ${stale.length} purane message hata diye — ab sirf naye jayenge`);
+  } catch (e) {
+    console.error('  clearOldOutboxBacklog error:', e.message);
+  }
+}
+
 // 19-20 Aug ko purana session baitha tha, isliye kai message 'failed' ho
 // gaye the. Ek baar ke liye sabko saaf naya mauka.
 async function resetFailedAfterApiSwitch() {
@@ -5500,6 +5532,9 @@ async function seedAdminIfNeeded() {
       .then(() => setTimeout(() => backfillMissedAssignAlerts().catch(() => {}), 45 * 1000))
       .then(() => setTimeout(() => resetTimedOutOutbox().catch(() => {}), 55 * 1000))
       .then(() => setTimeout(() => refireTodays5pmReminder().catch(() => {}), 70 * 1000))
+      // Sabse pehle chalao — drain ka pehla tick 60s baad aata hai, isliye ye
+      // usse bahut pehle purana backlog saaf kar deta hai
+      .then(() => setTimeout(() => clearOldOutboxBacklog().catch(() => {}), 5 * 1000))
       .then(() => fixBeadRuleToYes().catch(() => {}))
       .then(() => setTimeout(() => resetFailedAfterApiSwitch().catch(() => {}), 80 * 1000))
       .catch(err => console.error('  Background DB connection failed (will retry on demand):', err.message));
