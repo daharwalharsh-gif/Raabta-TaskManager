@@ -1374,18 +1374,22 @@ async function _waMarkSlotDone(marker) {
 
 async function runWhatsAppReminders(slotKey, force) {
   if (!WA.enabled) return { skipped: 'disabled' };
-  // OFFICE HOURS GUARD (hard rule): reminders SIRF 10:15 AM – 7:00 PM IST me
-  // jaate hain — scheduler, cron ya manual button, kahin se bhi trigger ho,
-  // is window ke bahar kabhi nahi bhejta. (10:15 se isliye ki subah ka slot
-  // 10:15 par hai — guard slot se pehle nahi hona chahiye, warna slot ka
-  // message block ho jaayega.)
+  // OFFICE HOURS GUARD (hard rule): reminders subah ke pehle slot se pehle
+  // aur 7 PM ke baad kabhi nahi jaate — scheduler, cron ya manual button,
+  // kahin se bhi trigger ho. Sabse pehla slot whatsapp.config.js ke
+  // reminderTimes se KHUD uthaya jaata hai — waha slot badlo, ye guard apne
+  // aap saath badal jaata hai (pehle 10:15 hardcode tha, isliye jab time
+  // 10:00 kiya to guard purana reh gaya aur naya slot khud hi block ho jaata
+  // — ab aisa nahi hoga).
   const ist = new Date(Date.now() + 330 * 60000);
   const istHour = ist.getUTCHours();
   const istMin = istHour * 60 + ist.getUTCMinutes();
-  const OFFICE_START = 10 * 60 + 15;   // 10:15 AM
+  const earliestSlot = [...waSlots()].sort((a, b) => (a.h * 60 + (a.m || 0)) - (b.h * 60 + (b.m || 0)))[0] || { h: 10, m: 0 };
+  const OFFICE_START = earliestSlot.h * 60 + (earliestSlot.m || 0);
   const OFFICE_END   = 19 * 60;        // 7:00 PM
   if (istMin < OFFICE_START || istMin >= OFFICE_END) {
-    console.log('  WhatsApp reminders skipped — outside office hours (10:15-19:00 IST)');
+    const startLabel = `${earliestSlot.h}:${String(earliestSlot.m || 0).padStart(2, '0')}`;
+    console.log(`  WhatsApp reminders skipped — outside office hours (${startLabel}-19:00 IST)`);
     return { skipped: 'outside-office-hours' };
   }
   if (_waPassInFlight) {
