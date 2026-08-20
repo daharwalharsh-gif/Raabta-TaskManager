@@ -19,7 +19,11 @@
 // phir app RESTART karo. Bas.
 // ══════════════════════════════════════════════════════
 module.exports = {
-  enabled: true,
+  // ⛔ ROKA HUA (Harsh, 20 Aug 2026): koi bhi WhatsApp message — pending
+  // backlog, naya assign-time alert, reminder, PMS/FMS — kuch bhi nahi jaayega
+  // jab tak ye wapas true na ho. Backlog DB (WA_Outbox) me surakshit padha
+  // rahega, gum nahi hoga — resume karte hi wahin se chalega.
+  enabled: false,
 
   // ── Aumpfy trigger — SAARE message isi se jaate hain ──
   url:    'https://api.aumpfy.com/api/apis/trigger/pms-08a73f',
