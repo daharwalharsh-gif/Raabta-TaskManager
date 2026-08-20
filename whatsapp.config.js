@@ -5,24 +5,18 @@
 // GitHub par sabko dikhti hai. Harsh ne 20 Aug ko saaf kaha: credentials .env
 // me NAHI, isi file me (code me) rahenge — waisa hi hai.
 //
-// EK HI PHONE, SAARE MESSAGE: delegation, checklist, daily reminder, aur
-// PMS/FMS sheet ke notification — SAB isi ek niche wali url/apiKey se jaate
-// hain.
+// DO ALAG API (20 Aug 2026, shaam — Harsh ka faisla):
+//   1) niche wali url/apiKey     -> delegation, checklist, daily reminder
+//   2) niche wali pms.url/apiKey -> PMS/FMS sheet ke notification
+// Dono seedha test karke pakka kiya, dono chalu hain (HTTP 200, 3 sec).
 //
-// 20 Aug, shaam: session dobara jud gaya! Isi URL + is key ka test seedha
-// (bina code ke) chalaya — HTTP 200, success:true, 3.2 second me jawab.
-// Purana raasta wapas chalu hai — isliye ab RESUME (enabled:true) kar diya.
-//
-// API change ho to niche url / apiKey (aur zaroorat ho to format) badlo,
+// API change ho to yahan url / apiKey (aur zaroorat ho to format) badlo,
 // phir app RESTART karo. Bas.
 // ══════════════════════════════════════════════════════
 module.exports = {
-  // ✅ CHALU (Harsh, 20 Aug 2026 shaam): session reconnect ho gaya, isliye
-  // resume kar diya. Assign karte hi (delegation/checklist) alert turant
-  // jaayega, aur pending backlog bhi apne aap nikalna shuru ho jaayega.
   enabled: true,
 
-  // ── Aumpfy trigger — SAARE message isi se jaate hain ──
+  // ── Aumpfy trigger — delegation, checklist, daily reminder ──
   url:    'https://api.aumpfy.com/api/apis/trigger/raabta-testing-c63350',
   apiKey: 'sl_a2032fc2f044d50a336e3d15ca9106ec6e17a51d1dd212ddef2e3b670601410a',
 
@@ -30,6 +24,21 @@ module.exports = {
   authHeader:   'x-api-key',
   phoneField:   'to',
   messageField: 'text',
+
+  // ── PMS / FMS sheet ke message ALAG API se jaate hain ──
+  // Ye apni alag WhatsApp session (pms wala phone, 919711718322) use karta
+  // hai. Delegation, checklist aur daily reminder upar wale se hi jaate hain
+  // — unhe yahan se koi farak nahi padta.
+  pms: {
+    url:    'https://api.aumpfy.com/api/apis/trigger/pms-08a73f',
+    apiKey: 'sl_ae88d0d5e8e084c46ac9faeedc2993c15d374ba03fdb7e9d470e77d31975bd47'
+  },
+
+  // Ek API baithi ho to message doosri (chalu) API se bhej dun? Default false
+  // — delegation/checklist/reminder hamesha apni API se, PMS hamesha apni se,
+  // kabhi cross nahi. true karoge to atkane par doosri se jaayega, par bande
+  // ko number alag dikhega.
+  allowApiFallback: false,
 
   // ── Baaki settings ──
   countryCode:  '91',
@@ -47,9 +56,3 @@ module.exports = {
   timeoutMs:    60000,   // Aumpfy real-number send can take ~50s to respond
   appUrl:       process.env.APP_URL || ''
 };
-
-// ── DOOSRI CHALU API (pms-08a73f) — sirf record ke liye ──
-// url:    'https://api.aumpfy.com/api/apis/trigger/pms-08a73f'
-// apiKey: 'sl_ae88d0d5e8e084c46ac9faeedc2993c15d374ba03fdb7e9d470e77d31975bd47'
-// Ye bhi chalu hai (alag number, 919711718322). Upar wali kabhi baithe to
-// isse wapas jaa sakte ho — bas url/apiKey yahan se copy karo.

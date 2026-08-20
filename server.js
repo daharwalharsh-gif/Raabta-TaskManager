@@ -897,10 +897,12 @@ function reminderScheduler() {
 //
 // KAAM KAISE HOTA HAI (upar se neeche padho, yahi poora flow hai):
 //
-//  1. CONFIG — whatsapp.config.js se EK API load hoti hai (WA.url/apiKey).
-//     Harsh, 20 Aug 2026: "sirf ek hi phone se bhejna hai message, sab type
-//     ke" — delegation, checklist, daily reminder, PMS/FMS sheet — SAB isi
-//     ek se. waApiFor() ab bas yahi ek jagah se url/apiKey deta hai.
+//  1. CONFIG — whatsapp.config.js se DO API load hoti hain:
+//       WA          → delegation, checklist, daily reminder
+//       WA.pms      → PMS/FMS sheet ke notification
+//     `kind` string (jaise 'fms-notify') decide karta hai kaunsi API use
+//     hogi — waApiFor() dekho. (20 Aug: pehle ek hi API thi, phir Harsh ne
+//     PMS ko wapas apni alag API par bhej diya — dono chalu hain.)
 //
 //  2. QUEUE (queueWhatsApp) — koi bhi message bhejne se PEHLE DB (WA_Outbox)
 //     me likha jaata hai. App restart ho jaye, Aumpfy fail kare, kuch bhi ho
@@ -929,9 +931,9 @@ function reminderScheduler() {
 // HAMESHA YAAD RAKHNA (Harsh ke pakke niyam):
 //   - Message KABHI seedha sendWhatsApp() se mat bhejo. Hamesha
 //     queueWhatsApp() se — warna fail hone par gum ho jaata hai.
-//   - Ab ek hi API hai — poore app me. Doosri API/session daalne ka mann ho
-//     to whatsapp.config.js ke aakhir ka comment padho pehle (purani API
-//     wahan record ke liye rakhi hai).
+//   - Ek API doosri ke liye kabhi fallback nahi karti (WA.allowApiFallback
+//     hamesha false rakhna) — delegation/checklist/reminder hamesha default
+//     API se hi, PMS/FMS hamesha pms API se hi.
 //   - Diagnose: GET /api/cron/wa-reminders ke JSON me `outbox` field —
 //     sent/pending/failed/sending/unknown ki ginti, aakhri galti, aur
 //     kaunsi API band hai (agar koi ho).
@@ -964,14 +966,26 @@ function normalizePhone(raw) {
 // EK HI PHONE, SAARE MESSAGE (Harsh, 20 Aug 2026): delegation, checklist,
 // daily reminder, PMS/FMS sheet — sab isi ek whatsapp.config.js wali
 // url/apiKey se jaate hain. Alag-alag API/session ka jhanjhat khatam.
+// PMS/FMS sheet ke notification alag session (pms) se jaate hain. Baaki
+// SAB (delegation, checklist, daily reminder) default se. Harsh, 20 Aug
+// shaam: "PMS ke number pr message pms-08a73f custom API se jayenge" —
+// dobara do API me split kiya.
 function waApiFor(kind) {
+  if (String(kind || '') === 'fms-notify' && WA.pms && WA.pms.url && WA.pms.apiKey) {
+    return { url: WA.pms.url, apiKey: WA.pms.apiKey, name: 'pms' };
+  }
   return { url: WA.url, apiKey: WA.apiKey, name: 'default' };
 }
 
-// Doosri API — ab hai hi nahi, isliye hamesha null. (Function isliye rakha
-// hai taaki sendWhatsAppSure ka structure na tootey; kabhi dobara do API
-// chahiye hon to yahan wapas laga sakte ho.)
+// Doosri API se bhejna — SIRF tab jab whatsapp.config.js me
+// allowApiFallback:true ho. Default false: delegation/checklist/reminder
+// hamesha default se, PMS/FMS hamesha pms se — ek doosre ko cross nahi karte.
 function waOtherApi(name, kind) {
+  if (!WA.allowApiFallback) return null;
+  if (name === 'pms') return { url: WA.url, apiKey: WA.apiKey, name: 'default' };
+  if (name === 'default' && WA.pms && WA.pms.url && WA.pms.apiKey) {
+    return { url: WA.pms.url, apiKey: WA.pms.apiKey, name: 'pms' };
+  }
   return null;
 }
 
