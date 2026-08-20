@@ -5,15 +5,18 @@
 // GitHub par sabko dikhti hai. Harsh ne 20 Aug ko saaf kaha: credentials .env
 // me NAHI, isi file me (code me) rahenge — waisa hi hai.
 //
-// EK HI PHONE, SAARE MESSAGE (20 Aug 2026 se): delegation, checklist, daily
-// reminder, aur PMS/FMS sheet ke notification — SAB isi ek niche wali
-// url/apiKey se jaate hain. Pehle do alag API thi (ek delegation/reminder ke
-// liye, doosri PMS ke liye) — Harsh ne ek hi kar diya.
+// EK HI PHONE, SAARE MESSAGE: delegation, checklist, daily reminder, aur
+// PMS/FMS sheet ke notification — SAB isi ek niche wali url/apiKey se jaate
+// hain.
 //
-// Niche wala number ABHI CHALU hai (919711718322 — "pms" session waala). Jo
-// pehle wali API thi (raabta-testing-c63350, number 919999298678) wo 19 Aug
-// shaam se jawab nahi de rahi (session-level dikkat, Waumfy ke andar — dekho
-// end ka comment). Isliye jo chalu hai wahi laga di, taaki message rukein na.
+// Harsh ne 20 Aug (dopahar baad) ko endpoint wapas raabta-testing-c63350 par
+// kar diya, key wahi rakhi (pms wali, sl_ae88…). DHYAN DO: maine ye badalne se
+// PEHLE seedha test kiya (bina code ke, sirf HTTP POST) — ye endpoint 100
+// second tak koi jawab nahi de raha, chahe koi bhi key lagao (galat key par
+// turant 401 aata hai, matlab endpoint zinda hai; asli message par kuch nahi
+// hota — session-level dikkat hai, Waumfy ke andar). Jab tak wahan session
+// dobara nahi judta, is URL se message nahi jayenge — enabled:false hone ki
+// wajah se abhi kuch bhej hi nahi raha, isliye ye filhaal bekaar nahi ja raha.
 //
 // API change ho to niche url / apiKey (aur zaroorat ho to format) badlo,
 // phir app RESTART karo. Bas.
@@ -26,7 +29,7 @@ module.exports = {
   enabled: false,
 
   // ── Aumpfy trigger — SAARE message isi se jaate hain ──
-  url:    'https://api.aumpfy.com/api/apis/trigger/pms-08a73f',
+  url:    'https://api.aumpfy.com/api/apis/trigger/raabta-testing-c63350',
   apiKey: 'sl_ae88d0d5e8e084c46ac9faeedc2993c15d374ba03fdb7e9d470e77d31975bd47',
 
   // ── Trigger body ka shape (naya trigger alag maange to yahan badlo) ──
@@ -49,9 +52,9 @@ module.exports = {
   appUrl:       process.env.APP_URL || ''
 };
 
-// ── PURANI API (band, ab use nahi ho rahi) — sirf record ke liye ──
-// url:    'https://api.aumpfy.com/api/apis/trigger/raabta-testing-c63350'
-// apiKey: 'sl_a2032fc2f044d50a336e3d15ca9106ec6e17a51d1dd212ddef2e3b670601410a'
-// Ye session (Waumfy → Phones → "Task Manager", 919999298678) kabhi reconnect
-// ho jaye aur ispar wapas jana ho, to bas upar wala url/apiKey inse badal do —
-// poore app me sab jagah yahi ek jagah se control hoti hai.
+// ── PICHLI CHALU API (pms-08a73f) — sirf record ke liye ──
+// url:    'https://api.aumpfy.com/api/apis/trigger/pms-08a73f'
+// apiKey: 'sl_ae88d0d5e8e084c46ac9faeedc2993c15d374ba03fdb7e9d470e77d31975bd47'
+// (yahi key hai jo ab upar bhi lagi hai) Ye endpoint 20 Aug dopahar tak chalu
+// tha (seedha test se pakka). Upar wale se kaam na bane to isse wapas jaa
+// sakte ho — bas url yahan se copy karo.
