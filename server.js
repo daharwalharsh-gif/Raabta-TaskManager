@@ -2649,6 +2649,69 @@ async function refireTodays5pmReminder() {
   }
 }
 
+// Harsh, 21 Aug subah: "jo aaj subah delegate huye h un ko bhej do." Subah
+// system band tha (kal raat ke stop ke baad), isliye kai delegate-alert ya to
+// ruke rahe ya Aumpfy ke timeout me 'unknown' ban gaye. Ek baar ka backfill:
+// AAJ bane delegation task utha kar har bande ko EK message jisme uske aaj ke
+// saare task ginaye hon. Marker se sirf ek baar.
+async function backfillTodayMorningAssign() {
+  const MARKER = 'wa_backfill_21aug_morning_v1';
+  try {
+    if (!waAutoAllowed()) return;
+    if (!WA.enabled || !WA.url || !WA.apiKey) return;
+    const d = await getDB();
+    await ensureAppStateTab(d);
+    const done = await d.findWhere('App_State', { key_name: MARKER });
+    if (done && done.length) return;
+
+    const todayIst = new Date(Date.now() + 330 * 60000).toISOString().split('T')[0];
+    if (todayIst !== '2026-08-21') {
+      await d.insert('App_State', { key_name: MARKER, value: 'din nikal gaya, skip',
+        updated_at: new Date().toISOString().replace('T', ' ').split('.')[0] });
+      return;
+    }
+
+    const delg = await d.findAll('Delegation_Tasks');
+    const fresh = delg.filter(t => String(t.created_at || '').startsWith(todayIst));
+    const byUser = {};
+    for (const t of fresh) {
+      const uid = String(t.assigned_to || '');
+      if (!uid) continue;
+      (byUser[uid] = byUser[uid] || []).push(t);
+    }
+
+    let queued = 0;
+    for (const [uid, tasks] of Object.entries(byUser)) {
+      const target = await getWhatsAppTarget(parseInt(uid));
+      if (!target) continue;
+      const lines = [
+        '*Raabta Task Manager*', '',
+        `Hello ${target.name || 'there'},`,
+        `Here are the *${tasks.length} task(s)* delegated to you today:`, ''
+      ];
+      tasks.slice(0, 15).forEach((t, i) => {
+        lines.push(`${i + 1}. ${t.description || ''}`);
+        lines.push(`   Due: ${t.due_date || '-'} | Priority: ${t.priority || 'low'}`);
+      });
+      if (tasks.length > 15) lines.push(`...and ${tasks.length - 15} more`);
+      lines.push('', 'Please complete them and mark as Done in the app.');
+      const appUrl = process.env.APP_URL || '';
+      if (appUrl) lines.push(`Open: ${appUrl}`);
+      await queueWhatsApp(target.phone, lines.join('\n'), 'assign-backfill', MARKER, target.name, { immediate: false });
+      queued++;
+    }
+
+    await d.insert('App_State', {
+      key_name: MARKER, value: `queued ${queued} for ${fresh.length} task(s)`,
+      updated_at: new Date().toISOString().replace('T', ' ').split('.')[0]
+    });
+    console.log(`  ✅ Aaj subah ke ${fresh.length} delegate task — ${queued} bande ko list queue hui`);
+    drainWhatsAppOutbox().catch(() => {});
+  } catch (e) {
+    console.error('  backfillTodayMorningAssign error:', e.message);
+  }
+}
+
 async function backfillMissedAssignAlerts() {
   const MARKER = 'wa_backfill_missed_assign_v1';
   try {
@@ -5671,6 +5734,7 @@ async function seedAdminIfNeeded() {
       // Sabse pehle chalao — drain ka pehla tick 60s baad aata hai, isliye ye
       // usse bahut pehle purana backlog saaf kar deta hai
       .then(() => setTimeout(() => clearOldOutboxBacklog().catch(() => {}), 5 * 1000))
+      .then(() => setTimeout(() => backfillTodayMorningAssign().catch(() => {}), 15 * 1000))
       .then(() => fixBeadRuleToYes().catch(() => {}))
       .then(() => setTimeout(() => resetFailedAfterApiSwitch().catch(() => {}), 80 * 1000))
       .catch(err => console.error('  Background DB connection failed (will retry on demand):', err.message));
