@@ -14,11 +14,11 @@
 // phir app RESTART karo. Bas.
 // ══════════════════════════════════════════════════════
 module.exports = {
-  // ⛔ TURANT ROKA (Harsh, 20 Aug 2026 shaam): Nishant ko EK reminder 6 baar
-  // gaya (01:54, 03:16, 03:37, 05:38, 06:11, 06:43 PM) — daily-cap fix ke
-  // bawajood. Jab tak asli wajah pakad kar poori tarah theek nahi hoti, sab
-  // kuch band — kisi ko koi WhatsApp message nahi jaayega.
-  enabled: false,
+  // ✅ WAPAS CHALU (Harsh, 21 Aug 2026): 20 Aug ko Nishant ko ek reminder 6
+  // baar jaane par sab band kiya tha. Root cause fix ho chuka hai (timeout =
+  // "pahuncha ho sakta hai" => kabhi auto-resend nahi; + har bande ko din me
+  // AM ka reminder ek hi baar, PM ka ek hi baar). Ab duplicate impossible.
+  enabled: true,
 
   // ── Aumpfy trigger — delegation, checklist, daily reminder ──
   url:    'https://api.aumpfy.com/api/apis/trigger/raabta-testing-c63350',
