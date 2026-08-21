@@ -3152,16 +3152,20 @@ function renderDashTable(tasks, type) {
   }
   // Apply date sort
   if (_dashDateSortState === 0) {
-    // Default: AAJ ke task sabse upar, phir aage ki date, aur purani date niche.
-    // Sabse purana sabse aakhir me. (Date par click karke ye badal sakte ho.)
+    // Default order (Harsh, 21 Aug): AAJ ke task sabse upar, uske baad FUTURE
+    // wale (nazdeek ki date pehle — kal, parso, ...), aur PURANE (overdue)
+    // sabse niche (taaza overdue pehle, sabse purana bilkul aakhir me).
+    // Bina-date wale sabse aakhir. (Date par click karke ye badal sakte ho.)
     const todayStr = new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
       .toISOString().split('T')[0];
     const dOf = t => dashDateKey(t.due_date || t.date);
     allPending = [...allPending].sort((a, b) => {
       const da = dOf(a), db = dOf(b);
-      const aToday = da === todayStr, bToday = db === todayStr;
-      if (aToday !== bToday) return aToday ? -1 : 1;   // aaj wale sabse upar
-      return db.localeCompare(da);                      // baaki: nayi date upar, purani niche
+      const rank = d => !d ? 3 : (d === todayStr ? 0 : (d > todayStr ? 1 : 2));
+      const ra = rank(da), rb = rank(db);
+      if (ra !== rb) return ra - rb;                    // aaj > future > purane > bina-date
+      if (ra === 1) return da.localeCompare(db);        // future: nazdeek wale pehle
+      return db.localeCompare(da);                      // purane: taaza pehle, sabse purana aakhir
     });
   } else if (_dashDateSortState === 1) {
     // Ascending: oldest (earliest) date first — aaj ki pehle aaye
