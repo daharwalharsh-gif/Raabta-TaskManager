@@ -1296,6 +1296,28 @@ async function drainWhatsAppOutbox() {
     let sent = 0, failed = 0;
     for (let i = 0; i < ready.length; i += WA_OUTBOX_CONCURRENCY) {
       await Promise.all(ready.slice(i, i + WA_OUTBOX_CONCURRENCY).map(async row => {
+        // ── DAILY REMINDER SIRF APNE DIN + APNE WAQT PAR ──
+        // 21 Aug subah 9:47 par logon ko reminder mila — wo KAL shaam 5 baje
+        // ke baasi reminder the jo band system me raat bhar pade rahe aur
+        // resume hote hi nikal gaye. Harsh ka niyam: reminder SIRF 10:15/5:00
+        // par, aur 7 PM ke baad kabhi nahi. Isliye: reminder apne din ke
+        // alawa, ya 7 PM ke baad, KABHI nahi bheja jaata — baasi ho to
+        // 'expired' likh kar chhod dete hain. (Assign-time alert par koi
+        // rok nahi — wo kabhi bhi ja sakta hai, Harsh ne wahi kaha hai.)
+        if (row.kind === 'daily-reminder') {
+          const istNow = new Date(Date.now() + 330 * 60000);
+          const todayIst = istNow.toISOString().split('T')[0];
+          const m = String(row.ref || '').match(/\d{4}-\d{2}-\d{2}/);
+          const refDate = m ? m[0] : '';
+          const nowMin = istNow.getUTCHours() * 60 + istNow.getUTCMinutes();
+          if (refDate !== todayIst || nowMin >= 19 * 60) {
+            await d.update('WA_Outbox', row.id, {
+              status: 'expired',
+              last_error: `baasi reminder (${refDate || 'bina-date'}) — slot nikal chuka, bheja NAHI`
+            }).catch(() => {});
+            return;
+          }
+        }
         const attempts = (parseInt(row.attempts) || 0) + 1;
         const posts = (parseInt(row.posts) || 0) + 1;
         if (posts > WA_OUTBOX_MAX_POSTS) {
@@ -5362,7 +5384,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
     try {
       const d = await getDB();
       const rows = await d.findAll('WA_Outbox');
-      outbox = { sent: 0, pending: 0, failed: 0, sending: 0, unknown: 0 };
+      outbox = { sent: 0, pending: 0, failed: 0, sending: 0, unknown: 0, expired: 0 };
       rows.forEach(r => { outbox[r.status] = (outbox[r.status] || 0) + 1; });
       // Atke kyun hain — attempts kitni baar ho chuki aur aakhri wajah kya thi
       const stuck = rows.filter(r => r.status === 'pending');
