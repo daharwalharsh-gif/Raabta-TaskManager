@@ -1090,7 +1090,11 @@ async function sendWhatsAppSure(rawPhone, message, timeoutMs, kind) {
 
 // ── 5) OUTBOX — DB me pehle likho, phir bhejo ─────────────────────────
 const WA_OUTBOX_MAX_ATTEMPTS = 3;    // asli galti (401/400) par itni baar koshish
-const WA_OUTBOX_SEND_TIMEOUT = 90000; // Aumpfy healthy ho to ~50s me jawab de deta hai
+// 21 Aug: Aumpfy ka SAFAL jawab bhi 88.9s me aaya (live test) — 90s timeout
+// bilkul kinare par tha, safal message bhi 'unknown' ban rahe the. 150s par
+// aisa nahi hoga; asli delivery to POST ke turant baad ho jaati hai, ye sirf
+// confirmation ka intezaar hai.
+const WA_OUTBOX_SEND_TIMEOUT = 150000;
 const WA_OUTBOX_PER_RUN = 30;         // ek tick me itne message uthao
 // Ab EK hi session poora traffic (delegation+checklist+reminder+FMS) sambhalta
 // hai — 3 saath-saath bhejne par response time 5s se badhkar 57s tak chala
