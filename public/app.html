@@ -3115,6 +3115,21 @@ function toggleDashDateSort() {
   if (window._lastDashTasks) renderDashTable(window._lastDashTasks, dashType);
 }
 
+// Date kisi bhi roop me ho — ISO (2026-08-21), slash (9/7/2026 = D/M/YYYY,
+// purane imported task), ya day-first dash (09-07-2026) — sabko compare layak
+// YYYY-MM-DD banao. Formats ka mix hi wajah tha ki "9/7/2026" wale July task
+// string-sort me August ke upar chadh jaate the (string me "9" > "2").
+function dashDateKey(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);          // ISO
+  let m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);              // D/M/YYYY
+  if (m) return m[3] + '-' + String(m[2]).padStart(2, '0') + '-' + String(m[1]).padStart(2, '0');
+  m = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})/);                      // DD-MM-YYYY
+  if (m) return m[3] + '-' + String(m[2]).padStart(2, '0') + '-' + String(m[1]).padStart(2, '0');
+  return s;
+}
+
 function renderDashTable(tasks, type) {
   // Show ALL pending tasks (delegation + checklist) combined
   const isAdmin = ME.role==='admin' || ME.role==='hod';
@@ -3141,7 +3156,7 @@ function renderDashTable(tasks, type) {
     // Sabse purana sabse aakhir me. (Date par click karke ye badal sakte ho.)
     const todayStr = new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
       .toISOString().split('T')[0];
-    const dOf = t => String(t.due_date || t.date || '');
+    const dOf = t => dashDateKey(t.due_date || t.date);
     allPending = [...allPending].sort((a, b) => {
       const da = dOf(a), db = dOf(b);
       const aToday = da === todayStr, bToday = db === todayStr;
@@ -3150,10 +3165,10 @@ function renderDashTable(tasks, type) {
     });
   } else if (_dashDateSortState === 1) {
     // Ascending: oldest (earliest) date first — aaj ki pehle aaye
-    allPending = [...allPending].sort((a,b) => (a.due_date||a.date||'').localeCompare(b.due_date||b.date||''));
+    allPending = [...allPending].sort((a,b) => dashDateKey(a.due_date||a.date).localeCompare(dashDateKey(b.due_date||b.date)));
   } else if (_dashDateSortState === 2) {
     // Descending: newest (latest) date first
-    allPending = [...allPending].sort((a,b) => (b.due_date||b.date||'').localeCompare(a.due_date||a.date||''));
+    allPending = [...allPending].sort((a,b) => dashDateKey(b.due_date||b.date).localeCompare(dashDateKey(a.due_date||a.date)));
   }
   if (!allPending.length) { tbody.innerHTML=`<tr><td colspan="6" class="empty">${dashSearchQuery ? 'No tasks match your search' : 'No pending tasks 🎉'}</td></tr>`; return; }
   const typeBadge = t => t.type==='checklist'
