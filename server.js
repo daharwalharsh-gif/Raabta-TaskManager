@@ -2675,7 +2675,7 @@ async function refireTodays5pmReminder() {
 // list ko dobara. Maine duplicate ka bataya, unhone jaan-boojh kar haan kaha.
 // Ek baar ka force pass (marker-gated), sirf aaj ke liye.
 async function refireMorning22Aug() {
-  const MARKER = 'wa_refire_am_20260822_v1';
+  const MARKER = 'wa_refire_am_20260822_v2';   // v1 dedup se ruk gaya tha
   try {
     if (!waAutoAllowed()) return;
     if (!WA.enabled || !WA.url || !WA.apiKey) return;
@@ -2695,6 +2695,17 @@ async function refireMorning22Aug() {
       key_name: MARKER, value: 'refired',
       updated_at: new Date().toISOString().replace('T', ' ').split('.')[0]
     });
+    // Per-banda AM-dedup pehli koshish me sabko rok raha tha ("29 bande
+    // skip"). Harsh ne saaf kaha dobara bhejo — to purane AM rows ka ref
+    // rename kar do, dedup unhe dekhega hi nahi, sab fresh queue honge.
+    // (Rows delete nahi karte — sent history bani rehti hai.)
+    const todayRef = `rem_${todayIst}_AM`;
+    const rows2 = await d.findAll('WA_Outbox');
+    for (const r0 of rows2) {
+      if (r0.kind === 'daily-reminder' && r0.ref === todayRef) {
+        await d.update('WA_Outbox', r0.id, { ref: todayRef + '_old' }).catch(() => {});
+      }
+    }
     const r = await runWhatsAppReminders(null, true);   // force — Harsh ka bola hua
     console.log('  ✅ Subah ka reminder dobara (Harsh ke bolne par):', JSON.stringify(r));
   } catch (e) {
