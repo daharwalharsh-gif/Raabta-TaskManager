@@ -2671,6 +2671,37 @@ async function refireTodays5pmReminder() {
 // baje ka slot rukne wala tha. Ab force 'wa_manual_' likhta hai; ye ek baar
 // aaj ke stray 'wa_pass_' markers (jo asli slot 1015/1700 ke nahi hain)
 // hata deta hai taaki aaj ka 5 baje wala pakka chale.
+// Harsh, 22 Aug ~12 baje: "jane do jldi se bhejo" — subah ka reminder poori
+// list ko dobara. Maine duplicate ka bataya, unhone jaan-boojh kar haan kaha.
+// Ek baar ka force pass (marker-gated), sirf aaj ke liye.
+async function refireMorning22Aug() {
+  const MARKER = 'wa_refire_am_20260822_v1';
+  try {
+    if (!waAutoAllowed()) return;
+    if (!WA.enabled || !WA.url || !WA.apiKey) return;
+    const d = await getDB();
+    await ensureAppStateTab(d);
+    const done = await d.findWhere('App_State', { key_name: MARKER });
+    if (done && done.length) return;
+
+    const todayIst = new Date(Date.now() + 330 * 60000).toISOString().split('T')[0];
+    if (todayIst !== '2026-08-22') {
+      await d.insert('App_State', { key_name: MARKER, value: 'din nikal gaya, skip',
+        updated_at: new Date().toISOString().replace('T', ' ').split('.')[0] });
+      return;
+    }
+
+    await d.insert('App_State', {
+      key_name: MARKER, value: 'refired',
+      updated_at: new Date().toISOString().replace('T', ' ').split('.')[0]
+    });
+    const r = await runWhatsAppReminders(null, true);   // force — Harsh ka bola hua
+    console.log('  ✅ Subah ka reminder dobara (Harsh ke bolne par):', JSON.stringify(r));
+  } catch (e) {
+    console.error('  refireMorning22Aug error:', e.message);
+  }
+}
+
 async function cleanStrayManualMarkers() {
   const MARKER = 'wa_clean_manual_marker_20260822_v1';
   try {
@@ -5821,6 +5852,7 @@ async function seedAdminIfNeeded() {
       .then(() => setTimeout(() => backfillTodayMorningAssign().catch(() => {}), 15 * 1000))
       .then(() => setTimeout(() => resendTodays404Casualties().catch(() => {}), 10 * 1000))
       .then(() => setTimeout(() => cleanStrayManualMarkers().catch(() => {}), 8 * 1000))
+      .then(() => setTimeout(() => refireMorning22Aug().catch(() => {}), 12 * 1000))
       .then(() => fixBeadRuleToYes().catch(() => {}))
       .then(() => setTimeout(() => resetFailedAfterApiSwitch().catch(() => {}), 80 * 1000))
       .catch(err => console.error('  Background DB connection failed (will retry on demand):', err.message));
