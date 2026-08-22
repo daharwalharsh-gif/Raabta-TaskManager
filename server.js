@@ -2655,9 +2655,9 @@ async function refireTodays5pmReminder() {
   }
 }
 
-// Harsh, 21 Aug subah: "jo aaj subah delegate huye h un ko bhej do." Subah
-// system band tha (kal raat ke stop ke baad), isliye kai delegate-alert ya to
-// ruke rahe ya Aumpfy ke timeout me 'unknown' ban gaye. Ek baar ka backfill:
+// Harsh, 22 Aug: "jo subah task delegate kiye the vo bhi jane chahiye."
+// (21 Aug ko bhi yahi hua tha — wo marker consume ho chuka.) Subah purana
+// API 404 de raha tha, isliye kuch delegate-alert unknown/failed me gaye. Ek baar ka backfill:
 // AAJ bane delegation task utha kar har bande ko EK message jisme uske aaj ke
 // saare task ginaye hon. Marker se sirf ek baar.
 // 22 Aug: purana Aumpfy trigger subah se 404 de raha tha (Waumfy ne naya
@@ -2781,7 +2781,7 @@ async function resendTodays404Casualties() {
 }
 
 async function backfillTodayMorningAssign() {
-  const MARKER = 'wa_backfill_21aug_morning_v1';
+  const MARKER = 'wa_backfill_22aug_morning_v1';   // 21 Aug wala consume ho chuka
   try {
     if (!waAutoAllowed()) return;
     if (!WA.enabled || !WA.url || !WA.apiKey) return;
@@ -2791,7 +2791,7 @@ async function backfillTodayMorningAssign() {
     if (done && done.length) return;
 
     const todayIst = new Date(Date.now() + 330 * 60000).toISOString().split('T')[0];
-    if (todayIst !== '2026-08-21') {
+    if (todayIst !== '2026-08-22') {
       await d.insert('App_State', { key_name: MARKER, value: 'din nikal gaya, skip',
         updated_at: new Date().toISOString().replace('T', ' ').split('.')[0] });
       return;
