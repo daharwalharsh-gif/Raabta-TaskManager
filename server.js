@@ -2654,6 +2654,49 @@ async function refireTodays5pmReminder() {
 // ruke rahe ya Aumpfy ke timeout me 'unknown' ban gaye. Ek baar ka backfill:
 // AAJ bane delegation task utha kar har bande ko EK message jisme uske aaj ke
 // saare task ginaye hon. Marker se sirf ek baar.
+// 22 Aug: purana Aumpfy trigger subah se 404 de raha tha (Waumfy ne naya
+// send-message API banate waqt use hata diya) — 404 = message PAKKA nahi
+// gaya (timeout jaisa "shayad pahunch gaya" nahi). Isliye aaj ke atke
+// unknown/failed rows ko naye API par ek saaf mauka: sirf AAJ bane rows,
+// revivals bhi 0 (404-era me mauke bekaar jal gaye the). Baasi reminder
+// waise bhi drain ka expiry-check rok dega.
+async function resendTodays404Casualties() {
+  const MARKER = 'wa_resend_404_era_20260822_v1';
+  try {
+    if (!waAutoAllowed()) return;
+    if (!WA.enabled || !WA.url || !WA.apiKey) return;
+    const d = await getDB();
+    await ensureAppStateTab(d);
+    const done = await d.findWhere('App_State', { key_name: MARKER });
+    if (done && done.length) return;
+
+    const todayIst = new Date(Date.now() + 330 * 60000).toISOString().split('T')[0];
+    if (todayIst !== '2026-08-22') {
+      await d.insert('App_State', { key_name: MARKER, value: 'din nikal gaya, skip',
+        updated_at: new Date().toISOString().replace('T', ' ').split('.')[0] });
+      return;
+    }
+
+    const rows = await d.findAll('WA_Outbox');
+    const stuck = rows.filter(r =>
+      (r.status === 'unknown' || r.status === 'failed') &&
+      String(r.created_at || '').startsWith(todayIst));
+    for (const r of stuck) {
+      await d.update('WA_Outbox', r.id, {
+        status: 'pending', attempts: '0', posts: '0', revivals: '0', last_error: ''
+      }).catch(() => {});
+    }
+    await d.insert('App_State', {
+      key_name: MARKER, value: `resent ${stuck.length}`,
+      updated_at: new Date().toISOString().replace('T', ' ').split('.')[0]
+    });
+    if (stuck.length) console.log(`  ✅ 404-era ke ${stuck.length} message ko naye API par naya mauka`);
+    drainWhatsAppOutbox().catch(() => {});
+  } catch (e) {
+    console.error('  resendTodays404Casualties error:', e.message);
+  }
+}
+
 async function backfillTodayMorningAssign() {
   const MARKER = 'wa_backfill_21aug_morning_v1';
   try {
@@ -5735,6 +5778,7 @@ async function seedAdminIfNeeded() {
       // usse bahut pehle purana backlog saaf kar deta hai
       .then(() => setTimeout(() => clearOldOutboxBacklog().catch(() => {}), 5 * 1000))
       .then(() => setTimeout(() => backfillTodayMorningAssign().catch(() => {}), 15 * 1000))
+      .then(() => setTimeout(() => resendTodays404Casualties().catch(() => {}), 10 * 1000))
       .then(() => fixBeadRuleToYes().catch(() => {}))
       .then(() => setTimeout(() => resetFailedAfterApiSwitch().catch(() => {}), 80 * 1000))
       .catch(err => console.error('  Background DB connection failed (will retry on demand):', err.message));
