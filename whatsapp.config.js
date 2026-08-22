@@ -1,38 +1,39 @@
 // ══════════════════════════════════════════════════════
-// WhatsApp API config (Aumpfy) — YEH AAPKI LIVE SETTINGS HAI
+// WhatsApp API config (Waumfy) — YEH AAPKI LIVE SETTINGS HAI
 // ══════════════════════════════════════════════════════
 // DHYAN DO: ye file git me TRACKED hai aur repo PUBLIC hai — yahan likhi key
 // GitHub par sabko dikhti hai. Harsh ne 20 Aug ko saaf kaha: credentials .env
 // me NAHI, isi file me (code me) rahenge — waisa hi hai.
 //
-// DO ALAG API (20 Aug 2026, shaam — Harsh ka faisla):
-//   1) niche wali url/apiKey     -> delegation, checklist, daily reminder
-//   2) niche wali pms.url/apiKey -> PMS/FMS sheet ke notification
-// Dono seedha test karke pakka kiya, dono chalu hain (HTTP 200, 3 sec).
+// NAYA WAUMFY API (Harsh, 22 Aug 2026): purane Aumpfy trigger ki jagah ab
+// seedha Waumfy ka send-message API. Test kiya lagate waqt: HTTP 200 sirf
+// 0.4 SECOND me (purana trigger 50-90s leta tha), number wahi purana
+// 919999298678 (Task Manager). Body ka shape bhi naya: {phone, message}
+// (pehle {to, text} tha) — niche phoneField/messageField isi liye badle hain.
+// Delegation, checklist, daily reminder — sab isi se jaate hain. Delay,
+// reminder time, outbox — sab pehle jaisa (Harsh: "sab same rakhna").
 //
 // API change ho to yahan url / apiKey (aur zaroorat ho to format) badlo,
 // phir app RESTART karo. Bas.
 // ══════════════════════════════════════════════════════
 module.exports = {
-  // ✅ WAPAS CHALU (Harsh, 21 Aug 2026): 20 Aug ko Nishant ko ek reminder 6
-  // baar jaane par sab band kiya tha. Root cause fix ho chuka hai (timeout =
-  // "pahuncha ho sakta hai" => kabhi auto-resend nahi; + har bande ko din me
-  // AM ka reminder ek hi baar, PM ka ek hi baar). Ab duplicate impossible.
   enabled: true,
 
-  // ── Aumpfy trigger — delegation, checklist, daily reminder ──
-  url:    'https://api.aumpfy.com/api/apis/trigger/raabta-testing-c63350',
-  apiKey: 'sl_a2032fc2f044d50a336e3d15ca9106ec6e17a51d1dd212ddef2e3b670601410a',
+  // ── Waumfy send-message — delegation, checklist, daily reminder ──
+  url:    'https://www.waumfy.com/api/v1/send-message',
+  apiKey: 'wag_sk_442465130360706f106c575e40901f36ac9e84d9',
 
-  // ── Trigger body ka shape (naya trigger alag maange to yahan badlo) ──
+  // ── Body ka shape: {"phone": "...", "message": "..."} ──
   authHeader:   'x-api-key',
-  phoneField:   'to',
-  messageField: 'text',
+  phoneField:   'phone',
+  messageField: 'message',
 
-  // ── PMS / FMS sheet ke message ALAG API se jaate hain ──
-  // Ye apni alag WhatsApp session (pms wala phone, 919711718322) use karta
-  // hai. Delegation, checklist aur daily reminder upar wale se hi jaate hain
-  // — unhe yahan se koi farak nahi padta.
+  // ── PMS / FMS sheet ke message (ABHI RUKE HAIN — niche fmsNotifyEnabled) ──
+  // ⚠️ DHYAN: ye PURANE Aumpfy trigger format ka hai jo {to, text} leta tha.
+  // Upar phoneField/messageField ab {phone, message} hain — isliye FMS ko
+  // wapas chalu karne se PEHLE is block ko bhi naye Waumfy API par le jaana
+  // hoga (ya iske liye alag field-mapping banani hogi). Abhi fmsNotifyEnabled
+  // false hai to koi farak nahi padta.
   pms: {
     url:    'https://api.aumpfy.com/api/apis/trigger/pms-08a73f',
     apiKey: 'sl_ae88d0d5e8e084c46ac9faeedc2993c15d374ba03fdb7e9d470e77d31975bd47'
@@ -41,14 +42,12 @@ module.exports = {
   // ⛔ PMS/FMS SHEET NOTIFICATION ROKI HUI (Harsh, 20 Aug 2026): "jab me
   // bolunga tab bhejna." Ye SIRF sheet-based PMS/FMS message rokta hai —
   // delegation/checklist assign-time alert aur subah-shaam daily reminder
-  // ispar bilkul asar nahi, wo alag `enabled` flag se chalte hain aur chalte
-  // rahenge. Resume karne ke liye ye wapas true karo.
+  // ispar bilkul asar nahi. Resume karne ke liye ye wapas true karo (aur
+  // upar wala ⚠️ pehle padho).
   fmsNotifyEnabled: false,
 
   // Ek API baithi ho to message doosri (chalu) API se bhej dun? Default false
-  // — delegation/checklist/reminder hamesha apni API se, PMS hamesha apni se,
-  // kabhi cross nahi. true karoge to atkane par doosri se jaayega, par bande
-  // ko number alag dikhega.
+  // — har message apni hi API se, kabhi cross nahi.
   allowApiFallback: false,
 
   // ── Baaki settings ──
@@ -64,6 +63,6 @@ module.exports = {
   // Monday ko reminders skip hote hain (server.js me hardcoded) — Harsh ne
   // isi ko bar-bar confirm kiya hai.
   reminderTimes: [ { h: 10, m: 15 }, { h: 17, m: 0 } ],   // 10:15 AM & 5:00 PM
-  timeoutMs:    60000,   // Aumpfy real-number send can take ~50s to respond
+  timeoutMs:    60000,   // naya API 0.4s me jawab deta hai; buffer ke liye same rakha
   appUrl:       process.env.APP_URL || ''
 };
