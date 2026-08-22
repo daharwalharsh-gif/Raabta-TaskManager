@@ -1537,7 +1537,13 @@ async function runWhatsAppReminders(slotKey, force) {
     // pass agar catch-up me 18:10 pe chale to alag marker banta aur duplicate
     // messages ja sakte the.
     const dateStr = ist.toISOString().split('T')[0];
-    const marker = `wa_pass_${dateStr}_${slotKey || istHour}`;
+    // Manual button (force) ka marker ALAG prefix se — daily cap sirf
+    // 'wa_pass_'ginta hai, isliye admin kabhi bhi button dabaye, subah-shaam
+    // ke automatic slot par koi asar nahi padta. (22 Aug: Harsh ne button
+    // dabaya to cap bhar gaya tha aur 5 baje wala rukne wala tha — ab nahi.)
+    const marker = force
+      ? `wa_manual_${dateStr}_${istHour}${String(ist.getUTCMinutes()).padStart(2, '0')}`
+      : `wa_pass_${dateStr}_${slotKey || istHour}`;
     if (!force && await _waSlotDone(marker)) {
       console.log(`  WhatsApp reminders already sent for ${marker} — skipped`);
       return { skipped: 'already-sent-today' };
@@ -2660,6 +2666,41 @@ async function refireTodays5pmReminder() {
 // unknown/failed rows ko naye API par ek saaf mauka: sirf AAJ bane rows,
 // revivals bhi 0 (404-era me mauke bekaar jal gaye the). Baasi reminder
 // waise bhi drain ka expiry-check rok dega.
+// 22 Aug: Harsh ne manual reminder button dabaya — us waqt force pass bhi
+// 'wa_pass_' marker likhta tha, jisse daily cap 2/2 bhar gaya aur shaam 5
+// baje ka slot rukne wala tha. Ab force 'wa_manual_' likhta hai; ye ek baar
+// aaj ke stray 'wa_pass_' markers (jo asli slot 1015/1700 ke nahi hain)
+// hata deta hai taaki aaj ka 5 baje wala pakka chale.
+async function cleanStrayManualMarkers() {
+  const MARKER = 'wa_clean_manual_marker_20260822_v1';
+  try {
+    const d = await getDB();
+    await ensureAppStateTab(d);
+    const done = await d.findWhere('App_State', { key_name: MARKER });
+    if (done && done.length) return;
+
+    const todayIst = new Date(Date.now() + 330 * 60000).toISOString().split('T')[0];
+    const slotKeys = new Set(waSlots().map(x => `${x.h}${String(x.m || 0).padStart(2, '0')}`));
+    const rows = await d.findAll('App_State');
+    const prefix = `wa_pass_${todayIst}_`;
+    let removed = 0;
+    for (const r of rows) {
+      const k = String(r.key_name || '');
+      if (!k.startsWith(prefix)) continue;
+      if (slotKeys.has(k.slice(prefix.length))) continue;   // asli slot marker — rehne do
+      await d.delete('App_State', r.id).catch(() => {});
+      removed++;
+    }
+    await d.insert('App_State', {
+      key_name: MARKER, value: `removed ${removed}`,
+      updated_at: new Date().toISOString().replace('T', ' ').split('.')[0]
+    });
+    if (removed) console.log(`  ✅ ${removed} stray manual marker hataya — 5 baje ka slot ab pakka chalega`);
+  } catch (e) {
+    console.error('  cleanStrayManualMarkers error:', e.message);
+  }
+}
+
 async function resendTodays404Casualties() {
   const MARKER = 'wa_resend_404_era_20260822_v1';
   try {
@@ -5779,6 +5820,7 @@ async function seedAdminIfNeeded() {
       .then(() => setTimeout(() => clearOldOutboxBacklog().catch(() => {}), 5 * 1000))
       .then(() => setTimeout(() => backfillTodayMorningAssign().catch(() => {}), 15 * 1000))
       .then(() => setTimeout(() => resendTodays404Casualties().catch(() => {}), 10 * 1000))
+      .then(() => setTimeout(() => cleanStrayManualMarkers().catch(() => {}), 8 * 1000))
       .then(() => fixBeadRuleToYes().catch(() => {}))
       .then(() => setTimeout(() => resetFailedAfterApiSwitch().catch(() => {}), 80 * 1000))
       .catch(err => console.error('  Background DB connection failed (will retry on demand):', err.message));
