@@ -2677,6 +2677,61 @@ async function refireTodays5pmReminder() {
 // Harsh, 22 Aug ~12 baje: "jane do jldi se bhejo" — subah ka reminder poori
 // list ko dobara. Maine duplicate ka bataya, unhone jaan-boojh kar haan kaha.
 // Ek baar ka force pass (marker-gated), sirf aaj ke liye.
+// 23 Aug shaam: 5 baje ka batch Waumfy ke "session warm-up" me phas gaya —
+// nayi-judi session par pehle 30 min sirf 5 message. ~5 gaye, baaki failed
+// (Waumfy ke andar; humari taraf "queued" hi dikha tha). Warm-up ~17:56 par
+// khatam — isliye ye refire 18:00 IST tak rukta hai, phir poori list ko PM
+// reminder dobara bhejta hai (per-banda PM dedup bypass karke). 19:00 se
+// pehle nikal jaata hai.
+async function refirePM23Aug() {
+  const MARKER = 'wa_refire_pm_20260823_v1';
+  try {
+    if (!waAutoAllowed()) return;
+    if (!WA.enabled || !WA.url || !WA.apiKey) return;
+    const d = await getDB();
+    await ensureAppStateTab(d);
+    const done = await d.findWhere('App_State', { key_name: MARKER });
+    if (done && done.length) return;
+
+    const istNow = () => new Date(Date.now() + 330 * 60000);
+    const todayIst = istNow().toISOString().split('T')[0];
+    if (todayIst !== '2026-08-23') {
+      await d.insert('App_State', { key_name: MARKER, value: 'din nikal gaya, skip',
+        updated_at: new Date().toISOString().replace('T', ' ').split('.')[0] });
+      return;
+    }
+
+    // 18:00 IST tak intezaar (warm-up ke baad). Marker abhi NAHI likhte —
+    // beech me app restart ho jaye to agli baar phir se schedule ho jayega.
+    const nowMin = istNow().getUTCHours() * 60 + istNow().getUTCMinutes();
+    const waitMs = Math.max(0, (18 * 60 - nowMin) * 60000);
+    if (waitMs > 0) {
+      console.log(`  PM refire: warm-up ke baad chalega — ${Math.round(waitMs / 60000)} min intezaar (18:00 IST par)`);
+      await new Promise(r => setTimeout(r, waitMs));
+    }
+    if (istNow().getUTCHours() * 60 + istNow().getUTCMinutes() >= 19 * 60) return;   // 7 baje nikal gaya to rehne do
+
+    const check = await d.findWhere('App_State', { key_name: MARKER });
+    if (check && check.length) return;   // beech me kisi aur instance ne kar diya
+    await d.insert('App_State', {
+      key_name: MARKER, value: 'refired',
+      updated_at: new Date().toISOString().replace('T', ' ').split('.')[0]
+    });
+    // Per-banda PM dedup bypass — aaj ke PM refs rename, sab fresh queue honge
+    const pmRef = `rem_${todayIst}_PM`;
+    const rows = await d.findAll('WA_Outbox');
+    for (const r0 of rows) {
+      if (r0.kind === 'daily-reminder' && r0.ref === pmRef) {
+        await d.update('WA_Outbox', r0.id, { ref: pmRef + '_old' }).catch(() => {});
+      }
+    }
+    const r = await runWhatsAppReminders(null, true);
+    console.log('  ✅ 5 baje ka reminder dobara (warm-up ke baad):', JSON.stringify(r));
+  } catch (e) {
+    console.error('  refirePM23Aug error:', e.message);
+  }
+}
+
 async function refireMorning22Aug() {
   const MARKER = 'wa_refire_am_20260822_v2';   // v1 dedup se ruk gaya tha
   try {
@@ -5867,6 +5922,7 @@ async function seedAdminIfNeeded() {
       .then(() => setTimeout(() => resendTodays404Casualties().catch(() => {}), 10 * 1000))
       .then(() => setTimeout(() => cleanStrayManualMarkers().catch(() => {}), 8 * 1000))
       .then(() => setTimeout(() => refireMorning22Aug().catch(() => {}), 12 * 1000))
+      .then(() => setTimeout(() => refirePM23Aug().catch(() => {}), 18 * 1000))
       .then(() => fixBeadRuleToYes().catch(() => {}))
       .then(() => setTimeout(() => resetFailedAfterApiSwitch().catch(() => {}), 80 * 1000))
       .catch(err => console.error('  Background DB connection failed (will retry on demand):', err.message));
