@@ -1664,7 +1664,9 @@ async function checkAndFireDueSlots() {
   if (!waAutoAllowed()) return { skipped: 'not-production' };
   if (!WA.enabled || !WA.url || !WA.apiKey) return;
   const ist = new Date(Date.now() + 330 * 60000);
-  if (ist.getUTCDay() === 1) return;                      // Monday skip
+  // Monday skip HATAYA (Harsh, 23 Aug 2026): "kal se proper subah 10.15 aur
+  // shaam 5 baje jana chahiye" — aur kal Monday tha. Ab reminder SAATON din
+  // jaate hain. (Ye skip shuru se code me tha, Harsh ne kabhi manga nahi tha.)
   const nowMin = ist.getUTCHours() * 60 + ist.getUTCMinutes();
   const OFFICE_END = 19 * 60;   // 7:00 PM IST — catch-up isi tak
   // Slot due hai agar uska time nikal chuka hai aur abhi office hours ke andar
@@ -1770,7 +1772,7 @@ function whatsAppReminderScheduler() {
     runFMSNotifications().catch(e => console.error('  FMS notify tick error:', e.message));
   }, 3 * 60 * 1000);
   selfKeepAlive();   // app khud ko jagati rahegi
-  console.log(`  WhatsApp reminder scheduler started (daily ${label} IST, Monday skip, catch-up till 7PM)`);
+  console.log(`  WhatsApp reminder scheduler started (daily ${label} IST, saaton din, catch-up till 7PM)`);
 }
 
 // ══════════════════════════════════════════════════════
@@ -5551,7 +5553,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
     if (!WA.enabled || !WA.url || !WA.apiKey) return res.json({ skipped: 'not-configured' });
     const ist = new Date(Date.now() + 330 * 60000);
     const istTime = ist.toISOString().replace('T', ' ').slice(0, 16) + ' IST';
-    if (ist.getUTCDay() === 1) return res.json({ skipped: 'monday', now: istTime });
+    // Monday skip hataya (23 Aug) — reminder saaton din jaate hain
     // Background me chalao — Aumpfy slow hai (~50s/msg), request ko mat latkao
     checkAndFireDueSlots()
       .then(r => console.log('  WA reminders (cron):', JSON.stringify(r)))
@@ -5685,7 +5687,7 @@ app.get('/api/admin/wa-diagnose', requireAuth, requireAdmin, async (req, res) =>
     const reasons = [];
     if (!WA.enabled) reasons.push('WhatsApp disabled hai (config me enabled:false)');
     if (!WA.url || !WA.apiKey) reasons.push('WhatsApp API configure nahi hai');
-    if (ist.getUTCDay() === 1) reasons.push('Aaj Monday hai — Monday ko reminders skip hote hain');
+    // (Monday skip 23 Aug ko hata — ab koi din skip nahi hota)
     if (nowMin < 615) reasons.push(`Abhi ${ist.toISOString().slice(11,16)} IST hai — pehla slot 10:15 par hai, abhi tak chala hi nahi`);
     if (nowMin >= 1140) reasons.push('7 PM ke baad reminders nahi jaate');
 
