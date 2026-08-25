@@ -50,6 +50,16 @@ module.exports = {
   // — har message apni hi API se, kabhi cross nahi.
   allowApiFallback: false,
 
+  // Daily reminder me HAR message ke beech ka gap (milliseconds). Harsh,
+  // 25 Aug: "80 second kar do — message queue me fas rahe hain." Waumfy ki
+  // apni queue/rate-limit me na fasein isliye hum khud ruk-ruk kar bhejte
+  // hain. Assign-time alert par ye gap LAGU NAHI hota — wo turant jaate hain.
+  reminderGapMs: 80000,
+
+  // In numbers ko daily reminder KABHI nahi jaata. 919999298678 khud bhejne
+  // wala phone hai (Phone 1) — khud ko hi reminder maar raha tha.
+  reminderExcludePhones: ['919999298678'],
+
   // ── Baaki settings ──
   countryCode:  '91',
   // Daily reminder times (IST). Add/remove entries to change kab reminder jaye.

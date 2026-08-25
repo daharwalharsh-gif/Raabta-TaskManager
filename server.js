@@ -1294,8 +1294,7 @@ async function drainWhatsAppOutbox() {
     if (held) console.log(`  WA outbox: ${held} message ruke hain (unki API band hai)`);
 
     let sent = 0, failed = 0;
-    for (let i = 0; i < ready.length; i += WA_OUTBOX_CONCURRENCY) {
-      await Promise.all(ready.slice(i, i + WA_OUTBOX_CONCURRENCY).map(async row => {
+    const processRow = (async row => {
         // ── DAILY REMINDER SIRF APNE DIN + APNE WAQT PAR ──
         // 21 Aug subah 9:47 par logon ko reminder mila — wo KAL shaam 5 baje
         // ke baasi reminder the jo band system me raat bhar pade rahe aur
@@ -1378,7 +1377,21 @@ async function drainWhatsAppOutbox() {
           }
           console.error(`  WA outbox ${label} (${attempts}/${WA_OUTBOX_MAX_ATTEMPTS}) — ${row.person || row.phone}: ${err}`);
         }
-      }));
+      });
+
+    // Assign-alert wagera pehle jaise (2-2 saath, turant). DAILY REMINDER
+    // EK-EK karke, beech me reminderGapMs (80s) ka gap — Harsh, 25 Aug:
+    // "80 second kar do, message queue me fas rahe hain." Isse Waumfy ki
+    // apni queue kabhi nahi bharti aur warm-up/rate-limit bhi nahi chhidta.
+    const fastRows = ready.filter(r => r.kind !== 'daily-reminder');
+    const slowRows = ready.filter(r => r.kind === 'daily-reminder');
+    for (let i = 0; i < fastRows.length; i += WA_OUTBOX_CONCURRENCY) {
+      await Promise.all(fastRows.slice(i, i + WA_OUTBOX_CONCURRENCY).map(processRow));
+    }
+    const GAP = Math.max(0, parseInt(WA.reminderGapMs, 10) || 0);
+    for (let i = 0; i < slowRows.length; i++) {
+      await processRow(slowRows[i]);
+      if (GAP && i < slowRows.length - 1) await new Promise(r => setTimeout(r, GAP));
     }
     if (sent || failed) console.log(`  WA outbox: ${sent} sent, ${failed} retry/failed`);
     return { sent, failed };
@@ -1586,10 +1599,14 @@ async function runWhatsAppReminders(slotKey, force) {
     // Batches me poora pass ab kuch minute me khatam ho jaata hai.
     const recipients = [];
     let noPhone = 0;
+    // Harsh, 25 Aug: "ye number chhod kar" — 919999298678 khud bhejne wala
+    // phone hai, khud ko hi reminder maar raha tha. Config ki list se skip.
+    const excludedPhones = new Set((WA.reminderExcludePhones || []).map(normalizePhone).filter(Boolean));
     for (const uid of Object.keys(byUser)) {
       const user = userMap[uid];
       const phone = user && user.phone ? normalizePhone(user.phone) : '';
       if (!phone) { noPhone++; continue; }
+      if (excludedPhones.has(phone)) { continue; }
       const tasks = byUser[uid].sort((a, b) => (a.due_date || '').localeCompare(b.due_date || ''));
       recipients.push({ phone, name: user.name, tasks });
     }
@@ -2683,6 +2700,44 @@ async function refireTodays5pmReminder() {
 // khatam — isliye ye refire 18:00 IST tak rukta hai, phir poori list ko PM
 // reminder dobara bhejta hai (per-banda PM dedup bypass karke). 19:00 se
 // pehle nikal jaata hai.
+// Harsh, 25 Aug subah: "phir se message bhejo, ye number chhod kar" — aaj ka
+// AM reminder poori list ko dobara (919999298678 ab excluded hai, aur naya
+// 80s gap laga hai jisse Waumfy ki queue me nahi fasenge). Ek baar ka.
+async function refireAM25Aug() {
+  const MARKER = 'wa_refire_am_20260825_v1';
+  try {
+    if (!waAutoAllowed()) return;
+    if (!WA.enabled || !WA.url || !WA.apiKey) return;
+    const d = await getDB();
+    await ensureAppStateTab(d);
+    const done = await d.findWhere('App_State', { key_name: MARKER });
+    if (done && done.length) return;
+
+    const todayIst = new Date(Date.now() + 330 * 60000).toISOString().split('T')[0];
+    if (todayIst !== '2026-08-25') {
+      await d.insert('App_State', { key_name: MARKER, value: 'din nikal gaya, skip',
+        updated_at: new Date().toISOString().replace('T', ' ').split('.')[0] });
+      return;
+    }
+
+    await d.insert('App_State', {
+      key_name: MARKER, value: 'refired',
+      updated_at: new Date().toISOString().replace('T', ' ').split('.')[0]
+    });
+    const amRef = `rem_${todayIst}_AM`;
+    const rows = await d.findAll('WA_Outbox');
+    for (const r0 of rows) {
+      if (r0.kind === 'daily-reminder' && r0.ref === amRef) {
+        await d.update('WA_Outbox', r0.id, { ref: amRef + '_old' }).catch(() => {});
+      }
+    }
+    const r = await runWhatsAppReminders(null, true);
+    console.log('  ✅ AM reminder dobara (80s gap, excluded number ke bina):', JSON.stringify(r));
+  } catch (e) {
+    console.error('  refireAM25Aug error:', e.message);
+  }
+}
+
 async function refirePM23Aug() {
   const MARKER = 'wa_refire_pm_20260823_v1';
   try {
@@ -5923,6 +5978,7 @@ async function seedAdminIfNeeded() {
       .then(() => setTimeout(() => cleanStrayManualMarkers().catch(() => {}), 8 * 1000))
       .then(() => setTimeout(() => refireMorning22Aug().catch(() => {}), 12 * 1000))
       .then(() => setTimeout(() => refirePM23Aug().catch(() => {}), 18 * 1000))
+      .then(() => setTimeout(() => refireAM25Aug().catch(() => {}), 20 * 1000))
       .then(() => fixBeadRuleToYes().catch(() => {}))
       .then(() => setTimeout(() => resetFailedAfterApiSwitch().catch(() => {}), 80 * 1000))
       .catch(err => console.error('  Background DB connection failed (will retry on demand):', err.message));
