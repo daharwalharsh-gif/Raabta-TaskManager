@@ -3743,8 +3743,7 @@ async function exportAllChecklistCSV() {
   rows.forEach((r, i) => {
     lines.push([i + 1, r.name, r.email, r.desc, r.freq, r.assignedOn].map(esc).join(','));
   });
-  const blob = new Blob(['﻿' + lines.join('
-')], { type: 'text/csv;charset=utf-8' });
+  const blob = new Blob([String.fromCharCode(0xFEFF) + lines.join(String.fromCharCode(13, 10))], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = `all_checklist_tasks_${new Date().toISOString().slice(0, 10)}.csv`;
