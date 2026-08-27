@@ -5781,20 +5781,39 @@ function maintNum(raw) {
   return Number.isFinite(n) ? n : 0;
 }
 
-// Sheet se sirf wahi rows jo Ashok + Office Cash hain
-async function maintReadCredits() {
+// Sheet ka data 60 sec cache me — page kholte hi turant khulta hai. Sheet me
+// nayi row aane par 1 min ke andar apne aap dikh jaati hai (aur background
+// refresh chalta rehta hai, to aksar turant).
+const MAINT_CACHE_TTL = 60 * 1000;
+let _maintCache = { at: 0, rows: null, inFlight: null };
+
+// Sheet se sirf wahi rows jo Ashok + Office Cash hain.
+// SIRF zaroori columns padhte hain (A,B,C,F,I,K) — D/E/H me lambe Drive link
+// hote hain, unhe kheenchne se hi call 5 sec le rahi thi.
+async function maintFetchCredits() {
   const sheets = await getSheetsClient();
-  const resp = await withRetry(() => sheets.spreadsheets.values.get({
+  const resp = await withRetry(() => sheets.spreadsheets.values.batchGet({
     spreadsheetId: MAINT_SHEET_ID,
-    range: `${MAINT_TAB}!A:K`
+    ranges: [
+      `${MAINT_TAB}!A:C`,   // timestamp, naam, amount
+      `${MAINT_TAB}!F:F`,   // payment mode
+      `${MAINT_TAB}!I:I`,   // details
+      `${MAINT_TAB}!K:K`    // comments
+    ]
   }));
-  const rows = resp.data.values || [];
+  const vr = resp.data.valueRanges || [];
+  const abc = (vr[0] && vr[0].values) || [];
+  const fCol = (vr[1] && vr[1].values) || [];
+  const iCol = (vr[2] && vr[2].values) || [];
+  const kCol = (vr[3] && vr[3].values) || [];
+  const cell = (col, i) => String(((col[i] || [])[0]) || '').trim();
+
   const out = [];
   // Row 1 heading hai — usse chhod do
-  for (let i = 1; i < rows.length; i++) {
-    const r = rows[i] || [];
+  for (let i = 1; i < abc.length; i++) {
+    const r = abc[i] || [];
     const name = String(r[1] || '').trim();        // B — Name of Employee
-    const mode = String(r[5] || '').trim();        // F — Payment Mode
+    const mode = cell(fCol, i);                    // F — Payment Mode
     if (!name.toLowerCase().includes(MAINT_NAME_MATCH)) continue;
     if (mode.toLowerCase() !== MAINT_MODE_MATCH) continue;
     const amount = maintNum(r[2]);                 // C — Amount
@@ -5804,13 +5823,36 @@ async function maintReadCredits() {
       date: String(r[0] || '').trim(),             // A — timestamp
       name,
       amount,
-      itemPhoto: String(r[3] || '').trim(),        // D
-      bill: String(r[4] || '').trim(),             // E
-      details: String(r[8] || '').trim(),          // I
-      comments: String(r[10] || '').trim()         // K
+      details: cell(iCol, i),                      // I
+      comments: cell(kCol, i)                      // K
     });
   }
   return out;
+}
+
+// Cache ke saath. Purana data hai to TURANT wahi dete hain aur background me
+// taaza kar lete hain — user ko "Loading" nahi dikhta.
+async function maintReadCredits(force) {
+  const fresh = _maintCache.rows && (Date.now() - _maintCache.at) < MAINT_CACHE_TTL;
+  if (!force && fresh) return _maintCache.rows;
+
+  // Purana data maujood hai par baasi — turant wahi do, peeche se refresh
+  if (!force && _maintCache.rows) {
+    if (!_maintCache.inFlight) {
+      _maintCache.inFlight = maintFetchCredits()
+        .then(rows => { _maintCache.rows = rows; _maintCache.at = Date.now(); return rows; })
+        .catch(e => { console.error('  maintenance refresh fail:', e.message); return _maintCache.rows; })
+        .finally(() => { _maintCache.inFlight = null; });
+    }
+    return _maintCache.rows;
+  }
+
+  // Pehli baar — do request ek saath na jaayein
+  if (_maintCache.inFlight) return _maintCache.inFlight;
+  _maintCache.inFlight = maintFetchCredits()
+    .then(rows => { _maintCache.rows = rows; _maintCache.at = Date.now(); return rows; })
+    .finally(() => { _maintCache.inFlight = null; });
+  return _maintCache.inFlight;
 }
 
 // Sheets-DB par tab apne aap nahi banti (MySQL me schema se ban jaati hai) —
@@ -5843,7 +5885,8 @@ async function ensureMaintenanceTab(d) {
 // GET /api/maintenance — cards ka data + dono list (aaya / gaya)
 app.get('/api/maintenance', requireAuth, async (req, res) => {
   try {
-    const [credits, d] = await Promise.all([maintReadCredits(), getDB()]);
+    const force = String(req.query.refresh || '') === '1';
+    const [credits, d] = await Promise.all([maintReadCredits(force), getDB()]);
     await ensureMaintenanceTab(d).catch(() => {});
     const rawExp = await d.findAll('Maintenance_Expenses').catch(() => []);
     // image_data list me NAHI bhejte — page bhaari ho jaata hai. Alag
@@ -6145,6 +6188,9 @@ async function seedAdminIfNeeded() {
       // Sabse pehle chalao — drain ka pehla tick 60s baad aata hai, isliye ye
       // usse bahut pehle purana backlog saaf kar deta hai
       .then(() => setTimeout(() => clearOldOutboxBacklog().catch(() => {}), 5 * 1000))
+      // Maintenance sheet ka data pehle se taiyar rakho — tab kholte hi
+      // turant khule, "Loading" na dikhe
+      .then(() => setTimeout(() => maintReadCredits(true).catch(() => {}), 25 * 1000))
       .then(() => setTimeout(() => backfillTodayMorningAssign().catch(() => {}), 15 * 1000))
       .then(() => setTimeout(() => resendTodays404Casualties().catch(() => {}), 10 * 1000))
       .then(() => setTimeout(() => cleanStrayManualMarkers().catch(() => {}), 8 * 1000))

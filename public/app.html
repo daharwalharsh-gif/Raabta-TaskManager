@@ -1461,7 +1461,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       <h2>Maintenance</h2>
       <div style="display:flex;gap:8px;align-items:center">
         <button class="btn btn-outline" onclick="loadMaintenance()" id="maintRefreshBtn">↻ Refresh</button>
-        <button class="btn btn-primary" onclick="openMaintExpense()">＋ Amount Nikaalo</button>
+        <button class="btn btn-primary" onclick="openMaintExpense()">＋ Withdraw Amount</button>
       </div>
     </div>
 
@@ -1470,7 +1470,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       <div class="ov-card completed">
         <div class="label">Total Received (Office Cash)</div>
         <div class="number" id="maintIn">—</div>
-        <div style="font-size:11px;color:#64748b;margin-top:4px" id="maintInSub">sheet se</div>
+        <div style="font-size:11px;color:#64748b;margin-top:4px" id="maintInSub">from sheet</div>
       </div>
       <div class="ov-card pending">
         <div class="label">Total Spent</div>
@@ -1478,7 +1478,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
         <div style="font-size:11px;color:#64748b;margin-top:4px" id="maintOutSub">entries</div>
       </div>
       <div class="ov-card revised">
-        <div class="label">Balance (Bacha Hua)</div>
+        <div class="label">Balance</div>
         <div class="number" id="maintBal">—</div>
         <div style="font-size:11px;color:#64748b;margin-top:4px">received − spent</div>
       </div>
@@ -1488,7 +1488,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       <!-- KHARCH (debit) -->
       <div class="task-table-card">
         <div class="card-head">
-          <div class="card-head-title">💸 Spent — kahan lagaya</div>
+          <div class="card-head-title">💸 Spent — where it was used</div>
           <button class="btn btn-outline" onclick="exportMaintCSV()" style="font-size:12px;padding:5px 10px">⬇ CSV</button>
         </div>
         <div style="overflow-x:auto;max-height:420px;overflow-y:auto;">
@@ -1512,7 +1512,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       <!-- AANA (credit) — sheet se -->
       <div class="task-table-card">
         <div class="card-head">
-          <div class="card-head-title">📥 Received — Purchase_System sheet se</div>
+          <div class="card-head-title">📥 Received — from Purchase_System sheet</div>
           <span style="font-size:11px;color:#94a3b8">Ashok kumar · Office Cash</span>
         </div>
         <div style="overflow-x:auto;max-height:420px;overflow-y:auto;">
@@ -1542,10 +1542,10 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
 ══════════════════════════════════════ -->
 <div class="modal-overlay" id="maintExpenseModal">
   <div class="modal" style="max-width:560px">
-    <h3>💸 Amount Nikaalo</h3>
+    <h3>💸 Withdraw Amount</h3>
     <div style="font-size:12px;color:#64748b;margin:-6px 0 14px">
-      Balance me se jitna nikaal rahe ho wo, aur kahan lagaya — dono likho.
-      Bill/photo lagana ho to laga do.
+      Enter how much you are taking out of the balance and where it was used.
+      Attach a bill or photo if you have one.
     </div>
 
     <div id="maintExpErr" style="display:none;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:8px;padding:9px 12px;font-size:13px;margin-bottom:12px"></div>
@@ -1564,8 +1564,8 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     </div>
 
     <div style="margin-bottom:12px">
-      <label style="display:block;font-size:11px;font-weight:600;color:#64748b;margin-bottom:4px;text-transform:uppercase">Kahan lagaya *</label>
-      <textarea id="maintExpDesc" rows="3" placeholder="jaise: shop ka AC repair karwaya, mistri ko diya"
+      <label style="display:block;font-size:11px;font-weight:600;color:#64748b;margin-bottom:4px;text-transform:uppercase">Where it was used *</label>
+      <textarea id="maintExpDesc" rows="3" placeholder="e.g. AC repair at shop, paid to technician"
         style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;font-family:'Inter',sans-serif;outline:none;box-sizing:border-box;resize:vertical"></textarea>
     </div>
 
@@ -1577,8 +1577,8 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     </div>
 
     <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:16px">
-      <div style="display:flex;justify-content:space-between"><span style="color:#64748b">Abhi balance</span><strong id="maintExpBalNow">—</strong></div>
-      <div style="display:flex;justify-content:space-between;margin-top:5px"><span style="color:#64748b">Iske baad bachega</span><strong id="maintExpBalAfter" style="color:#16a34a">—</strong></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:#64748b">Current balance</span><strong id="maintExpBalNow">—</strong></div>
+      <div style="display:flex;justify-content:space-between;margin-top:5px"><span style="color:#64748b">Balance after this</span><strong id="maintExpBalAfter" style="color:#16a34a">—</strong></div>
     </div>
 
     <div class="modal-actions">
@@ -1594,7 +1594,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     <h3 id="maintImageTitle">Bill</h3>
     <div id="maintImageBody" style="text-align:center;max-height:70vh;overflow:auto"></div>
     <div class="modal-actions">
-      <button class="btn btn-outline" onclick="document.getElementById('maintImageModal').classList.remove('active')">Close</button>
+      <button class="btn btn-outline" onclick="document.getElementById('maintImageModal').classList.remove('open')">Close</button>
     </div>
   </div>
 </div>
@@ -5849,19 +5849,19 @@ function maintDate(raw) {
 async function loadMaintenance() {
   const expBody = document.getElementById('maintExpBody');
   const crBody = document.getElementById('maintCreditBody');
-  if (expBody) expBody.innerHTML = '<tr><td colspan="5" class="empty">Loading…</td></tr>';
-  if (crBody) crBody.innerHTML = '<tr><td colspan="4" class="empty">Loading…</td></tr>';
+  if (expBody && !(_maintData.expenses || []).length) expBody.innerHTML = '<tr><td colspan="5" class="empty">Loading…</td></tr>';
+  if (crBody && !(_maintData.credits || []).length) crBody.innerHTML = '<tr><td colspan="4" class="empty">Loading…</td></tr>';
 
   try {
     const d = await api('/api/maintenance');
-    if (!d || d.error) throw new Error((d && d.error) || 'Data nahi mila');
+    if (!d || d.error) throw new Error((d && d.error) || 'Could not load data');
     _maintData = d;
     renderMaintenance();
   } catch (e) {
-    const msg = maintEsc(e.message || 'Load nahi hua');
+    const msg = maintEsc(e.message || 'Failed to load');
     if (expBody) expBody.innerHTML = `<tr><td colspan="5" class="empty">⚠️ ${msg}</td></tr>`;
     if (crBody) crBody.innerHTML = `<tr><td colspan="4" class="empty">⚠️ ${msg}</td></tr>`;
-    showToast('Maintenance load nahi hua: ' + (e.message || ''), 'error');
+    showToast('Could not load Maintenance: ' + (e.message || ''), 'error');
   }
 }
 
@@ -5882,7 +5882,7 @@ function renderMaintenance() {
   // ── Kharch ki list ──
   const expBody = document.getElementById('maintExpBody');
   if (!(d.expenses || []).length) {
-    expBody.innerHTML = '<tr><td colspan="5" class="empty">Abhi koi kharch nahi 🎉</td></tr>';
+    expBody.innerHTML = '<tr><td colspan="5" class="empty">No expenses yet 🎉</td></tr>';
   } else {
     expBody.innerHTML = d.expenses.map(e => `
       <tr>
@@ -5890,7 +5890,7 @@ function renderMaintenance() {
         <td>${maintEsc(e.description)}${e.by ? `<div style="font-size:10px;color:#94a3b8;margin-top:2px">— ${maintEsc(e.by)}</div>` : ''}</td>
         <td style="white-space:nowrap;text-align:right;font-weight:700;color:#dc2626">${maintMoney(e.amount)}</td>
         <td style="white-space:nowrap">${e.hasImage
-          ? `<button class="btn btn-outline" style="font-size:11px;padding:3px 8px" onclick="viewMaintImage('${e.id}','${maintEsc(e.imageName)}')">📎 Dekho</button>`
+          ? `<button class="btn btn-outline" style="font-size:11px;padding:3px 8px" onclick="viewMaintImage('${e.id}','${maintEsc(e.imageName)}')">📎 View</button>`
           : '<span style="color:#cbd5e1">—</span>'}</td>
         <td style="white-space:nowrap">${isAdmin
           ? `<button class="btn btn-outline" style="font-size:11px;padding:3px 8px;color:#dc2626;border-color:#fecaca" onclick="deleteMaintExpense('${e.id}')">🗑</button>`
@@ -5901,7 +5901,7 @@ function renderMaintenance() {
   // ── Sheet se aaya hua ──
   const crBody = document.getElementById('maintCreditBody');
   if (!(d.credits || []).length) {
-    crBody.innerHTML = '<tr><td colspan="4" class="empty">Sheet me Ashok + Office Cash wali koi row nahi mili</td></tr>';
+    crBody.innerHTML = '<tr><td colspan="4" class="empty">No Ashok + Office Cash rows found in the sheet</td></tr>';
   } else {
     crBody.innerHTML = d.credits.map(c => `
       <tr>
@@ -5929,12 +5929,12 @@ function openMaintExpense() {
 
   document.getElementById('maintExpBalNow').textContent = maintMoney(_maintData.balance);
   document.getElementById('maintExpBalAfter').textContent = maintMoney(_maintData.balance);
-  document.getElementById('maintExpenseModal').classList.add('active');
+  document.getElementById('maintExpenseModal').classList.add('open');
   setTimeout(() => document.getElementById('maintExpAmount').focus(), 100);
 }
 
 function closeMaintExpense() {
-  document.getElementById('maintExpenseModal').classList.remove('active');
+  document.getElementById('maintExpenseModal').classList.remove('open');
 }
 
 // Amount type karte hi "iske baad bachega" live update
@@ -5958,18 +5958,18 @@ function onMaintImagePick() {
 
   const MAX = 5 * 1024 * 1024;   // 5 MB — isse bada DB me bhaari padta hai
   if (f.size > MAX) {
-    info.innerHTML = '<span style="color:#dc2626">⚠️ File 5MB se badi hai — chhoti file lagao</span>';
+    info.innerHTML = '<span style="color:#dc2626">⚠️ File is larger than 5MB — please pick a smaller one</span>';
     inp.value = '';
     return;
   }
-  info.textContent = `${f.name} · ${(f.size / 1024).toFixed(0)} KB — padha ja raha hai…`;
+  info.textContent = `${f.name} · ${(f.size / 1024).toFixed(0)} KB — reading…`;
   const rd = new FileReader();
   rd.onload = () => {
     _maintImageB64 = String(rd.result || '');
     _maintImageMeta = { name: f.name, type: f.type };
     info.innerHTML = `✅ ${maintEsc(f.name)} · ${(f.size / 1024).toFixed(0)} KB`;
   };
-  rd.onerror = () => { info.innerHTML = '<span style="color:#dc2626">⚠️ File padhi nahi gayi</span>'; };
+  rd.onerror = () => { info.innerHTML = '<span style="color:#dc2626">⚠️ Could not read the file</span>'; };
   rd.readAsDataURL(f);
 }
 
@@ -5983,9 +5983,9 @@ async function saveMaintExpense() {
   const fail = m => { err.textContent = m; err.style.display = 'block'; };
   err.style.display = 'none';
 
-  if (!amount || amount <= 0) return fail('Amount daalo (0 se zyada)');
-  if (!spentOn) return fail('Date daalo');
-  if (!description) return fail('Kahan lagaya — ye likhna zaroori hai');
+  if (!amount || amount <= 0) return fail('Enter an amount greater than 0');
+  if (!spentOn) return fail('Please pick a date');
+  if (!description) return fail('Please write where it was used');
 
   btn.disabled = true;
   btn.textContent = 'Saving…';
@@ -5996,12 +5996,12 @@ async function saveMaintExpense() {
       imageType: _maintImageMeta.type,
       imageData: _maintImageB64
     });
-    if (!r || r.error) throw new Error((r && r.error) || 'Save nahi hua');
+    if (!r || r.error) throw new Error((r && r.error) || 'Could not save');
     closeMaintExpense();
-    showToast('Entry save ho gayi ✅');
+    showToast('Entry saved ✅');
     await loadMaintenance();
   } catch (e) {
-    fail(e.message || 'Save nahi hua');
+    fail(e.message || 'Could not save');
   } finally {
     btn.disabled = false;
     btn.textContent = 'Save Entry';
@@ -6009,14 +6009,14 @@ async function saveMaintExpense() {
 }
 
 async function deleteMaintExpense(id) {
-  if (!confirm('Ye entry hata dein? Balance apne aap wapas badh jayega.')) return;
+  if (!confirm('Delete this entry? The balance will go back up automatically.')) return;
   try {
     const r = await api('/api/maintenance/expense/' + id, 'DELETE');
-    if (!r || r.error) throw new Error((r && r.error) || 'Delete nahi hua');
-    showToast('Entry hata di');
+    if (!r || r.error) throw new Error((r && r.error) || 'Could not delete');
+    showToast('Entry deleted');
     await loadMaintenance();
   } catch (e) {
-    showToast(e.message || 'Delete nahi hua', 'error');
+    showToast(e.message || 'Could not delete', 'error');
   }
 }
 
@@ -6025,15 +6025,15 @@ async function viewMaintImage(id, name) {
   const body = document.getElementById('maintImageBody');
   document.getElementById('maintImageTitle').textContent = name || 'Bill';
   body.innerHTML = '<div class="empty">Loading…</div>';
-  modal.classList.add('active');
+  modal.classList.add('open');
   try {
     const r = await api(`/api/maintenance/expense/${id}/image`);
-    if (!r || r.error || !r.data) throw new Error((r && r.error) || 'Image nahi mili');
+    if (!r || r.error || !r.data) throw new Error((r && r.error) || 'Image not found');
     body.innerHTML = String(r.type || '').includes('pdf')
       ? `<iframe src="${r.data}" style="width:100%;height:68vh;border:1px solid #e2e8f0;border-radius:8px"></iframe>`
       : `<img src="${r.data}" style="max-width:100%;border-radius:8px"/>`;
   } catch (e) {
-    body.innerHTML = `<div class="empty">⚠️ ${maintEsc(e.message || 'Image nahi mili')}</div>`;
+    body.innerHTML = `<div class="empty">⚠️ ${maintEsc(e.message || 'Image not found')}</div>`;
   }
 }
 
