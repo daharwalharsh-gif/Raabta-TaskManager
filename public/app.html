@@ -728,6 +728,10 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
       <span class="nav-label-text">HR Reporting</span>
     </div>
+    <div class="nav-item" id="nav-maintenance" style="display:none" onclick="navigate('maintenance',this)">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      <span class="nav-label-text">Maintenance</span>
+    </div>
     <div class="nav-divider"></div>
     <div class="nav-item" onclick="navigate('profile',this)">
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
@@ -1448,6 +1452,151 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     </div>
   </div>
 
+  <!-- ══════════════════════════════════════
+       MAINTENANCE — Ashok kumar ka Office Cash hisaab
+       Aana: Purchase_System sheet se apne aap. Jaana: yahin se entry.
+  ══════════════════════════════════════ -->
+  <div id="page-maintenance" class="page">
+    <div class="page-header">
+      <h2>Maintenance</h2>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-outline" onclick="loadMaintenance()" id="maintRefreshBtn">↻ Refresh</button>
+        <button class="btn btn-primary" onclick="openMaintExpense()">＋ Amount Nikaalo</button>
+      </div>
+    </div>
+
+    <!-- Teen card: aaya / gaya / bacha -->
+    <div class="overview" style="margin-bottom:18px">
+      <div class="ov-card completed">
+        <div class="label">Total Received (Office Cash)</div>
+        <div class="number" id="maintIn">—</div>
+        <div style="font-size:11px;color:#64748b;margin-top:4px" id="maintInSub">sheet se</div>
+      </div>
+      <div class="ov-card pending">
+        <div class="label">Total Spent</div>
+        <div class="number" id="maintOut">—</div>
+        <div style="font-size:11px;color:#64748b;margin-top:4px" id="maintOutSub">entries</div>
+      </div>
+      <div class="ov-card revised">
+        <div class="label">Balance (Bacha Hua)</div>
+        <div class="number" id="maintBal">—</div>
+        <div style="font-size:11px;color:#64748b;margin-top:4px">received − spent</div>
+      </div>
+    </div>
+
+    <div class="dash-bottom" style="grid-template-columns:1fr 1fr;gap:18px">
+      <!-- KHARCH (debit) -->
+      <div class="task-table-card">
+        <div class="card-head">
+          <div class="card-head-title">💸 Spent — kahan lagaya</div>
+          <button class="btn btn-outline" onclick="exportMaintCSV()" style="font-size:12px;padding:5px 10px">⬇ CSV</button>
+        </div>
+        <div style="overflow-x:auto;max-height:420px;overflow-y:auto;">
+          <table style="min-width:520px">
+            <thead style="position:sticky;top:0;z-index:2;background:#f8fafc">
+              <tr>
+                <th style="white-space:nowrap">Date</th>
+                <th>Description</th>
+                <th style="white-space:nowrap;text-align:right">Amount</th>
+                <th style="white-space:nowrap">Bill</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="maintExpBody">
+              <tr><td colspan="5" class="empty">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- AANA (credit) — sheet se -->
+      <div class="task-table-card">
+        <div class="card-head">
+          <div class="card-head-title">📥 Received — Purchase_System sheet se</div>
+          <span style="font-size:11px;color:#94a3b8">Ashok kumar · Office Cash</span>
+        </div>
+        <div style="overflow-x:auto;max-height:420px;overflow-y:auto;">
+          <table style="min-width:520px">
+            <thead style="position:sticky;top:0;z-index:2;background:#f8fafc">
+              <tr>
+                <th style="white-space:nowrap">Date</th>
+                <th>Name</th>
+                <th style="white-space:nowrap;text-align:right">Amount</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody id="maintCreditBody">
+              <tr><td colspan="4" class="empty">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+</div>
+
+<!-- ══════════════════════════════════════
+     MAINTENANCE — Amount nikaalne ki entry
+══════════════════════════════════════ -->
+<div class="modal-overlay" id="maintExpenseModal">
+  <div class="modal" style="max-width:560px">
+    <h3>💸 Amount Nikaalo</h3>
+    <div style="font-size:12px;color:#64748b;margin:-6px 0 14px">
+      Balance me se jitna nikaal rahe ho wo, aur kahan lagaya — dono likho.
+      Bill/photo lagana ho to laga do.
+    </div>
+
+    <div id="maintExpErr" style="display:none;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:8px;padding:9px 12px;font-size:13px;margin-bottom:12px"></div>
+
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+      <div style="flex:1;min-width:150px">
+        <label style="display:block;font-size:11px;font-weight:600;color:#64748b;margin-bottom:4px;text-transform:uppercase">Amount (₹) *</label>
+        <input type="number" id="maintExpAmount" min="1" step="any" placeholder="5000"
+          style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;font-family:'Inter',sans-serif;outline:none;box-sizing:border-box"/>
+      </div>
+      <div style="flex:1;min-width:150px">
+        <label style="display:block;font-size:11px;font-weight:600;color:#64748b;margin-bottom:4px;text-transform:uppercase">Date *</label>
+        <input type="date" id="maintExpDate"
+          style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;font-family:'Inter',sans-serif;outline:none;box-sizing:border-box"/>
+      </div>
+    </div>
+
+    <div style="margin-bottom:12px">
+      <label style="display:block;font-size:11px;font-weight:600;color:#64748b;margin-bottom:4px;text-transform:uppercase">Kahan lagaya *</label>
+      <textarea id="maintExpDesc" rows="3" placeholder="jaise: shop ka AC repair karwaya, mistri ko diya"
+        style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;font-family:'Inter',sans-serif;outline:none;box-sizing:border-box;resize:vertical"></textarea>
+    </div>
+
+    <div style="margin-bottom:14px">
+      <label style="display:block;font-size:11px;font-weight:600;color:#64748b;margin-bottom:4px;text-transform:uppercase">Bill / Photo (optional)</label>
+      <input type="file" id="maintExpImage" accept="image/*,application/pdf" onchange="onMaintImagePick()"
+        style="width:100%;padding:8px;border:1.5px dashed #cbd5e1;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;box-sizing:border-box"/>
+      <div id="maintExpImageInfo" style="font-size:11px;color:#64748b;margin-top:5px"></div>
+    </div>
+
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between"><span style="color:#64748b">Abhi balance</span><strong id="maintExpBalNow">—</strong></div>
+      <div style="display:flex;justify-content:space-between;margin-top:5px"><span style="color:#64748b">Iske baad bachega</span><strong id="maintExpBalAfter" style="color:#16a34a">—</strong></div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeMaintExpense()">Cancel</button>
+      <button class="btn btn-primary" id="maintExpSaveBtn" onclick="saveMaintExpense()">Save Entry</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bill/photo dekhne ka popup -->
+<div class="modal-overlay" id="maintImageModal">
+  <div class="modal" style="max-width:720px">
+    <h3 id="maintImageTitle">Bill</h3>
+    <div id="maintImageBody" style="text-align:center;max-height:70vh;overflow:auto"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="document.getElementById('maintImageModal').classList.remove('active')">Close</button>
+    </div>
+  </div>
 </div>
 
 <!-- ══════════════════════════════════════
@@ -2461,6 +2610,11 @@ async function init() {
     if (ME.role === 'admin' || (ME.email || '').toLowerCase() === 'pc@raabtajewels.com') {
       document.getElementById('nav-crm').style.display = 'flex';
     }
+    // Maintenance tab — Ashok kumar ke Office Cash ka hisaab (sirf admin)
+    if (ME.role === 'admin') {
+      const mNav = document.getElementById('nav-maintenance');
+      if (mNav) mNav.style.display = 'flex';
+    }
     setMinDates();
     loadDashboard();
     loadApprovalBadge();
@@ -2540,7 +2694,7 @@ function setMinDates() {
 // ══════════════════════════════════════════════════════
 // NAVIGATION
 // ══════════════════════════════════════════════════════
-const pageTitles = {dashboard:'Dashboard',alltasks:'All Tasks',approvals:'Approvals',users:'Users',profile:'Profile',mis:'MIS Report',fms:'FMS Admin','fms-tasks':'FMS Tasks','fms-tracking':'FMS Tracking',records:'Employee Records',leave:'Leave',crm:'PC',hrreport:'HR Reporting'};
+const pageTitles = {dashboard:'Dashboard',alltasks:'All Tasks',approvals:'Approvals',users:'Users',profile:'Profile',mis:'MIS Report',fms:'FMS Admin','fms-tasks':'FMS Tasks','fms-tracking':'FMS Tracking',records:'Employee Records',leave:'Leave',crm:'PC',hrreport:'HR Reporting',maintenance:'Maintenance'};
 
 function navigate(page, el) {
   window._currentPage = page;
@@ -2565,6 +2719,7 @@ function navigate(page, el) {
   if (page==='crm') loadCRM();
   if (page==='mis') initMISDeptFilter();
   if (page==='records') loadRecords();
+  if (page==='maintenance') loadMaintenance();
   window.scrollTo(0,0);
 }
 
@@ -5651,6 +5806,262 @@ async function logout() {
   await fetch('/api/logout',{method:'POST', credentials:'include'});
   localStorage.removeItem('authToken');
   window.location.replace('/');
+}
+
+// ══════════════════════════════════════════════════════
+// MAINTENANCE — Ashok kumar ka Office Cash hisaab
+// ══════════════════════════════════════════════════════
+// Aana (credit): Purchase_System sheet se apne aap — B col me "Ashok kumar"
+// aur F col me "Office Cash" wali rows ka amount jud kar total banta hai.
+// Jaana (debit): yahin se entry — kitna nikala, kahan lagaya, bill/photo.
+// Balance = aaya − gaya. Sheet me nayi row aate hi total apne aap badhta hai.
+let _maintData = { totalIn: 0, totalOut: 0, balance: 0, credits: [], expenses: [] };
+let _maintImageB64 = '';      // chuni hui file base64 me
+let _maintImageMeta = { name: '', type: '' };
+
+// 20500 -> "₹20,500"  (paise tabhi jab sach me hon)
+function maintMoney(n) {
+  const v = Number(n) || 0;
+  const hasPaise = Math.abs(v % 1) > 0.001;
+  return '₹' + v.toLocaleString('en-IN', {
+    minimumFractionDigits: hasPaise ? 2 : 0,
+    maximumFractionDigits: 2
+  });
+}
+
+function maintEsc(t) {
+  return String(t == null ? '' : t)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// Sheet ka "01/04/2025 19:0" ya app ka "2026-08-27" — dono ko DD-MM-YYYY
+function maintDate(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return '—';
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) return `${String(m[1]).padStart(2, '0')}-${String(m[2]).padStart(2, '0')}-${m[3]}`;
+  return s.split(' ')[0];
+}
+
+async function loadMaintenance() {
+  const expBody = document.getElementById('maintExpBody');
+  const crBody = document.getElementById('maintCreditBody');
+  if (expBody) expBody.innerHTML = '<tr><td colspan="5" class="empty">Loading…</td></tr>';
+  if (crBody) crBody.innerHTML = '<tr><td colspan="4" class="empty">Loading…</td></tr>';
+
+  try {
+    const d = await api('/api/maintenance');
+    if (!d || d.error) throw new Error((d && d.error) || 'Data nahi mila');
+    _maintData = d;
+    renderMaintenance();
+  } catch (e) {
+    const msg = maintEsc(e.message || 'Load nahi hua');
+    if (expBody) expBody.innerHTML = `<tr><td colspan="5" class="empty">⚠️ ${msg}</td></tr>`;
+    if (crBody) crBody.innerHTML = `<tr><td colspan="4" class="empty">⚠️ ${msg}</td></tr>`;
+    showToast('Maintenance load nahi hua: ' + (e.message || ''), 'error');
+  }
+}
+
+function renderMaintenance() {
+  const d = _maintData;
+  const isAdmin = ME.role === 'admin';
+
+  document.getElementById('maintIn').textContent = maintMoney(d.totalIn);
+  document.getElementById('maintOut').textContent = maintMoney(d.totalOut);
+  document.getElementById('maintBal').textContent = maintMoney(d.balance);
+  document.getElementById('maintInSub').textContent = `${(d.credits || []).length} entries`;
+  document.getElementById('maintOutSub').textContent = `${(d.expenses || []).length} entries`;
+
+  // Balance minus ho jaye to laal — turant dikhe ki zyada nikal liya
+  const balEl = document.getElementById('maintBal');
+  balEl.style.color = (Number(d.balance) || 0) < 0 ? '#dc2626' : '';
+
+  // ── Kharch ki list ──
+  const expBody = document.getElementById('maintExpBody');
+  if (!(d.expenses || []).length) {
+    expBody.innerHTML = '<tr><td colspan="5" class="empty">Abhi koi kharch nahi 🎉</td></tr>';
+  } else {
+    expBody.innerHTML = d.expenses.map(e => `
+      <tr>
+        <td style="white-space:nowrap">${maintDate(e.spentOn)}</td>
+        <td>${maintEsc(e.description)}${e.by ? `<div style="font-size:10px;color:#94a3b8;margin-top:2px">— ${maintEsc(e.by)}</div>` : ''}</td>
+        <td style="white-space:nowrap;text-align:right;font-weight:700;color:#dc2626">${maintMoney(e.amount)}</td>
+        <td style="white-space:nowrap">${e.hasImage
+          ? `<button class="btn btn-outline" style="font-size:11px;padding:3px 8px" onclick="viewMaintImage('${e.id}','${maintEsc(e.imageName)}')">📎 Dekho</button>`
+          : '<span style="color:#cbd5e1">—</span>'}</td>
+        <td style="white-space:nowrap">${isAdmin
+          ? `<button class="btn btn-outline" style="font-size:11px;padding:3px 8px;color:#dc2626;border-color:#fecaca" onclick="deleteMaintExpense('${e.id}')">🗑</button>`
+          : ''}</td>
+      </tr>`).join('');
+  }
+
+  // ── Sheet se aaya hua ──
+  const crBody = document.getElementById('maintCreditBody');
+  if (!(d.credits || []).length) {
+    crBody.innerHTML = '<tr><td colspan="4" class="empty">Sheet me Ashok + Office Cash wali koi row nahi mili</td></tr>';
+  } else {
+    crBody.innerHTML = d.credits.map(c => `
+      <tr>
+        <td style="white-space:nowrap">${maintDate(c.date)}</td>
+        <td>${maintEsc(c.name)}</td>
+        <td style="white-space:nowrap;text-align:right;font-weight:700;color:#16a34a">${maintMoney(c.amount)}</td>
+        <td>${maintEsc(c.details || c.comments || '')}</td>
+      </tr>`).join('');
+  }
+}
+
+// ── Amount nikaalne ka modal ──
+function openMaintExpense() {
+  document.getElementById('maintExpErr').style.display = 'none';
+  document.getElementById('maintExpAmount').value = '';
+  document.getElementById('maintExpDesc').value = '';
+  document.getElementById('maintExpImage').value = '';
+  document.getElementById('maintExpImageInfo').textContent = '';
+  _maintImageB64 = '';
+  _maintImageMeta = { name: '', type: '' };
+
+  // Aaj ki date default (local, UTC shift ke bina)
+  const now = new Date(Date.now() - new Date().getTimezoneOffset() * 60000);
+  document.getElementById('maintExpDate').value = now.toISOString().split('T')[0];
+
+  document.getElementById('maintExpBalNow').textContent = maintMoney(_maintData.balance);
+  document.getElementById('maintExpBalAfter').textContent = maintMoney(_maintData.balance);
+  document.getElementById('maintExpenseModal').classList.add('active');
+  setTimeout(() => document.getElementById('maintExpAmount').focus(), 100);
+}
+
+function closeMaintExpense() {
+  document.getElementById('maintExpenseModal').classList.remove('active');
+}
+
+// Amount type karte hi "iske baad bachega" live update
+document.addEventListener('input', function (ev) {
+  if (!ev.target || ev.target.id !== 'maintExpAmount') return;
+  const amt = parseFloat(ev.target.value) || 0;
+  const after = (Number(_maintData.balance) || 0) - amt;
+  const el = document.getElementById('maintExpBalAfter');
+  if (!el) return;
+  el.textContent = maintMoney(after);
+  el.style.color = after < 0 ? '#dc2626' : '#16a34a';
+});
+
+function onMaintImagePick() {
+  const inp = document.getElementById('maintExpImage');
+  const info = document.getElementById('maintExpImageInfo');
+  const f = inp.files && inp.files[0];
+  _maintImageB64 = '';
+  _maintImageMeta = { name: '', type: '' };
+  if (!f) { info.textContent = ''; return; }
+
+  const MAX = 5 * 1024 * 1024;   // 5 MB — isse bada DB me bhaari padta hai
+  if (f.size > MAX) {
+    info.innerHTML = '<span style="color:#dc2626">⚠️ File 5MB se badi hai — chhoti file lagao</span>';
+    inp.value = '';
+    return;
+  }
+  info.textContent = `${f.name} · ${(f.size / 1024).toFixed(0)} KB — padha ja raha hai…`;
+  const rd = new FileReader();
+  rd.onload = () => {
+    _maintImageB64 = String(rd.result || '');
+    _maintImageMeta = { name: f.name, type: f.type };
+    info.innerHTML = `✅ ${maintEsc(f.name)} · ${(f.size / 1024).toFixed(0)} KB`;
+  };
+  rd.onerror = () => { info.innerHTML = '<span style="color:#dc2626">⚠️ File padhi nahi gayi</span>'; };
+  rd.readAsDataURL(f);
+}
+
+async function saveMaintExpense() {
+  const err = document.getElementById('maintExpErr');
+  const btn = document.getElementById('maintExpSaveBtn');
+  const amount = parseFloat(document.getElementById('maintExpAmount').value);
+  const spentOn = document.getElementById('maintExpDate').value;
+  const description = document.getElementById('maintExpDesc').value.trim();
+
+  const fail = m => { err.textContent = m; err.style.display = 'block'; };
+  err.style.display = 'none';
+
+  if (!amount || amount <= 0) return fail('Amount daalo (0 se zyada)');
+  if (!spentOn) return fail('Date daalo');
+  if (!description) return fail('Kahan lagaya — ye likhna zaroori hai');
+
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  try {
+    const r = await api('/api/maintenance/expense', 'POST', {
+      amount, spentOn, description,
+      imageName: _maintImageMeta.name,
+      imageType: _maintImageMeta.type,
+      imageData: _maintImageB64
+    });
+    if (!r || r.error) throw new Error((r && r.error) || 'Save nahi hua');
+    closeMaintExpense();
+    showToast('Entry save ho gayi ✅');
+    await loadMaintenance();
+  } catch (e) {
+    fail(e.message || 'Save nahi hua');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save Entry';
+  }
+}
+
+async function deleteMaintExpense(id) {
+  if (!confirm('Ye entry hata dein? Balance apne aap wapas badh jayega.')) return;
+  try {
+    const r = await api('/api/maintenance/expense/' + id, 'DELETE');
+    if (!r || r.error) throw new Error((r && r.error) || 'Delete nahi hua');
+    showToast('Entry hata di');
+    await loadMaintenance();
+  } catch (e) {
+    showToast(e.message || 'Delete nahi hua', 'error');
+  }
+}
+
+async function viewMaintImage(id, name) {
+  const modal = document.getElementById('maintImageModal');
+  const body = document.getElementById('maintImageBody');
+  document.getElementById('maintImageTitle').textContent = name || 'Bill';
+  body.innerHTML = '<div class="empty">Loading…</div>';
+  modal.classList.add('active');
+  try {
+    const r = await api(`/api/maintenance/expense/${id}/image`);
+    if (!r || r.error || !r.data) throw new Error((r && r.error) || 'Image nahi mili');
+    body.innerHTML = String(r.type || '').includes('pdf')
+      ? `<iframe src="${r.data}" style="width:100%;height:68vh;border:1px solid #e2e8f0;border-radius:8px"></iframe>`
+      : `<img src="${r.data}" style="max-width:100%;border-radius:8px"/>`;
+  } catch (e) {
+    body.innerHTML = `<div class="empty">⚠️ ${maintEsc(e.message || 'Image nahi mili')}</div>`;
+  }
+}
+
+function exportMaintCSV() {
+  const d = _maintData;
+  const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  const lines = [];
+  lines.push(['Type', 'Date', 'Name / Description', 'Amount', 'By'].map(q).join(','));
+  (d.credits || []).forEach(c => {
+    lines.push(['Received', maintDate(c.date), c.name + (c.details ? ' — ' + c.details : ''), c.amount, ''].map(q).join(','));
+  });
+  (d.expenses || []).forEach(e => {
+    lines.push(['Spent', maintDate(e.spentOn), e.description, e.amount, e.by || ''].map(q).join(','));
+  });
+  lines.push('');
+  lines.push([q('TOTAL RECEIVED'), '', '', q(d.totalIn), ''].join(','));
+  lines.push([q('TOTAL SPENT'), '', '', q(d.totalOut), ''].join(','));
+  lines.push([q('BALANCE'), '', '', q(d.balance), ''].join(','));
+
+  const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Maintenance_${new Date().toISOString().split('T')[0]}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 function showToast(msg,type='success') {

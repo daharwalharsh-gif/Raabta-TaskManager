@@ -567,6 +567,20 @@ const MYSQL_SCHEMA = {
   // logon ko duplicate reminder nahi jaate.
   App_State: {
     key_name: "VARCHAR(120) DEFAULT ''", value: "TEXT", updated_at: "VARCHAR(40) DEFAULT ''"
+  },
+  // MAINTENANCE — Ashok kumar ke "Office Cash" wale amount ka hisaab.
+  // Aana (credit) Purchase_System sheet se apne aap padha jaata hai; ye table
+  // sirf KHARCH (debit) rakhti hai — kahan lagaya, kitna, aur bill/photo.
+  Maintenance_Expenses: {
+    spent_on: "VARCHAR(20) DEFAULT ''",        // kis din kharch hua (YYYY-MM-DD)
+    amount: "VARCHAR(20) DEFAULT '0'",
+    description: "TEXT",                        // kahan lagaya
+    image_name: "VARCHAR(255) DEFAULT ''",
+    image_type: "VARCHAR(120) DEFAULT ''",
+    image_data: "LONGTEXT",                     // bill/photo base64 (optional)
+    created_by: "VARCHAR(20) DEFAULT ''",
+    created_by_name: "VARCHAR(120) DEFAULT ''",
+    created_at: "VARCHAR(40) DEFAULT ''"
   }
 };
 
@@ -5746,6 +5760,164 @@ app.post('/api/admin/run-wa-reminders', requireAuth, requireAdmin, async (req, r
     .then(r => console.log('  WA reminders (manual):', JSON.stringify(r)))
     .catch(e => console.error('  WA reminders (manual) error:', e.message));
   res.json({ started: true });
+});
+
+// ══════════════════════════════════════════════════════
+// MAINTENANCE — Ashok kumar ka "Office Cash" hisaab
+// ══════════════════════════════════════════════════════
+// AANA (credit): Delhi Sales Form ke "Purchase_System" tab se apne aap.
+//   Row tabhi ginti hai jab:  B col me "Ashok kumar"  AUR  F col = "Office Cash"
+//   Amount C col se. Sheet me nayi row aate hi total apne aap badh jaata hai.
+// JAANA (debit): Maintenance_Expenses table — app se entry hoti hai.
+// Balance = kul aana − kul jaana.
+const MAINT_SHEET_ID = '1axEpoebcGsfl7JT_fL1PNLBJIEDNFHMxM4_cSzh5biQ';
+const MAINT_TAB = 'Purchase_System';
+const MAINT_NAME_MATCH = 'ashok';        // B col me ye shabd ho (chhota-bada farak nahi)
+const MAINT_MODE_MATCH = 'office cash';  // F col me ye ho
+
+// "13,000" / "₹ 1498" / "1498.50" — sabse number nikaalo
+function maintNum(raw) {
+  const n = parseFloat(String(raw == null ? '' : raw).replace(/[^0-9.\-]/g, ''));
+  return Number.isFinite(n) ? n : 0;
+}
+
+// Sheet se sirf wahi rows jo Ashok + Office Cash hain
+async function maintReadCredits() {
+  const sheets = await getSheetsClient();
+  const resp = await withRetry(() => sheets.spreadsheets.values.get({
+    spreadsheetId: MAINT_SHEET_ID,
+    range: `${MAINT_TAB}!A:K`
+  }));
+  const rows = resp.data.values || [];
+  const out = [];
+  // Row 1 heading hai — usse chhod do
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i] || [];
+    const name = String(r[1] || '').trim();        // B — Name of Employee
+    const mode = String(r[5] || '').trim();        // F — Payment Mode
+    if (!name.toLowerCase().includes(MAINT_NAME_MATCH)) continue;
+    if (mode.toLowerCase() !== MAINT_MODE_MATCH) continue;
+    const amount = maintNum(r[2]);                 // C — Amount
+    if (!amount) continue;
+    out.push({
+      sheetRow: i + 1,
+      date: String(r[0] || '').trim(),             // A — timestamp
+      name,
+      amount,
+      itemPhoto: String(r[3] || '').trim(),        // D
+      bill: String(r[4] || '').trim(),             // E
+      details: String(r[8] || '').trim(),          // I
+      comments: String(r[10] || '').trim()         // K
+    });
+  }
+  return out;
+}
+
+// Sheets-DB par tab apne aap nahi banti (MySQL me schema se ban jaati hai) —
+// isliye pehli baar me bana dete hain. Dono driver par safe: MySQL me
+// findAll chal jaata hai to kuch karna hi nahi padta.
+async function ensureMaintenanceTab(d) {
+  try {
+    await d.findAll('Maintenance_Expenses');
+  } catch (e) {
+    if (!d.sheets) throw e;                 // MySQL — schema khud sambhalta hai
+    const cols = ['id', 'spent_on', 'amount', 'description', 'image_name',
+                  'image_type', 'image_data', 'created_by', 'created_by_name', 'created_at'];
+    try {
+      await withRetry(() => d.sheets.spreadsheets.batchUpdate({
+        spreadsheetId: SHEET_ID,
+        requestBody: { requests: [{ addSheet: { properties: { title: 'Maintenance_Expenses' } } }] }
+      }));
+    } catch (e2) { /* pehle se bani hai — koi baat nahi */ }
+    await withRetry(() => d.sheets.spreadsheets.values.update({
+      spreadsheetId: SHEET_ID,
+      range: `Maintenance_Expenses!A1:${idxToColLetter(cols.length - 1)}1`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [cols] }
+    }));
+    delete d._hdrCache['Maintenance_Expenses'];
+    delete d._cache['Maintenance_Expenses'];
+  }
+}
+
+// GET /api/maintenance — cards ka data + dono list (aaya / gaya)
+app.get('/api/maintenance', requireAuth, async (req, res) => {
+  try {
+    const [credits, d] = await Promise.all([maintReadCredits(), getDB()]);
+    await ensureMaintenanceTab(d).catch(() => {});
+    const rawExp = await d.findAll('Maintenance_Expenses').catch(() => []);
+    // image_data list me NAHI bhejte — page bhaari ho jaata hai. Alag
+    // endpoint se maangte hain jab dekhna ho.
+    const expenses = rawExp.map(e => ({
+      id: e.id,
+      spentOn: e.spent_on || '',
+      amount: maintNum(e.amount),
+      description: e.description || '',
+      hasImage: !!(e.image_data && String(e.image_data).length > 10),
+      imageName: e.image_name || '',
+      by: e.created_by_name || '',
+      createdAt: e.created_at || ''
+    })).sort((a, b) => String(b.spentOn || b.createdAt).localeCompare(String(a.spentOn || a.createdAt)));
+
+    const totalIn = credits.reduce((s, c) => s + c.amount, 0);
+    const totalOut = expenses.reduce((s, e) => s + e.amount, 0);
+    res.json({
+      totalIn, totalOut, balance: totalIn - totalOut,
+      credits: credits.slice().reverse(),   // nayi entry sabse upar
+      expenses
+    });
+  } catch (err) {
+    console.error('  /api/maintenance error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/maintenance/expense/:id/image — bill/photo alag se
+app.get('/api/maintenance/expense/:id/image', requireAuth, async (req, res) => {
+  try {
+    const d = await getDB();
+    const row = await d.findOne('Maintenance_Expenses', { id: req.params.id });
+    if (!row || !row.image_data) return res.status(404).json({ error: 'Image nahi mili' });
+    res.json({ name: row.image_name || 'bill', type: row.image_type || '', data: row.image_data });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /api/maintenance/expense — naya kharch
+app.post('/api/maintenance/expense', requireAuth, async (req, res) => {
+  try {
+    const { spentOn, amount, description, imageName, imageType, imageData } = req.body || {};
+    const amt = maintNum(amount);
+    if (!amt || amt <= 0) return res.status(400).json({ error: 'Amount sahi daalo' });
+    if (!String(description || '').trim()) return res.status(400).json({ error: 'Kahan lagaya — ye likhna zaroori hai' });
+
+    const d = await getDB();
+    await ensureMaintenanceTab(d);
+    const nowStr = new Date(Date.now() + 330 * 60000).toISOString().replace('T', ' ').split('.')[0];
+    const row = await d.insert('Maintenance_Expenses', {
+      spent_on: String(spentOn || '').trim() || nowStr.split(' ')[0],
+      amount: String(amt),
+      description: String(description).trim(),
+      image_name: String(imageName || '').slice(0, 250),
+      image_type: String(imageType || '').slice(0, 110),
+      image_data: String(imageData || ''),
+      created_by: String(req.session.userId || ''),
+      created_by_name: String(req.session.name || ''),
+      created_at: nowStr
+    });
+    res.json({ success: true, id: row && row.id });
+  } catch (err) {
+    console.error('  maintenance expense add error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/maintenance/expense/:id — galat entry hataane ke liye (admin)
+app.delete('/api/maintenance/expense/:id', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const d = await getDB();
+    await d.delete('Maintenance_Expenses', req.params.id);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // GET /api/admin/wa-outbox — assign-time messages ka hisaab: kitne gaye,
