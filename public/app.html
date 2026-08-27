@@ -3709,49 +3709,6 @@ async function exportDoerChecklistCSV() {
   showToast(`✅ ${tasks.length} checklist task(s) download ho gaye`);
 }
 
-// SAARE users ke checklist tasks ki list CSV me — Name, Email, Task
-// Description, Frequency, Date of Assign (Harsh, 26 Aug). Bulk checklist me
-// ek hi task ki har due-date ki alag row hoti hai (daily wala saal me 300+
-// baar) — isliye yahan EK task-series = EK row: same doer + description +
-// frequency ko jod kar, assign-date sabse pehli wali.
-async function exportAllChecklistCSV() {
-  showToast('Checklist list ban rahi hai…');
-  const [data, users] = await Promise.all([api('/api/tasks?type=checklist'), api('/api/users')]);
-  let tasks = [];
-  if (data && data.grouped) data.grouped.forEach(g => g.tasks.forEach(t => tasks.push(t)));
-  else tasks = (data && data.tasks) || [];
-  if (!tasks.length) { showToast('Koi checklist task nahi mila', 'error'); return; }
-  const emailById = {};
-  (Array.isArray(users) ? users : []).forEach(u => { emailById[String(u.id)] = u.email || ''; });
-
-  const series = {};
-  tasks.forEach(t => {
-    const key = `${t.assigned_to}|${(t.description || '').trim().toLowerCase()}|${(t.frequency || '').toLowerCase()}`;
-    const cur = series[key];
-    if (!cur) {
-      series[key] = { name: t.assignedToName || '', email: emailById[String(t.assigned_to)] || '',
-        desc: t.description || '', freq: t.frequency || 'one-time', assignedOn: t.assigned_on || '' };
-    } else if (t.assigned_on && (!cur.assignedOn || t.assigned_on < cur.assignedOn)) {
-      cur.assignedOn = t.assigned_on;   // sabse pehli assign-date
-    }
-  });
-  const rows = Object.values(series).sort((a, b) =>
-    (a.name || '').localeCompare(b.name || '') || (a.desc || '').localeCompare(b.desc || ''));
-
-  const esc = v => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
-  const lines = [['#', 'Name', 'Email', 'Task Description', 'Frequency', 'Date of Assign'].join(',')];
-  rows.forEach((r, i) => {
-    lines.push([i + 1, r.name, r.email, r.desc, r.freq, r.assignedOn].map(esc).join(','));
-  });
-  const blob = new Blob([String.fromCharCode(0xFEFF) + lines.join(String.fromCharCode(13, 10))], { type: 'text/csv;charset=utf-8' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `all_checklist_tasks_${new Date().toISOString().slice(0, 10)}.csv`;
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-  showToast(`✅ ${rows.length} checklist task(s) ki list download ho gayi`);
-}
-
 function toggleBlock(header) { header.nextElementSibling.classList.toggle('open'); }
 
 // ══════════════════════════════════════════════════════
@@ -8886,5 +8843,58 @@ async function handleTransfer(id, action) {
 init();
 setDefaultMISDates();
 </script>
-</body>
-</html>
+<!-- ══════════════════════════════════════════════════════
+     ALAG SCRIPT BLOCK — jaan-boojh kar (27 Aug 2026)
+     26 Aug ko is CSV function ki EK line ka escape toot gaya tha aur
+     poore main script block ka parse fail ho gaya — app 5 ghante
+     "Loading..." par atki rahi. Syntax error runtime par pakda nahi
+     ja sakta (parse-time hi block mar jaata hai), isliye ye extra
+     feature ab APNE block me hai: yahan kuch toote to sirf ye button
+     kaam nahi karega, poori app chalti rahegi.
+     Naya optional feature add karo to usse bhi aise hi alag rakhna.
+     ══════════════════════════════════════════════════════ -->
+<script>
+// SAARE users ke checklist tasks ki list CSV me — Name, Email, Task
+// Description, Frequency, Date of Assign (Harsh, 26 Aug). Bulk checklist me
+// ek hi task ki har due-date ki alag row hoti hai (daily wala saal me 300+
+// baar) — isliye yahan EK task-series = EK row: same doer + description +
+// frequency ko jod kar, assign-date sabse pehli wali.
+async function exportAllChecklistCSV() {
+  showToast('Checklist list ban rahi hai…');
+  const [data, users] = await Promise.all([api('/api/tasks?type=checklist'), api('/api/users')]);
+  let tasks = [];
+  if (data && data.grouped) data.grouped.forEach(g => g.tasks.forEach(t => tasks.push(t)));
+  else tasks = (data && data.tasks) || [];
+  if (!tasks.length) { showToast('Koi checklist task nahi mila', 'error'); return; }
+  const emailById = {};
+  (Array.isArray(users) ? users : []).forEach(u => { emailById[String(u.id)] = u.email || ''; });
+
+  const series = {};
+  tasks.forEach(t => {
+    const key = `${t.assigned_to}|${(t.description || '').trim().toLowerCase()}|${(t.frequency || '').toLowerCase()}`;
+    const cur = series[key];
+    if (!cur) {
+      series[key] = { name: t.assignedToName || '', email: emailById[String(t.assigned_to)] || '',
+        desc: t.description || '', freq: t.frequency || 'one-time', assignedOn: t.assigned_on || '' };
+    } else if (t.assigned_on && (!cur.assignedOn || t.assigned_on < cur.assignedOn)) {
+      cur.assignedOn = t.assigned_on;   // sabse pehli assign-date
+    }
+  });
+  const rows = Object.values(series).sort((a, b) =>
+    (a.name || '').localeCompare(b.name || '') || (a.desc || '').localeCompare(b.desc || ''));
+
+  const esc = v => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
+  const lines = [['#', 'Name', 'Email', 'Task Description', 'Frequency', 'Date of Assign'].join(',')];
+  rows.forEach((r, i) => {
+    lines.push([i + 1, r.name, r.email, r.desc, r.freq, r.assignedOn].map(esc).join(','));
+  });
+  const blob = new Blob([String.fromCharCode(0xFEFF) + lines.join(String.fromCharCode(13, 10))], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `all_checklist_tasks_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  showToast(`✅ ${rows.length} checklist task(s) ki list download ho gayi`);
+}
+
+</script>
