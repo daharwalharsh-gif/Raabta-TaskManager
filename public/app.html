@@ -732,6 +732,10 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
       <span class="nav-label-text">Maintenance</span>
     </div>
+    <div class="nav-item" id="nav-maintenance2" style="display:none" onclick="navigate('maintenance2',this)">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+      <span class="nav-label-text">Maintenance 2</span>
+    </div>
     <div class="nav-divider"></div>
     <div class="nav-item" onclick="navigate('profile',this)">
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
@@ -1534,6 +1538,59 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     </div>
   </div>
 
+  <!-- ══════════════════════════════════════
+       MAINTENANCE 2 — naam ke saath nikale gaye amount ka ALAG hisaab.
+       Withdraw me naam (Bappi ji / Bajji ji) chuna ho to entry yahan aati
+       hai. Main Maintenance ke balance par iska koi asar nahi (Harsh, 28 Aug).
+  ══════════════════════════════════════ -->
+  <div id="page-maintenance2" class="page">
+    <div class="page-header">
+      <h2>Maintenance 2</h2>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-outline" onclick="loadMaintenance2(true)">↻ Refresh</button>
+        <button class="btn btn-primary" onclick="openMaintExpense()">＋ Withdraw Amount</button>
+      </div>
+    </div>
+
+    <!-- Har naam ka apna card + kul total -->
+    <div class="overview" style="margin-bottom:18px" id="maint2Cards">
+      <div class="ov-card pending">
+        <div class="label">Loading…</div>
+        <div class="number">—</div>
+      </div>
+    </div>
+
+    <div class="task-table-card">
+      <div class="card-head">
+        <div class="card-head-title">💸 Withdrawals by name</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="maint2Filter" onchange="renderMaintenance2()"
+            style="padding:6px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;outline:none;background:#fff">
+            <option value="">All names</option>
+          </select>
+          <button class="btn btn-outline" onclick="exportMaint2CSV()" style="font-size:12px;padding:5px 10px">⬇ CSV</button>
+        </div>
+      </div>
+      <div style="overflow-x:auto;max-height:520px;overflow-y:auto;">
+        <table style="min-width:620px">
+          <thead style="position:sticky;top:0;z-index:2;background:#f8fafc">
+            <tr>
+              <th style="white-space:nowrap">Date</th>
+              <th style="white-space:nowrap">Name</th>
+              <th>Description</th>
+              <th style="white-space:nowrap;text-align:right">Amount</th>
+              <th style="white-space:nowrap">Bill</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="maint2Body">
+            <tr><td colspan="6" class="empty">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
 
 </div>
 
@@ -1567,6 +1624,17 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       <label style="display:block;font-size:11px;font-weight:600;color:#64748b;margin-bottom:4px;text-transform:uppercase">Where it was used *</label>
       <textarea id="maintExpDesc" rows="3" placeholder="e.g. AC repair at shop, paid to technician"
         style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;font-family:'Inter',sans-serif;outline:none;box-sizing:border-box;resize:vertical"></textarea>
+    </div>
+
+    <div style="margin-bottom:12px">
+      <label style="display:block;font-size:11px;font-weight:600;color:#64748b;margin-bottom:4px;text-transform:uppercase">Name (optional)</label>
+      <select id="maintExpPerson" onchange="onMaintPersonChange()"
+        style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;font-family:'Inter',sans-serif;outline:none;box-sizing:border-box;background:#fff">
+        <option value="">— None (Maintenance) —</option>
+      </select>
+      <div id="maintPersonHint" style="font-size:11px;color:#94a3b8;margin-top:5px">
+        No name selected — this goes to <strong>Maintenance</strong> and reduces the balance.
+      </div>
     </div>
 
     <div style="margin-bottom:14px">
@@ -2614,6 +2682,8 @@ async function init() {
     if (ME.role === 'admin') {
       const mNav = document.getElementById('nav-maintenance');
       if (mNav) mNav.style.display = 'flex';
+      const m2Nav = document.getElementById('nav-maintenance2');
+      if (m2Nav) m2Nav.style.display = 'flex';
     }
     setMinDates();
     loadDashboard();
@@ -2694,7 +2764,7 @@ function setMinDates() {
 // ══════════════════════════════════════════════════════
 // NAVIGATION
 // ══════════════════════════════════════════════════════
-const pageTitles = {dashboard:'Dashboard',alltasks:'All Tasks',approvals:'Approvals',users:'Users',profile:'Profile',mis:'MIS Report',fms:'FMS Admin','fms-tasks':'FMS Tasks','fms-tracking':'FMS Tracking',records:'Employee Records',leave:'Leave',crm:'PC',hrreport:'HR Reporting',maintenance:'Maintenance'};
+const pageTitles = {dashboard:'Dashboard',alltasks:'All Tasks',approvals:'Approvals',users:'Users',profile:'Profile',mis:'MIS Report',fms:'FMS Admin','fms-tasks':'FMS Tasks','fms-tracking':'FMS Tracking',records:'Employee Records',leave:'Leave',crm:'PC',hrreport:'HR Reporting',maintenance:'Maintenance',maintenance2:'Maintenance 2'};
 
 function navigate(page, el) {
   window._currentPage = page;
@@ -2720,6 +2790,7 @@ function navigate(page, el) {
   if (page==='mis') initMISDeptFilter();
   if (page==='records') loadRecords();
   if (page==='maintenance') loadMaintenance();
+  if (page==='maintenance2') loadMaintenance2();
   window.scrollTo(0,0);
 }
 
@@ -5930,6 +6001,17 @@ function openMaintExpense() {
   const now = new Date(Date.now() - new Date().getTimezoneOffset() * 60000);
   document.getElementById('maintExpDate').value = now.toISOString().split('T')[0];
 
+  // Naam ka dropdown — server se aayi list se bharo (naam wahin se aate hain)
+  const psel = document.getElementById('maintExpPerson');
+  if (psel) {
+    psel.innerHTML = '<option value="">— None (Maintenance) —</option>' +
+      (_maintData.persons || []).map(n => `<option value="${maintEsc(n)}">${maintEsc(n)}</option>`).join('');
+    // Maintenance 2 tab se khola ho aur wahan naam chuna ho, to wahi pre-select
+    const f = document.getElementById('maint2Filter');
+    psel.value = (window._currentPage === 'maintenance2' && f && f.value) ? f.value : '';
+  }
+  onMaintPersonChange();
+
   document.getElementById('maintExpBalNow').textContent = maintMoney(_maintData.balance);
   document.getElementById('maintExpBalAfter').textContent = maintMoney(_maintData.balance);
   document.getElementById('maintExpenseModal').classList.add('open');
@@ -5944,7 +6026,10 @@ function closeMaintExpense() {
 document.addEventListener('input', function (ev) {
   if (!ev.target || ev.target.id !== 'maintExpAmount') return;
   const amt = parseFloat(ev.target.value) || 0;
-  const after = (Number(_maintData.balance) || 0) - amt;
+  // Naam chuna ho to entry Maintenance 2 me jaati hai — main balance waisa hi
+  const psel = document.getElementById('maintExpPerson');
+  const named = !!(psel && psel.value);
+  const after = (Number(_maintData.balance) || 0) - (named ? 0 : amt);
   const el = document.getElementById('maintExpBalAfter');
   if (!el) return;
   el.textContent = maintMoney(after);
@@ -5993,8 +6078,10 @@ async function saveMaintExpense() {
   btn.disabled = true;
   btn.textContent = 'Saving…';
   try {
+    const psel = document.getElementById('maintExpPerson');
     const r = await api('/api/maintenance/expense', 'POST', {
       amount, spentOn, description,
+      person: psel ? psel.value : '',
       imageName: _maintImageMeta.name,
       imageType: _maintImageMeta.type,
       imageData: _maintImageB64
@@ -6002,7 +6089,7 @@ async function saveMaintExpense() {
     if (!r || r.error) throw new Error((r && r.error) || 'Could not save');
     closeMaintExpense();
     showToast('Entry saved ✅');
-    await loadMaintenance();
+    await (window._currentPage === 'maintenance2' ? loadMaintenance2(true) : loadMaintenance(true));
   } catch (e) {
     fail(e.message || 'Could not save');
   } finally {
@@ -6017,7 +6104,7 @@ async function deleteMaintExpense(id) {
     const r = await api('/api/maintenance/expense/' + id, 'DELETE');
     if (!r || r.error) throw new Error((r && r.error) || 'Could not delete');
     showToast('Entry deleted');
-    await loadMaintenance();
+    await (window._currentPage === 'maintenance2' ? loadMaintenance2(true) : loadMaintenance(true));
   } catch (e) {
     showToast(e.message || 'Could not delete', 'error');
   }
@@ -6066,6 +6153,126 @@ function exportMaintCSV() {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
+// ── MAINTENANCE 2 — naam ke saath nikale amount ka ALAG hisaab ──
+// Withdraw me Bappi ji / Bajji ji chuna ho to entry yahan aati hai. Main
+// Maintenance ke balance par iska koi asar nahi (Harsh, 28 Aug).
+// Data wahi ek /api/maintenance se aata hai (_maintData), isliye alag call
+// nahi lagti — dono tab ek hi cache par chalte hain.
+async function loadMaintenance2(force) {
+  const body = document.getElementById('maint2Body');
+  const fresh = !(_maintData.personExpenses || []).length && !_maintData.persons;
+  if (body && fresh) body.innerHTML = '<tr><td colspan="6" class="empty">Loading…</td></tr>';
+  try {
+    const d = await api('/api/maintenance' + (force ? '?refresh=1' : ''));
+    if (!d || d.error) throw new Error((d && d.error) || 'Could not load');
+    _maintData = d;
+    renderMaintenance2();
+  } catch (e) {
+    if (body) body.innerHTML = `<tr><td colspan="6" class="empty">⚠️ ${maintEsc(e.message || 'Could not load')}</td></tr>`;
+    showToast('Could not load Maintenance 2: ' + (e.message || ''), 'error');
+  }
+}
+
+function renderMaintenance2() {
+  const d = _maintData;
+  const isAdmin = ME.role === 'admin';
+  const persons = d.persons || [];
+  const totals = d.personTotals || {};
+
+  // Har naam ka card + kul total
+  const cards = document.getElementById('maint2Cards');
+  if (cards) {
+    const cls = ['pending', 'revised', 'completed'];
+    cards.innerHTML = persons.map((n, i) => `
+      <div class="ov-card ${cls[i % cls.length]}">
+        <div class="label">${maintEsc(n)}</div>
+        <div class="number">${maintMoney(totals[n] || 0)}</div>
+        <div style="font-size:11px;color:#64748b;margin-top:4px">${(d.personExpenses || []).filter(e => e.person === n).length} entries</div>
+      </div>`).join('') + `
+      <div class="ov-card completed">
+        <div class="label">Total</div>
+        <div class="number">${maintMoney(d.personGrandTotal || 0)}</div>
+        <div style="font-size:11px;color:#64748b;margin-top:4px">separate from Maintenance</div>
+      </div>`;
+  }
+
+  // Naam ka filter dropdown (ek hi baar bharo, chuna hua yaad rahe)
+  const sel = document.getElementById('maint2Filter');
+  if (sel && sel.options.length <= 1) {
+    const keep = sel.value;
+    sel.innerHTML = '<option value="">All names</option>' +
+      persons.map(n => `<option value="${maintEsc(n)}">${maintEsc(n)}</option>`).join('');
+    sel.value = keep;
+  }
+  const pick = sel ? sel.value : '';
+
+  const rows = (d.personExpenses || []).filter(e => !pick || e.person === pick);
+  const body = document.getElementById('maint2Body');
+  if (!rows.length) {
+    body.innerHTML = `<tr><td colspan="6" class="empty">${pick ? 'No entries for ' + maintEsc(pick) : 'No entries yet 🎉'}</td></tr>`;
+    return;
+  }
+  body.innerHTML = rows.map(e => `
+    <tr>
+      <td style="white-space:nowrap">${maintDate(e.spentOn)}</td>
+      <td style="white-space:nowrap"><span style="font-size:11px;background:#eef2ff;color:#3730a3;padding:2px 8px;border-radius:10px;font-weight:700">${maintEsc(e.person)}</span></td>
+      <td>${maintEsc(e.description)}${e.by ? `<div style="font-size:10px;color:#94a3b8;margin-top:2px">— ${maintEsc(e.by)}</div>` : ''}</td>
+      <td style="white-space:nowrap;text-align:right;font-weight:700;color:#dc2626">${maintMoney(e.amount)}</td>
+      <td style="white-space:nowrap">${e.hasImage
+        ? `<button class="btn btn-outline" style="font-size:11px;padding:3px 8px" onclick="viewMaintImage('${e.id}','${maintEsc(e.imageName)}')">📎 View</button>`
+        : '<span style="color:#cbd5e1">—</span>'}</td>
+      <td style="white-space:nowrap">${isAdmin
+        ? `<button class="btn btn-outline" style="font-size:11px;padding:3px 8px;color:#dc2626;border-color:#fecaca" onclick="deleteMaintExpense('${e.id}')">🗑</button>`
+        : ''}</td>
+    </tr>`).join('');
+}
+
+// Naam chunte hi neeche ki line badalti hai — kahan jayegi, balance par asar
+function onMaintPersonChange() {
+  const sel = document.getElementById('maintExpPerson');
+  const hint = document.getElementById('maintPersonHint');
+  if (!sel || !hint) return;
+  const n = sel.value;
+  hint.innerHTML = n
+    ? `Goes to <strong>Maintenance 2</strong> under <strong>${maintEsc(n)}</strong> — the main balance stays the same.`
+    : 'No name selected — this goes to <strong>Maintenance</strong> and reduces the balance.';
+
+  // Naam chuna to "balance after" wapas poora — main balance ghatta hi nahi
+  const amt = parseFloat(document.getElementById('maintExpAmount').value) || 0;
+  const after = (Number(_maintData.balance) || 0) - (n ? 0 : amt);
+  const el = document.getElementById('maintExpBalAfter');
+  if (el) {
+    el.textContent = maintMoney(after);
+    el.style.color = after < 0 ? '#dc2626' : '#16a34a';
+  }
+}
+
+function exportMaint2CSV() {
+  const d = _maintData;
+  const sel = document.getElementById('maint2Filter');
+  const pick = sel ? sel.value : '';
+  const rows = (d.personExpenses || []).filter(e => !pick || e.person === pick);
+  const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  const lines = [['Date', 'Name', 'Description', 'Amount', 'Entered By'].map(q).join(',')];
+  rows.forEach(e => lines.push([maintDate(e.spentOn), e.person, e.description, e.amount, e.by || ''].map(q).join(',')));
+  lines.push('');
+  (d.persons || []).forEach(n => {
+    if (!pick || pick === n) lines.push([q(n + ' TOTAL'), '', '', q(d.personTotals[n] || 0), ''].join(','));
+  });
+  if (!pick) lines.push([q('GRAND TOTAL'), '', '', q(d.personGrandTotal || 0), ''].join(','));
+
+  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Maintenance2_${new Date().toISOString().split('T')[0]}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 
 function showToast(msg,type='success') {
   const t=document.createElement('div');

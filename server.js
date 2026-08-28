@@ -574,6 +574,10 @@ const MYSQL_SCHEMA = {
   Maintenance_Expenses: {
     spent_on: "VARCHAR(20) DEFAULT ''",        // kis din kharch hua (YYYY-MM-DD)
     amount: "VARCHAR(20) DEFAULT '0'",
+    // Kiske naam par nikala. Khali = normal Maintenance (main balance se
+    // ghatta hai). Naam ho (Bappi ji / Bajji ji) = Maintenance 2 ka ALAG
+    // hisaab — main balance ko chhoota hi nahi (Harsh, 28 Aug).
+    person: "VARCHAR(120) DEFAULT ''",
     description: "TEXT",                        // kahan lagaya
     image_name: "VARCHAR(255) DEFAULT ''",
     image_type: "VARCHAR(120) DEFAULT ''",
@@ -5775,6 +5779,10 @@ const MAINT_TAB = 'Purchase_System';
 const MAINT_NAME_MATCH = 'ashok';        // B col me ye shabd ho (chhota-bada farak nahi)
 const MAINT_MODE_MATCH = 'office cash';  // F col me ye ho
 
+// Maintenance 2 ke naam. Withdraw ke waqt in me se koi chuna jaye to entry
+// Maintenance 2 me jaati hai (alag hisaab). Naam badalne ho to sirf yahan.
+const MAINT_PERSONS = ['Bappi ji', 'Bajji ji'];
+
 // "13,000" / "₹ 1498" / "1498.50" — sabse number nikaalo
 function maintNum(raw) {
   const n = parseFloat(String(raw == null ? '' : raw).replace(/[^0-9.\-]/g, ''));
@@ -5891,23 +5899,39 @@ app.get('/api/maintenance', requireAuth, async (req, res) => {
     const rawExp = await d.findAll('Maintenance_Expenses').catch(() => []);
     // image_data list me NAHI bhejte — page bhaari ho jaata hai. Alag
     // endpoint se maangte hain jab dekhna ho.
-    const expenses = rawExp.map(e => ({
+    const allExp = rawExp.map(e => ({
       id: e.id,
       spentOn: e.spent_on || '',
       amount: maintNum(e.amount),
       description: e.description || '',
+      person: (e.person || '').trim(),
       hasImage: !!(e.image_data && String(e.image_data).length > 10),
       imageName: e.image_name || '',
       by: e.created_by_name || '',
       createdAt: e.created_at || ''
     })).sort((a, b) => String(b.spentOn || b.createdAt).localeCompare(String(a.spentOn || a.createdAt)));
 
+    // Bina naam wale = normal Maintenance (main balance se ghatte hain)
+    // Naam wale     = Maintenance 2 ka ALAG hisaab, main balance ko nahi chhoote
+    const expenses = allExp.filter(e => !e.person);
+    const personExpenses = allExp.filter(e => e.person);
+
     const totalIn = credits.reduce((s, c) => s + c.amount, 0);
     const totalOut = expenses.reduce((s, e) => s + e.amount, 0);
+
+    // Har naam ka apna total
+    const byPerson = {};
+    MAINT_PERSONS.forEach(n => { byPerson[n] = 0; });
+    personExpenses.forEach(e => { byPerson[e.person] = (byPerson[e.person] || 0) + e.amount; });
+
     res.json({
       totalIn, totalOut, balance: totalIn - totalOut,
       credits: credits.slice().reverse(),   // nayi entry sabse upar
-      expenses
+      expenses,
+      persons: MAINT_PERSONS,
+      personExpenses,
+      personTotals: byPerson,
+      personGrandTotal: personExpenses.reduce((s, e) => s + e.amount, 0)
     });
   } catch (err) {
     console.error('  /api/maintenance error:', err.message);
@@ -5928,7 +5952,7 @@ app.get('/api/maintenance/expense/:id/image', requireAuth, async (req, res) => {
 // POST /api/maintenance/expense — naya kharch
 app.post('/api/maintenance/expense', requireAuth, async (req, res) => {
   try {
-    const { spentOn, amount, description, imageName, imageType, imageData } = req.body || {};
+    const { spentOn, amount, description, imageName, imageType, imageData, person } = req.body || {};
     const amt = maintNum(amount);
     if (!amt || amt <= 0) return res.status(400).json({ error: 'Amount sahi daalo' });
     if (!String(description || '').trim()) return res.status(400).json({ error: 'Kahan lagaya — ye likhna zaroori hai' });
@@ -5940,6 +5964,8 @@ app.post('/api/maintenance/expense', requireAuth, async (req, res) => {
       spent_on: String(spentOn || '').trim() || nowStr.split(' ')[0],
       amount: String(amt),
       description: String(description).trim(),
+      // Sirf list wala naam maanenge — kuch aur aaye to khali (normal Maintenance)
+      person: MAINT_PERSONS.includes(String(person || '').trim()) ? String(person).trim() : '',
       image_name: String(imageName || '').slice(0, 250),
       image_type: String(imageType || '').slice(0, 110),
       image_data: String(imageData || ''),
