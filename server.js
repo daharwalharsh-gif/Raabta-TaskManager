@@ -574,10 +574,13 @@ const MYSQL_SCHEMA = {
   Maintenance_Expenses: {
     spent_on: "VARCHAR(20) DEFAULT ''",        // kis din kharch hua (YYYY-MM-DD)
     amount: "VARCHAR(20) DEFAULT '0'",
-      // Kiske naam par nikala (Bappi ji / Bajji ji), ya khali. Har haal me
-    // amount Maintenance ke balance se ghatta hai — ye sirf batata hai ki
-    // paisa kis naam par gaya, taaki Maintenance 2 me naam-wise dikha sakein.
+      // Kiske naam par (Bappi ji / Bajji ji), ya khali.
     person: "VARCHAR(120) DEFAULT ''",
+    // '' (khali) = Maintenance se nikla. Balance se ghatta hai. Naam ho to
+    //              Maintenance 2 me us bande ka "Received" ban jaata hai.
+    // 'm2'       = Maintenance 2 se nikla — us bande ke apne paise me se.
+    //              Main balance se DOBARA nahi ghatta (ek baar ghat chuka).
+    ledger: "VARCHAR(10) DEFAULT ''",
     description: "TEXT",                        // kahan lagaya
     image_name: "VARCHAR(255) DEFAULT ''",
     image_type: "VARCHAR(120) DEFAULT ''",
@@ -5905,26 +5908,33 @@ app.get('/api/maintenance', requireAuth, async (req, res) => {
       amount: maintNum(e.amount),
       description: e.description || '',
       person: (e.person || '').trim(),
+      ledger: (e.ledger || '').trim(),
       hasImage: !!(e.image_data && String(e.image_data).length > 10),
       imageName: e.image_name || '',
       by: e.created_by_name || '',
       createdAt: e.created_at || ''
     })).sort((a, b) => String(b.spentOn || b.createdAt).localeCompare(String(a.spentOn || a.createdAt)));
 
-    // Paisa ek hi jagah (Ashok ke Office Cash) se jaata hai — isliye HAR
-    // withdrawal, naam wala ho ya na ho, Maintenance ke Spent me aata hai aur
-    // balance se ghatta hai (Harsh, 29 Aug: "amount to minus honga na").
-    // Maintenance 2 usi ka alag nazariya hai: kis naam par kitna gaya.
-    const expenses = allExp;
+    // MAINTENANCE ka Spent = wo rows jo Maintenance se nikli (ledger khali).
+    // Maintenance 2 se nikli rows (ledger 'm2') yahan NAHI aati — wo paisa
+    // pehle hi ghat chuka jab wo Maintenance se us bande ko diya gaya tha.
+    const expenses = allExp.filter(e => e.ledger !== 'm2');
     const personExpenses = allExp.filter(e => e.person);
 
     const totalIn = credits.reduce((s, c) => s + c.amount, 0);
-    const totalOut = allExp.reduce((s, e) => s + e.amount, 0);
+    const totalOut = expenses.reduce((s, e) => s + e.amount, 0);
 
-    // Har naam ka apna total
-    const byPerson = {};
-    MAINT_PERSONS.forEach(n => { byPerson[n] = 0; });
-    personExpenses.forEach(e => { byPerson[e.person] = (byPerson[e.person] || 0) + e.amount; });
+    // Har naam ka apna chhota khaata:
+    //   received = Maintenance se uske naam par jo nikla
+    //   spent    = Maintenance 2 se usne jo kharch kiya
+    //   balance  = uske paas kitna bacha
+    const ledgers = {};
+    MAINT_PERSONS.forEach(n => { ledgers[n] = { received: 0, spent: 0, balance: 0 }; });
+    personExpenses.forEach(e => {
+      const L = ledgers[e.person] || (ledgers[e.person] = { received: 0, spent: 0, balance: 0 });
+      if (e.ledger === 'm2') L.spent += e.amount; else L.received += e.amount;
+    });
+    Object.values(ledgers).forEach(L => { L.balance = L.received - L.spent; });
 
     res.json({
       totalIn, totalOut, balance: totalIn - totalOut,
@@ -5932,8 +5942,10 @@ app.get('/api/maintenance', requireAuth, async (req, res) => {
       expenses,
       persons: MAINT_PERSONS,
       personExpenses,
-      personTotals: byPerson,
-      personGrandTotal: personExpenses.reduce((s, e) => s + e.amount, 0)
+      personLedgers: ledgers,
+      personReceivedTotal: Object.values(ledgers).reduce((s, L) => s + L.received, 0),
+      personSpentTotal: Object.values(ledgers).reduce((s, L) => s + L.spent, 0),
+      personBalanceTotal: Object.values(ledgers).reduce((s, L) => s + L.balance, 0)
     });
   } catch (err) {
     console.error('  /api/maintenance error:', err.message);
@@ -5954,7 +5966,7 @@ app.get('/api/maintenance/expense/:id/image', requireAuth, async (req, res) => {
 // POST /api/maintenance/expense — naya kharch
 app.post('/api/maintenance/expense', requireAuth, async (req, res) => {
   try {
-    const { spentOn, amount, description, imageName, imageType, imageData, person } = req.body || {};
+    const { spentOn, amount, description, imageName, imageType, imageData, person, ledger } = req.body || {};
     const amt = maintNum(amount);
     if (!amt || amt <= 0) return res.status(400).json({ error: 'Amount sahi daalo' });
     if (!String(description || '').trim()) return res.status(400).json({ error: 'Kahan lagaya — ye likhna zaroori hai' });
@@ -5968,6 +5980,9 @@ app.post('/api/maintenance/expense', requireAuth, async (req, res) => {
       description: String(description).trim(),
       // Sirf list wala naam maanenge — kuch aur aaye to khali (normal Maintenance)
       person: MAINT_PERSONS.includes(String(person || '').trim()) ? String(person).trim() : '',
+      // 'm2' tabhi jab naam bhi ho — bina naam ke Maintenance 2 ki entry
+      // ban hi nahi sakti (kiske khaate se katega?)
+      ledger: (String(ledger || '').trim() === 'm2' && MAINT_PERSONS.includes(String(person || '').trim())) ? 'm2' : '',
       image_name: String(imageName || '').slice(0, 250),
       image_type: String(imageType || '').slice(0, 110),
       image_data: String(imageData || ''),
