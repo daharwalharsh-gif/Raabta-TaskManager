@@ -732,10 +732,6 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
       <span class="nav-label-text">Maintenance</span>
     </div>
-    <div class="nav-item" id="nav-maintenance2" style="display:none" onclick="navigate('maintenance2',this)">
-      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-      <span class="nav-label-text">Maintenance 2</span>
-    </div>
     <div class="nav-divider"></div>
     <div class="nav-item" onclick="navigate('profile',this)">
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
@@ -1464,11 +1460,18 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     <div class="page-header">
       <h2>Maintenance</h2>
       <div style="display:flex;gap:8px;align-items:center">
-        <button class="btn btn-outline" onclick="loadMaintenance()" id="maintRefreshBtn">↻ Refresh</button>
+        <button class="btn btn-outline" onclick="refreshMaintView()" id="maintRefreshBtn">↻ Refresh</button>
         <button class="btn btn-primary" onclick="openMaintExpense()">＋ Withdraw Amount</button>
       </div>
     </div>
 
+    <!-- Dono hisaab ek hi tab me — Harsh: "alag tab nahi, andar hi button do" -->
+    <div class="tab-group" id="maintViewTabs" style="margin-bottom:16px">
+      <div class="tab active" id="maintTab1" onclick="switchMaintView(1,this)">Maintenance</div>
+      <div class="tab" id="maintTab2" onclick="switchMaintView(2,this)">Maintenance 2</div>
+    </div>
+
+    <div id="maintView1">
     <!-- Teen card: aaya / gaya / bacha -->
     <div class="overview" style="margin-bottom:18px">
       <div class="ov-card completed">
@@ -1536,21 +1539,11 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
         </div>
       </div>
     </div>
-  </div>
+    </div><!-- /maintView1 -->
 
-  <!-- ══════════════════════════════════════
-       MAINTENANCE 2 — naam ke saath nikale gaye amount ka ALAG hisaab.
-       Withdraw me naam (Bappi ji / Bajji ji) chuna ho to entry yahan aati
-       hai. Main Maintenance ke balance par iska koi asar nahi (Harsh, 28 Aug).
-  ══════════════════════════════════════ -->
-  <div id="page-maintenance2" class="page">
-    <div class="page-header">
-      <h2>Maintenance 2</h2>
-      <div style="display:flex;gap:8px;align-items:center">
-        <button class="btn btn-outline" onclick="loadMaintenance2(true)">↻ Refresh</button>
-        <button class="btn btn-primary" onclick="openMaintExpense()">＋ Withdraw Amount</button>
-      </div>
-    </div>
+    <!-- MAINTENANCE 2 — naam (Bappi ji / Bajji ji) ke saath nikale amount ka
+         ALAG hisaab. Main balance par koi asar nahi. -->
+    <div id="maintView2" style="display:none">
 
     <!-- Har naam ka apna card + kul total -->
     <div class="overview" style="margin-bottom:18px" id="maint2Cards">
@@ -1589,7 +1582,9 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
         </table>
       </div>
     </div>
+    </div><!-- /maintView2 -->
   </div>
+
 
 
 </div>
@@ -2682,8 +2677,6 @@ async function init() {
     if (ME.role === 'admin') {
       const mNav = document.getElementById('nav-maintenance');
       if (mNav) mNav.style.display = 'flex';
-      const m2Nav = document.getElementById('nav-maintenance2');
-      if (m2Nav) m2Nav.style.display = 'flex';
     }
     setMinDates();
     loadDashboard();
@@ -2764,7 +2757,7 @@ function setMinDates() {
 // ══════════════════════════════════════════════════════
 // NAVIGATION
 // ══════════════════════════════════════════════════════
-const pageTitles = {dashboard:'Dashboard',alltasks:'All Tasks',approvals:'Approvals',users:'Users',profile:'Profile',mis:'MIS Report',fms:'FMS Admin','fms-tasks':'FMS Tasks','fms-tracking':'FMS Tracking',records:'Employee Records',leave:'Leave',crm:'PC',hrreport:'HR Reporting',maintenance:'Maintenance',maintenance2:'Maintenance 2'};
+const pageTitles = {dashboard:'Dashboard',alltasks:'All Tasks',approvals:'Approvals',users:'Users',profile:'Profile',mis:'MIS Report',fms:'FMS Admin','fms-tasks':'FMS Tasks','fms-tracking':'FMS Tracking',records:'Employee Records',leave:'Leave',crm:'PC',hrreport:'HR Reporting',maintenance:'Maintenance'};
 
 function navigate(page, el) {
   window._currentPage = page;
@@ -2790,7 +2783,6 @@ function navigate(page, el) {
   if (page==='mis') initMISDeptFilter();
   if (page==='records') loadRecords();
   if (page==='maintenance') loadMaintenance();
-  if (page==='maintenance2') loadMaintenance2();
   window.scrollTo(0,0);
 }
 
@@ -5920,17 +5912,18 @@ function maintDate(raw) {
   return s.split(' ')[0];
 }
 
-async function loadMaintenance() {
+async function loadMaintenance(force) {
   const expBody = document.getElementById('maintExpBody');
   const crBody = document.getElementById('maintCreditBody');
   if (expBody && !(_maintData.expenses || []).length) expBody.innerHTML = '<tr><td colspan="5" class="empty">Loading…</td></tr>';
   if (crBody && !(_maintData.credits || []).length) crBody.innerHTML = '<tr><td colspan="4" class="empty">Loading…</td></tr>';
 
   try {
-    const d = await api('/api/maintenance');
+    const d = await api('/api/maintenance' + (force ? '?refresh=1' : ''));
     if (!d || d.error) throw new Error((d && d.error) || 'Could not load data');
     _maintData = d;
     renderMaintenance();
+    renderMaintenance2();   // doosra view bhi taiyar — switch turant ho
   } catch (e) {
     const msg = maintEsc(e.message || 'Failed to load');
     if (expBody) expBody.innerHTML = `<tr><td colspan="5" class="empty">⚠️ ${msg}</td></tr>`;
@@ -6008,7 +6001,7 @@ function openMaintExpense() {
       (_maintData.persons || []).map(n => `<option value="${maintEsc(n)}">${maintEsc(n)}</option>`).join('');
     // Maintenance 2 tab se khola ho aur wahan naam chuna ho, to wahi pre-select
     const f = document.getElementById('maint2Filter');
-    psel.value = (window._currentPage === 'maintenance2' && f && f.value) ? f.value : '';
+    psel.value = (_maintView === 2 && f && f.value) ? f.value : '';
   }
   onMaintPersonChange();
 
@@ -6089,7 +6082,7 @@ async function saveMaintExpense() {
     if (!r || r.error) throw new Error((r && r.error) || 'Could not save');
     closeMaintExpense();
     showToast('Entry saved ✅');
-    await (window._currentPage === 'maintenance2' ? loadMaintenance2(true) : loadMaintenance(true));
+    await refreshMaintView();
   } catch (e) {
     fail(e.message || 'Could not save');
   } finally {
@@ -6104,7 +6097,7 @@ async function deleteMaintExpense(id) {
     const r = await api('/api/maintenance/expense/' + id, 'DELETE');
     if (!r || r.error) throw new Error((r && r.error) || 'Could not delete');
     showToast('Entry deleted');
-    await (window._currentPage === 'maintenance2' ? loadMaintenance2(true) : loadMaintenance(true));
+    await refreshMaintView();
   } catch (e) {
     showToast(e.message || 'Could not delete', 'error');
   }
@@ -6154,6 +6147,27 @@ function exportMaintCSV() {
   URL.revokeObjectURL(url);
 }
 
+// Maintenance ke andar hi do view — alag sidebar tab nahi (Harsh, 29 Aug:
+// "alag se tab na banao bhai, andar hi ek button de do").
+// 1 = normal Maintenance, 2 = naam wale (Bappi ji / Bajji ji) ka alag hisaab.
+let _maintView = 1;
+function switchMaintView(n, el) {
+  _maintView = n;
+  const v1 = document.getElementById('maintView1');
+  const v2 = document.getElementById('maintView2');
+  if (v1) v1.style.display = (n === 1) ? '' : 'none';
+  if (v2) v2.style.display = (n === 2) ? '' : 'none';
+  document.querySelectorAll('#maintViewTabs .tab').forEach(t => t.classList.remove('active'));
+  if (el) el.classList.add('active');
+  // Data dono ka ek hi hai — bas dobara render, nayi API call nahi
+  if (n === 2) renderMaintenance2(); else renderMaintenance();
+}
+
+// Refresh button jis view par ho usi ko taaza kare
+function refreshMaintView() {
+  return (_maintView === 2) ? loadMaintenance2(true) : loadMaintenance(true);
+}
+
 // ── MAINTENANCE 2 — naam ke saath nikale amount ka ALAG hisaab ──
 // Withdraw me Bappi ji / Bajji ji chuna ho to entry yahan aati hai. Main
 // Maintenance ke balance par iska koi asar nahi (Harsh, 28 Aug).
@@ -6168,6 +6182,7 @@ async function loadMaintenance2(force) {
     if (!d || d.error) throw new Error((d && d.error) || 'Could not load');
     _maintData = d;
     renderMaintenance2();
+    renderMaintenance();
   } catch (e) {
     if (body) body.innerHTML = `<tr><td colspan="6" class="empty">⚠️ ${maintEsc(e.message || 'Could not load')}</td></tr>`;
     showToast('Could not load Maintenance 2: ' + (e.message || ''), 'error');
