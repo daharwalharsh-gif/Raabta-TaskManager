@@ -1504,13 +1504,14 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
               <tr>
                 <th style="white-space:nowrap">Date</th>
                 <th>Description</th>
+                <th style="white-space:nowrap">Name</th>
                 <th style="white-space:nowrap;text-align:right">Amount</th>
                 <th style="white-space:nowrap">Bill</th>
                 <th></th>
               </tr>
             </thead>
             <tbody id="maintExpBody">
-              <tr><td colspan="5" class="empty">Loading…</td></tr>
+              <tr><td colspan="6" class="empty">Loading…</td></tr>
             </tbody>
           </table>
         </div>
@@ -1597,7 +1598,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     <h3>💸 Withdraw Amount</h3>
     <div style="font-size:12px;color:#64748b;margin:-6px 0 14px">
       Enter how much you are taking out of the balance and where it was used.
-      Attach a bill or photo if you have one.
+      Pick a name if the money went to Bappi ji or Bajji ji. Attach a bill if you have one.
     </div>
 
     <div id="maintExpErr" style="display:none;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:8px;padding:9px 12px;font-size:13px;margin-bottom:12px"></div>
@@ -5915,7 +5916,7 @@ function maintDate(raw) {
 async function loadMaintenance(force) {
   const expBody = document.getElementById('maintExpBody');
   const crBody = document.getElementById('maintCreditBody');
-  if (expBody && !(_maintData.expenses || []).length) expBody.innerHTML = '<tr><td colspan="5" class="empty">Loading…</td></tr>';
+  if (expBody && !(_maintData.expenses || []).length) expBody.innerHTML = '<tr><td colspan="6" class="empty">Loading…</td></tr>';
   if (crBody && !(_maintData.credits || []).length) crBody.innerHTML = '<tr><td colspan="4" class="empty">Loading…</td></tr>';
 
   try {
@@ -5926,7 +5927,7 @@ async function loadMaintenance(force) {
     renderMaintenance2();   // doosra view bhi taiyar — switch turant ho
   } catch (e) {
     const msg = maintEsc(e.message || 'Failed to load');
-    if (expBody) expBody.innerHTML = `<tr><td colspan="5" class="empty">⚠️ ${msg}</td></tr>`;
+    if (expBody) expBody.innerHTML = `<tr><td colspan="6" class="empty">⚠️ ${msg}</td></tr>`;
     if (crBody) crBody.innerHTML = `<tr><td colspan="4" class="empty">⚠️ ${msg}</td></tr>`;
     showToast('Could not load Maintenance: ' + (e.message || ''), 'error');
   }
@@ -5949,12 +5950,15 @@ function renderMaintenance() {
   // ── Kharch ki list ──
   const expBody = document.getElementById('maintExpBody');
   if (!(d.expenses || []).length) {
-    expBody.innerHTML = '<tr><td colspan="5" class="empty">No expenses yet 🎉</td></tr>';
+    expBody.innerHTML = '<tr><td colspan="6" class="empty">No expenses yet 🎉</td></tr>';
   } else {
     expBody.innerHTML = d.expenses.map(e => `
       <tr>
         <td style="white-space:nowrap">${maintDate(e.spentOn)}</td>
         <td>${maintEsc(e.description)}${e.by ? `<div style="font-size:10px;color:#94a3b8;margin-top:2px">— ${maintEsc(e.by)}</div>` : ''}</td>
+        <td style="white-space:nowrap">${e.person
+          ? `<span style="font-size:11px;background:#eef2ff;color:#3730a3;padding:2px 8px;border-radius:10px;font-weight:700">${maintEsc(e.person)}</span>`
+          : '<span style="color:#cbd5e1">—</span>'}</td>
         <td style="white-space:nowrap;text-align:right;font-weight:700;color:#dc2626">${maintMoney(e.amount)}</td>
         <td style="white-space:nowrap">${e.hasImage
           ? `<button class="btn btn-outline" style="font-size:11px;padding:3px 8px" onclick="viewMaintImage('${e.id}','${maintEsc(e.imageName)}')">📎 View</button>`
@@ -6019,10 +6023,7 @@ function closeMaintExpense() {
 document.addEventListener('input', function (ev) {
   if (!ev.target || ev.target.id !== 'maintExpAmount') return;
   const amt = parseFloat(ev.target.value) || 0;
-  // Naam chuna ho to entry Maintenance 2 me jaati hai — main balance waisa hi
-  const psel = document.getElementById('maintExpPerson');
-  const named = !!(psel && psel.value);
-  const after = (Number(_maintData.balance) || 0) - (named ? 0 : amt);
+  const after = (Number(_maintData.balance) || 0) - amt;
   const el = document.getElementById('maintExpBalAfter');
   if (!el) return;
   el.textContent = maintMoney(after);
@@ -6129,7 +6130,7 @@ function exportMaintCSV() {
     lines.push(['Received', maintDate(c.date), c.name + (c.details ? ' — ' + c.details : ''), c.amount, ''].map(q).join(','));
   });
   (d.expenses || []).forEach(e => {
-    lines.push(['Spent', maintDate(e.spentOn), e.description, e.amount, e.by || ''].map(q).join(','));
+    lines.push(['Spent', maintDate(e.spentOn), e.description + (e.person ? ' [' + e.person + ']' : ''), e.amount, e.by || ''].map(q).join(','));
   });
   lines.push('');
   lines.push([q('TOTAL RECEIVED'), '', '', q(d.totalIn), ''].join(','));
@@ -6208,7 +6209,7 @@ function renderMaintenance2() {
       <div class="ov-card completed">
         <div class="label">Total</div>
         <div class="number">${maintMoney(d.personGrandTotal || 0)}</div>
-        <div style="font-size:11px;color:#64748b;margin-top:4px">separate from Maintenance</div>
+        <div style="font-size:11px;color:#64748b;margin-top:4px">already deducted from balance</div>
       </div>`;
   }
 
@@ -6249,13 +6250,14 @@ function onMaintPersonChange() {
   const hint = document.getElementById('maintPersonHint');
   if (!sel || !hint) return;
   const n = sel.value;
+  // Paisa ek hi pool se jaata hai — naam ho ya na ho, balance ghatta hai.
+  // Naam sirf batata hai ki kis par gaya (Maintenance 2 me naam-wise).
   hint.innerHTML = n
-    ? `Goes to <strong>Maintenance 2</strong> under <strong>${maintEsc(n)}</strong> — the main balance stays the same.`
-    : 'No name selected — this goes to <strong>Maintenance</strong> and reduces the balance.';
+    ? `Reduces the balance, and also shows under <strong>${maintEsc(n)}</strong> in Maintenance 2.`
+    : 'No name — reduces the balance and shows in Maintenance only.';
 
-  // Naam chuna to "balance after" wapas poora — main balance ghatta hi nahi
   const amt = parseFloat(document.getElementById('maintExpAmount').value) || 0;
-  const after = (Number(_maintData.balance) || 0) - (n ? 0 : amt);
+  const after = (Number(_maintData.balance) || 0) - amt;
   const el = document.getElementById('maintExpBalAfter');
   if (el) {
     el.textContent = maintMoney(after);

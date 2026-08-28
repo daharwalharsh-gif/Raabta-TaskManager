@@ -574,9 +574,9 @@ const MYSQL_SCHEMA = {
   Maintenance_Expenses: {
     spent_on: "VARCHAR(20) DEFAULT ''",        // kis din kharch hua (YYYY-MM-DD)
     amount: "VARCHAR(20) DEFAULT '0'",
-    // Kiske naam par nikala. Khali = normal Maintenance (main balance se
-    // ghatta hai). Naam ho (Bappi ji / Bajji ji) = Maintenance 2 ka ALAG
-    // hisaab — main balance ko chhoota hi nahi (Harsh, 28 Aug).
+      // Kiske naam par nikala (Bappi ji / Bajji ji), ya khali. Har haal me
+    // amount Maintenance ke balance se ghatta hai — ye sirf batata hai ki
+    // paisa kis naam par gaya, taaki Maintenance 2 me naam-wise dikha sakein.
     person: "VARCHAR(120) DEFAULT ''",
     description: "TEXT",                        // kahan lagaya
     image_name: "VARCHAR(255) DEFAULT ''",
@@ -5911,13 +5911,15 @@ app.get('/api/maintenance', requireAuth, async (req, res) => {
       createdAt: e.created_at || ''
     })).sort((a, b) => String(b.spentOn || b.createdAt).localeCompare(String(a.spentOn || a.createdAt)));
 
-    // Bina naam wale = normal Maintenance (main balance se ghatte hain)
-    // Naam wale     = Maintenance 2 ka ALAG hisaab, main balance ko nahi chhoote
-    const expenses = allExp.filter(e => !e.person);
+    // Paisa ek hi jagah (Ashok ke Office Cash) se jaata hai — isliye HAR
+    // withdrawal, naam wala ho ya na ho, Maintenance ke Spent me aata hai aur
+    // balance se ghatta hai (Harsh, 29 Aug: "amount to minus honga na").
+    // Maintenance 2 usi ka alag nazariya hai: kis naam par kitna gaya.
+    const expenses = allExp;
     const personExpenses = allExp.filter(e => e.person);
 
     const totalIn = credits.reduce((s, c) => s + c.amount, 0);
-    const totalOut = expenses.reduce((s, e) => s + e.amount, 0);
+    const totalOut = allExp.reduce((s, e) => s + e.amount, 0);
 
     // Har naam ka apna total
     const byPerson = {};
