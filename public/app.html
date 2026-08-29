@@ -1461,7 +1461,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       <h2>Maintenance</h2>
       <div style="display:flex;gap:8px;align-items:center">
         <button class="btn btn-outline" onclick="refreshMaintView()" id="maintRefreshBtn">↻ Refresh</button>
-        <button class="btn btn-primary" onclick="openMaintExpense()">＋ Withdraw Amount</button>
+        <button class="btn btn-primary" id="maintWithdrawBtn" onclick="openMaintExpense()">＋ Withdraw Amount</button>
       </div>
     </div>
 
@@ -2716,8 +2716,11 @@ async function init() {
     if (ME.role === 'admin' || (ME.email || '').toLowerCase() === 'pc@raabtajewels.com') {
       document.getElementById('nav-crm').style.display = 'flex';
     }
-    // Maintenance tab — Ashok kumar ke Office Cash ka hisaab (sirf admin)
-    if (ME.role === 'admin') {
+    // Maintenance tab kise dikhe (server ka maintView flag batata hai):
+    //   'all'    = admin — dono view
+    //   'main'   = Ashok — sirf Maintenance
+    //   'person' = Bappi / Bajji — sirf Maintenance 2, wo bhi apna hi hisaab
+    if (ME.maintView) {
       const mNav = document.getElementById('nav-maintenance');
       if (mNav) mNav.style.display = 'flex';
     }
@@ -5955,7 +5958,24 @@ function maintDate(raw) {
   return s.split(' ')[0];
 }
 
+// Kaunsa view kise dikhe — ek hi jagah, taaki poore page me ek jaisa rahe
+function applyMaintAccess() {
+  const v = ME.maintView || '';
+  const t1 = document.getElementById('maintTab1');
+  const t2 = document.getElementById('maintTab2');
+  // Ashok ko sirf pehla, Bappi/Bajji ko sirf doosra — button hi chhupa dete hain
+  if (t1) t1.style.display = (v === 'person') ? 'none' : '';
+  if (t2) t2.style.display = (v === 'main') ? 'none' : '';
+  // Withdraw sirf admin — doer sirf dekh sakte hain
+  const wBtn = document.getElementById('maintWithdrawBtn');
+  if (wBtn) wBtn.style.display = (ME.role === 'admin') ? '' : 'none';
+  // Person ko seedha Maintenance 2 par le jao
+  if (v === 'person' && _maintView !== 2) switchMaintView(2, t2);
+  if (v === 'main' && _maintView !== 1) switchMaintView(1, t1);
+}
+
 async function loadMaintenance(force) {
+  applyMaintAccess();
   const expBody = document.getElementById('maintExpBody');
   const crBody = document.getElementById('maintCreditBody');
   if (expBody && !(_maintData.expenses || []).length) expBody.innerHTML = '<tr><td colspan="6" class="empty">Loading…</td></tr>';
@@ -6231,6 +6251,7 @@ function refreshMaintView() {
 // Data wahi ek /api/maintenance se aata hai (_maintData), isliye tab badalne
 // par nayi call nahi lagti.
 async function loadMaintenance2(force) {
+  applyMaintAccess();
   const outB = document.getElementById('maint2OutBody');
   const inB = document.getElementById('maint2InBody');
   const fresh = !(_maintData.personExpenses || []).length && !_maintData.persons;
@@ -6261,13 +6282,19 @@ function renderMaintenance2() {
 
   // Naam ka dropdown — ek hi baar bharo, chuna hua yaad rahe
   const sel = document.getElementById('maint2Filter');
+  const onlyMine = (ME.maintView === 'person') ? (d.myPerson || persons[0] || '') : '';
   if (sel && sel.options.length <= 1) {
     const keep = sel.value;
-    sel.innerHTML = '<option value="">All names</option>' +
-      persons.map(n => `<option value="${maintEsc(n)}">${maintEsc(n)}</option>`).join('');
-    sel.value = keep;
+    sel.innerHTML = onlyMine
+      ? `<option value="${maintEsc(onlyMine)}">${maintEsc(onlyMine)}</option>`
+      : ('<option value="">All names</option>' +
+         persons.map(n => `<option value="${maintEsc(n)}">${maintEsc(n)}</option>`).join(''));
+    sel.value = onlyMine || keep;
   }
-  const pick = sel ? sel.value : '';
+  // Bappi/Bajji ko sirf apna — filter badalne ki zarurat hi nahi
+  const filtWrap = sel ? sel.parentElement : null;
+  if (filtWrap && onlyMine) filtWrap.style.display = 'none';
+  const pick = onlyMine || (sel ? sel.value : '');
 
   // Chhoti pills — har naam ke paas kitna bacha, ek nazar me
   const pills = document.getElementById('maint2PersonPills');

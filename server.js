@@ -1946,7 +1946,10 @@ app.get('/api/me', requireAuth, async (req, res) => {
       // Leave page ko batata hai ki sabki leaves + approve/reject dikhana hai
       canManageLeaves: canManageLeaves(user.role, user.email, user.notification_email),
       // HR Reporting tab sirf Admin + HR ko (PC/HOD ko nahi)
-      hrReport: isHrReportUser(user.role, user.email, user.notification_email)
+      hrReport: isHrReportUser(user.role, user.email, user.notification_email),
+      // Maintenance tab kis roop me dikhe — dekho maintAccessFor()
+      maintView: maintAccessFor(user).view,
+      maintPerson: maintAccessFor(user).person
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -5786,6 +5789,28 @@ const MAINT_MODE_MATCH = 'office cash';  // F col me ye ho
 // Maintenance 2 me jaati hai (alag hisaab). Naam badalne ho to sirf yahan.
 const MAINT_PERSONS = ['Bappi ji', 'Bajji ji'];
 
+// Kaun kya dekh sakta hai (Harsh, 29 Aug):
+//   admin  -> dono view (Maintenance + Maintenance 2)
+//   Ashok  -> sirf pehla (Maintenance) — office cash uske paas hi rehta hai
+//   Bappi / Bajji -> sirf doosra (Maintenance 2), aur usme bhi SIRF apna
+//                    hisaab (doosre ka paisa nahi dikhta)
+// Naam se pehchante hain — sheet me bhi "Ashok kumar/Ashok Sn" jaise alag-alag
+// roop hain, isliye seedha match ke bajaye "naam me ye shabd hai kya" dekhte
+// hain, jaise office-cash rows me karte hain.
+function maintAccessFor(user) {
+  const nm = String((user && user.name) || '').toLowerCase();
+  const em = String((user && user.email) || '').toLowerCase();
+  const hay = nm + ' ' + em;
+  if (String((user && user.role) || '') === 'admin') return { view: 'all', person: '' };
+  // Person match — MAINT_PERSONS ka pehla shabd (Bappi / Bajji)
+  for (const pn of MAINT_PERSONS) {
+    const key = pn.split(' ')[0].toLowerCase();       // "bappi" / "bajji"
+    if (hay.includes(key)) return { view: 'person', person: pn };
+  }
+  if (hay.includes('ashok')) return { view: 'main', person: '' };
+  return { view: '', person: '' };
+}
+
 // "13,000" / "₹ 1498" / "1498.50" — sabse number nikaalo
 function maintNum(raw) {
   const n = parseFloat(String(raw == null ? '' : raw).replace(/[^0-9.\-]/g, ''));
@@ -5896,6 +5921,11 @@ async function ensureMaintenanceTab(d) {
 // GET /api/maintenance — cards ka data + dono list (aaya / gaya)
 app.get('/api/maintenance', requireAuth, async (req, res) => {
   try {
+    const d0 = await getDB();
+    const me = await d0.findOne('Users', { id: String(req.session.userId) });
+    const acc = maintAccessFor(me);
+    if (!acc.view) return res.status(403).json({ error: 'Not allowed' });
+
     const force = String(req.query.refresh || '') === '1';
     const [credits, d] = await Promise.all([maintReadCredits(force), getDB()]);
     await ensureMaintenanceTab(d).catch(() => {});
@@ -5936,7 +5966,25 @@ app.get('/api/maintenance', requireAuth, async (req, res) => {
     });
     Object.values(ledgers).forEach(L => { L.balance = L.received - L.spent; });
 
+    // Bappi/Bajji ko SIRF apna hisaab — doosre ka paisa, aur Maintenance ka
+    // poora khaata, unhe nahi dikhta. Ashok ko Maintenance dikhta hai.
+    if (acc.view === 'person') {
+      const mine = personExpenses.filter(e => e.person === acc.person);
+      const L = ledgers[acc.person] || { received: 0, spent: 0, balance: 0 };
+      return res.json({
+        maintView: 'person', myPerson: acc.person,
+        totalIn: 0, totalOut: 0, balance: 0, credits: [], expenses: [],
+        persons: [acc.person],
+        personExpenses: mine,
+        personLedgers: { [acc.person]: L },
+        personReceivedTotal: L.received,
+        personSpentTotal: L.spent,
+        personBalanceTotal: L.balance
+      });
+    }
+
     res.json({
+      maintView: acc.view, myPerson: '',
       totalIn, totalOut, balance: totalIn - totalOut,
       credits: credits.slice().reverse(),   // nayi entry sabse upar
       expenses,
@@ -5957,14 +6005,21 @@ app.get('/api/maintenance', requireAuth, async (req, res) => {
 app.get('/api/maintenance/expense/:id/image', requireAuth, async (req, res) => {
   try {
     const d = await getDB();
+    const me = await d.findOne('Users', { id: String(req.session.userId) });
+    const acc = maintAccessFor(me);
+    if (!acc.view) return res.status(403).json({ error: 'Not allowed' });
     const row = await d.findOne('Maintenance_Expenses', { id: req.params.id });
     if (!row || !row.image_data) return res.status(404).json({ error: 'Image nahi mili' });
+    // Bappi/Bajji sirf apni entry ka bill dekh sakte hain
+    if (acc.view === 'person' && String(row.person || '') !== acc.person) {
+      return res.status(403).json({ error: 'Not allowed' });
+    }
     res.json({ name: row.image_name || 'bill', type: row.image_type || '', data: row.image_data });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // POST /api/maintenance/expense — naya kharch
-app.post('/api/maintenance/expense', requireAuth, async (req, res) => {
+app.post('/api/maintenance/expense', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { spentOn, amount, description, imageName, imageType, imageData, person, ledger } = req.body || {};
     const amt = maintNum(amount);
