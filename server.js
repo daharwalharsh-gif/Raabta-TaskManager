@@ -480,7 +480,12 @@ const MYSQL_SCHEMA = {
     description: "TEXT", assigned_to: "VARCHAR(20) DEFAULT ''", assigned_by: "VARCHAR(20) DEFAULT ''",
     due_date: "VARCHAR(40) DEFAULT ''", status: "VARCHAR(20) DEFAULT 'pending'",
     priority: "VARCHAR(20) DEFAULT 'low'", remarks: "TEXT", frequency: "VARCHAR(20) DEFAULT ''",
-    created_at: "VARCHAR(40) DEFAULT ''"
+    created_at: "VARCHAR(40) DEFAULT ''",
+    // Sirf DB me padhne ki aasani ke liye (Harsh, 1 Sep): assigned_to me ID
+    // hoti hai (13, 24...) jise dekh kar pata nahi chalta kaun hai. Ye column
+    // usi bande ka NAAM rakhta hai. App kahin ise padhta nahi — assigned_to
+    // hi asli hai; ye sirf phpMyAdmin me nazar daalne ke liye hai.
+    doer_name: "VARCHAR(120) DEFAULT ''"
   },
   Task_Approvals: {
     task_id: "VARCHAR(20) DEFAULT ''", task_type: "VARCHAR(20) DEFAULT ''",
@@ -1425,6 +1430,15 @@ async function drainWhatsAppOutbox() {
 }
 
 
+// Checklist row me rakhne ke liye doer ka naam. Sirf DB me padhne ki aasani
+// ke liye — kabhi fail ho to khali chhod dete hain, task banna nahi rukta.
+async function doerNameFor(userId) {
+  try {
+    const u = await db.findOne('Users', { id: String(userId) });
+    return (u && u.name) ? String(u.name) : '';
+  } catch { return ''; }
+}
+
 // Resolve a user's WhatsApp target ({ name, phone }) or null if no usable phone.
 async function getWhatsAppTarget(userId) {
   try {
@@ -2301,7 +2315,8 @@ app.post('/api/tasks', requireAuth, async (req, res) => {
       await db.insert('Checklist_Tasks', {
         description: desc, assigned_to: targetUser, assigned_by: String(req.session.userId),
         due_date: date, status: 'pending', priority: priority || 'low',
-        remarks: remarks || '', frequency: '', created_at: nowStr
+        remarks: remarks || '', frequency: '', created_at: nowStr,
+        doer_name: await doerNameFor(targetUser)
       });
       // Non-blocking WhatsApp to the assignee (assign-time — WA.notifyOnAssign se control)
       if (WA.notifyOnAssign) (async () => {
@@ -2324,11 +2339,13 @@ app.post('/api/tasks/bulk-checklist', requireAuth, requireAdmin, async (req, res
     if (!desc || !assignedTo || !dates || !dates.length) return res.status(400).json({ error: 'Missing fields' });
     const freq = (frequency || '').toLowerCase().trim();
     const nowStr = new Date().toISOString().replace('T', ' ').split('.')[0];
+    const doerNm = await doerNameFor(assignedTo);
     const rows = dates.map(date => ({
       description: desc, assigned_to: String(parseInt(assignedTo)),
       assigned_by: String(req.session.userId), due_date: date,
       status: 'pending', priority: priority || 'low',
-      remarks: remarks || '', frequency: freq, created_at: nowStr
+      remarks: remarks || '', frequency: freq, created_at: nowStr,
+      doer_name: doerNm
     }));
     await db.batchInsert('Checklist_Tasks', rows);
     // Non-blocking WhatsApp — one summary message to the assignee
@@ -2599,6 +2616,49 @@ app.post('/api/tasks/checklist-reassign-assigner', requireAuth, requireAdmin, as
 // ONE-TIME MIGRATIONS — startup par chalti hain, App_State marker se sirf
 // EK BAAR. Dobara deploy/restart hone par apne aap skip ho jaati hain.
 // ══════════════════════════════════════════════════════
+// Purane checklist rows me doer_name khali hai — ek baar bhar dete hain.
+// MySQL par ek hi UPDATE...JOIN se (6000+ rows bhi pal bhar me), warna
+// row-by-row. Marker se sirf ek baar chalta hai.
+async function backfillChecklistDoerName() {
+  const MARKER = 'checklist_doer_name_backfill_v1';
+  try {
+    const d = await getDB();
+    await ensureAppStateTab(d);
+    const done = await d.findWhere('App_State', { key_name: MARKER });
+    if (done && done.length) return;
+
+    let filled = 0;
+    if (d.pool) {
+      // MySQL — ek hi query, sabse tez
+      const [r] = await d.pool.query(
+        'UPDATE `Checklist_Tasks` c JOIN `Users` u ON u.id = c.assigned_to ' +
+        "SET c.doer_name = u.name WHERE c.doer_name = '' OR c.doer_name IS NULL"
+      );
+      filled = (r && r.affectedRows) || 0;
+    } else {
+      // Sheets — row by row
+      const [tasks, users] = await Promise.all([d.findAll('Checklist_Tasks'), d.findAll('Users')]);
+      const byId = {};
+      users.forEach(u => { byId[String(u.id)] = u.name || ''; });
+      for (const t of tasks) {
+        if (t.doer_name) continue;
+        const nm = byId[String(t.assigned_to)] || '';
+        if (!nm) continue;
+        await d.update('Checklist_Tasks', t.id, { doer_name: nm }).catch(() => {});
+        filled++;
+      }
+    }
+
+    await d.insert('App_State', {
+      key_name: MARKER, value: `filled ${filled}`,
+      updated_at: new Date().toISOString().replace('T', ' ').split('.')[0]
+    });
+    console.log(`  ✅ Checklist doer_name bhara: ${filled} row`);
+  } catch (e) {
+    console.error('  backfillChecklistDoerName error (agli baar retry hogi):', e.message);
+  }
+}
+
 async function runOneTimeMigrations() {
   // Checklist tasks ka "Assigned By: Harsh" -> "Rahul Sir"
   const MARKER = 'migration_checklist_harsh_to_rahul_v1';
@@ -5521,7 +5581,11 @@ app.put('/api/transfers/:id', requireAuth, requireAdminOrHod, async (req, res) =
     await db.update('Task_Transfers', req.params.id, { status: action, note: note || '' });
     if (action === 'approved') {
       const tabName = getTabName(tr.task_type);
-      await db.update(tabName, tr.task_id, { assigned_to: String(tr.to_user) });
+      const trUpd = { assigned_to: String(tr.to_user) };
+      // Checklist me doer ka naam bhi saath badal do, warna DB me purana naam
+      // reh jaata (ye column sirf padhne ke liye hai)
+      if (tabName === 'Checklist_Tasks') trUpd.doer_name = await doerNameFor(tr.to_user);
+      await db.update(tabName, tr.task_id, trUpd);
     }
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -6276,6 +6340,7 @@ async function seedAdminIfNeeded() {
     // Start background DB connection
     getDB()
       .then(() => runOneTimeMigrations())
+      .then(() => setTimeout(() => backfillChecklistDoerName().catch(() => {}), 25 * 1000))
       // Outbox aane se pehle jo assign-alert gum ho gaye — ek baar bhej do
       .then(() => setTimeout(() => backfillMissedAssignAlerts().catch(() => {}), 45 * 1000))
       .then(() => setTimeout(() => resetTimedOutOutbox().catch(() => {}), 55 * 1000))
