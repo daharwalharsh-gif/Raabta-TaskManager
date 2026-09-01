@@ -5824,24 +5824,22 @@ const MAINT_CACHE_TTL = 60 * 1000;
 let _maintCache = { at: 0, rows: null, inFlight: null };
 
 // Sheet se sirf wahi rows jo Ashok + Office Cash hain.
-// SIRF zaroori columns padhte hain (A,B,C,F,I,K) — D/E/H me lambe Drive link
-// hote hain, unhe kheenchne se hi call 5 sec le rahi thi.
+// Harsh ne SIRF ye teen column bole the — wahi padhte hain:
+//   B = naam (Ashok), C = amount, F = payment mode (Office Cash)
+// Baaki (D/E/H ke Drive link, I ka Details, K ke Comments) chhoote hain —
+// unki zarurat nahi thi aur kheenchne se call dheemi bhi hoti thi.
 async function maintFetchCredits() {
   const sheets = await getSheetsClient();
   const resp = await withRetry(() => sheets.spreadsheets.values.batchGet({
     spreadsheetId: MAINT_SHEET_ID,
     ranges: [
       `${MAINT_TAB}!A:C`,   // timestamp, naam, amount
-      `${MAINT_TAB}!F:F`,   // payment mode
-      `${MAINT_TAB}!I:I`,   // details
-      `${MAINT_TAB}!K:K`    // comments
+      `${MAINT_TAB}!F:F`    // payment mode
     ]
   }));
   const vr = resp.data.valueRanges || [];
   const abc = (vr[0] && vr[0].values) || [];
   const fCol = (vr[1] && vr[1].values) || [];
-  const iCol = (vr[2] && vr[2].values) || [];
-  const kCol = (vr[3] && vr[3].values) || [];
   const cell = (col, i) => String(((col[i] || [])[0]) || '').trim();
 
   const out = [];
@@ -5858,9 +5856,7 @@ async function maintFetchCredits() {
       sheetRow: i + 1,
       date: String(r[0] || '').trim(),             // A — timestamp
       name,
-      amount,
-      details: cell(iCol, i),                      // I
-      comments: cell(kCol, i)                      // K
+      amount
     });
   }
   return out;

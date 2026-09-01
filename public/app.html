@@ -1530,11 +1530,10 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
                 <th style="white-space:nowrap">Date</th>
                 <th>Name</th>
                 <th style="white-space:nowrap;text-align:right">Amount</th>
-                <th>Details</th>
               </tr>
             </thead>
             <tbody id="maintCreditBody">
-              <tr><td colspan="4" class="empty">Loading…</td></tr>
+              <tr><td colspan="3" class="empty">Loading…</td></tr>
             </tbody>
           </table>
         </div>
@@ -5979,7 +5978,7 @@ async function loadMaintenance(force) {
   const expBody = document.getElementById('maintExpBody');
   const crBody = document.getElementById('maintCreditBody');
   if (expBody && !(_maintData.expenses || []).length) expBody.innerHTML = '<tr><td colspan="6" class="empty">Loading…</td></tr>';
-  if (crBody && !(_maintData.credits || []).length) crBody.innerHTML = '<tr><td colspan="4" class="empty">Loading…</td></tr>';
+  if (crBody && !(_maintData.credits || []).length) crBody.innerHTML = '<tr><td colspan="3" class="empty">Loading…</td></tr>';
 
   try {
     const d = await api('/api/maintenance' + (force ? '?refresh=1' : ''));
@@ -5990,7 +5989,7 @@ async function loadMaintenance(force) {
   } catch (e) {
     const msg = maintEsc(e.message || 'Failed to load');
     if (expBody) expBody.innerHTML = `<tr><td colspan="6" class="empty">⚠️ ${msg}</td></tr>`;
-    if (crBody) crBody.innerHTML = `<tr><td colspan="4" class="empty">⚠️ ${msg}</td></tr>`;
+    if (crBody) crBody.innerHTML = `<tr><td colspan="3" class="empty">⚠️ ${msg}</td></tr>`;
     showToast('Could not load Maintenance: ' + (e.message || ''), 'error');
   }
 }
@@ -6034,14 +6033,13 @@ function renderMaintenance() {
   // ── Sheet se aaya hua ──
   const crBody = document.getElementById('maintCreditBody');
   if (!(d.credits || []).length) {
-    crBody.innerHTML = '<tr><td colspan="4" class="empty">No Ashok + Office Cash rows found in the sheet</td></tr>';
+    crBody.innerHTML = '<tr><td colspan="3" class="empty">No Ashok + Office Cash rows found in the sheet</td></tr>';
   } else {
     crBody.innerHTML = d.credits.map(c => `
       <tr>
         <td style="white-space:nowrap">${maintDate(c.date)}</td>
         <td>${maintEsc(c.name)}</td>
         <td style="white-space:nowrap;text-align:right;font-weight:700;color:#16a34a">${maintMoney(c.amount)}</td>
-        <td>${maintEsc(c.details || c.comments || '')}</td>
       </tr>`).join('');
   }
 }
@@ -6203,7 +6201,7 @@ function exportMaintCSV() {
   const lines = [];
   lines.push(['Type', 'Date', 'Name / Description', 'Amount', 'By'].map(q).join(','));
   (d.credits || []).forEach(c => {
-    lines.push(['Received', maintDate(c.date), c.name + (c.details ? ' — ' + c.details : ''), c.amount, ''].map(q).join(','));
+    lines.push(['Received', maintDate(c.date), c.name, c.amount, ''].map(q).join(','));
   });
   (d.expenses || []).forEach(e => {
     lines.push(['Spent', maintDate(e.spentOn), e.description + (e.person ? ' [' + e.person + ']' : ''), e.amount, e.by || ''].map(q).join(','));
