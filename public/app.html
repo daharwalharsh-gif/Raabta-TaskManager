@@ -1724,7 +1724,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       <!-- AAYA — Maintenance se in ke naam par nikla -->
       <div class="task-table-card maint-table">
         <div class="card-head">
-          <div class="card-head-title">📥 Received — from Maintenance</div>
+          <div class="card-head-title">📥 Received — Deposits sheet + Maintenance</div>
           <span style="font-size:11px;color:#94a3b8">withdrawn in their name</span>
         </div>
         <div style="overflow-x:auto;max-height:420px;overflow-y:auto;">
@@ -6485,7 +6485,7 @@ function renderMaintenance2() {
   document.getElementById('maint2InSub').textContent = `${inRows.length} entries`;
   document.getElementById('maint2OutSub').textContent = `${outRows.length} entries`;
   document.getElementById('maint2InLabel').textContent =
-    pick ? `Received by ${pick}` : 'Total Received (from Maintenance)';
+    pick ? `Received by ${pick}` : 'Total Received (Deposits + Maintenance)';
 
   // Zyada kharch ho gaya to balance laal
   const balEl = document.getElementById('maint2Bal');
@@ -6508,7 +6508,7 @@ function renderMaintenance2() {
         <td data-lbl="Bill" style="white-space:nowrap">${e.hasImage
           ? `<button class="btn btn-outline" style="font-size:11px;padding:3px 8px" onclick="viewMaintImage('${e.id}','${maintEsc(e.imageName)}')">📎 View</button>`
           : '<span style="color:#cbd5e1">—</span>'}</td>
-        <td style="white-space:nowrap">${isAdmin
+        <td style="white-space:nowrap">${(isAdmin && !e.fromSheet)
           ? `<button class="btn btn-outline" style="font-size:11px;padding:3px 8px;color:#dc2626;border-color:#fecaca" onclick="deleteMaintExpense('${e.id}')">🗑</button>`
           : ''}</td>
       </tr>`).join('');
@@ -6518,7 +6518,7 @@ function renderMaintenance2() {
     pick ? `Nothing spent by ${maintEsc(pick)} yet` : 'Nothing spent yet 🎉');
   fill('maint2InBody', inRows, '#16a34a',
     pick ? `${maintEsc(pick)} has not received anything yet`
-         : 'Nothing received yet — withdraw from Maintenance with a name');
+         : 'Nothing received yet — from the Deposits sheet, or withdraw from Maintenance with a name');
 }
 
 // Pill dabao to wahi naam filter ho jaye (dobara dabao to sab dikhein)

@@ -5849,6 +5849,13 @@ const MAINT_TAB = 'Purchase_System';
 const MAINT_NAME_MATCH = 'ashok';        // B col me ye shabd ho (chhota-bada farak nahi)
 const MAINT_MODE_MATCH = 'office cash';  // F col me ye ho
 
+// Maintenance 2 ka aana usi sheet ke "Deposits" tab se (Harsh, 1 Sep).
+// Us tab me:  A = timestamp, B = Amount Deposited, D = Deposit Type
+// D me hi naam likha hota hai ("BAPPI", "Taken by Rahul" jaisa). Jis row ke
+// D me Bappi/Bajji ka naam ho, wo rakam us bande ke Received me jud jaati hai
+// — bilkul waise hi jaise Ashok ka Purchase_System se judta hai.
+const MAINT_DEP_TAB = 'Deposits';
+
 // Maintenance 2 ke naam. Withdraw ke waqt in me se koi chuna jaye to entry
 // Maintenance 2 me jaati hai (alag hisaab). Naam badalne ho to sirf yahan.
 const MAINT_PERSONS = ['Bappi ji', 'Bajji ji'];
@@ -5875,6 +5882,29 @@ function maintAccessFor(user) {
   return { view: '', person: '' };
 }
 
+// Sheet me likhe naam ko apne list wale naam se milao. "BAPPI ", "bappi ji",
+// "Taken by Bajji" — sab chal jaayenge. Na mile to khali.
+function maintPersonFromText(txt) {
+  const hay = String(txt || '').toLowerCase();
+  if (!hay.trim()) return '';
+  for (const pn of MAINT_PERSONS) {
+    const key = pn.split(' ')[0].toLowerCase();   // "bappi" / "bajji"
+    if (hay.includes(key)) return pn;
+  }
+  return '';
+}
+
+// "01/09/2026 17:54:24" ya "2026-09-01" -> "2026-09-01".
+// Sheet aur DB ki date ek jaisi ho jaati hai, to list sahi tarah se jamti hai.
+function maintDateKey(raw) {
+  const s = String(raw || '').trim();
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return m[1] + '-' + String(m[2]).padStart(2, '0') + '-' + String(m[3]).padStart(2, '0');
+  m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);   // DD/MM/YYYY
+  if (m) return m[3] + '-' + String(m[2]).padStart(2, '0') + '-' + String(m[1]).padStart(2, '0');
+  return s.split(' ')[0];
+}
+
 // "13,000" / "₹ 1498" / "1498.50" — sabse number nikaalo
 function maintNum(raw) {
   const n = parseFloat(String(raw == null ? '' : raw).replace(/[^0-9.\-]/g, ''));
@@ -5897,13 +5927,15 @@ async function maintFetchCredits() {
   const resp = await withRetry(() => sheets.spreadsheets.values.batchGet({
     spreadsheetId: MAINT_SHEET_ID,
     ranges: [
-      `${MAINT_TAB}!A:C`,   // timestamp, naam, amount
-      `${MAINT_TAB}!F:F`    // payment mode
+      `${MAINT_TAB}!A:C`,       // timestamp, naam, amount
+      `${MAINT_TAB}!F:F`,       // payment mode
+      `${MAINT_DEP_TAB}!A:D`    // Deposits — timestamp, amount, slip, type(naam)
     ]
   }));
   const vr = resp.data.valueRanges || [];
   const abc = (vr[0] && vr[0].values) || [];
   const fCol = (vr[1] && vr[1].values) || [];
+  const dep = (vr[2] && vr[2].values) || [];
   const cell = (col, i) => String(((col[i] || [])[0]) || '').trim();
 
   const out = [];
@@ -5924,7 +5956,25 @@ async function maintFetchCredits() {
       amount
     });
   }
-  return out;
+
+  // Deposits — jis row ke D col me Bappi/Bajji ka naam ho.
+  // 0 wali row bhi rakhte hain: hisaab me kuch nahi jodti, par list me dikhti
+  // hai to pata chalta hai entry pahunch gayi.
+  const deposits = [];
+  for (let i = 1; i < dep.length; i++) {
+    const r = dep[i] || [];
+    const who = maintPersonFromText(r[3]);        // D — Deposit Type me naam
+    if (!who) continue;
+    deposits.push({
+      sheetRow: i + 1,
+      date: maintDateKey(r[0]),                   // A — timestamp
+      person: who,
+      label: String(r[3] || '').trim(),           // D — jaisa sheet me likha hai
+      amount: maintNum(r[1])                      // B — Amount Deposited
+    });
+  }
+
+  return { credits: out, deposits };
 }
 
 // Cache ke saath. Purana data hai to TURANT wahi dete hain aur background me
@@ -6005,7 +6055,9 @@ app.get('/api/maintenance', requireAuth, async (req, res) => {
     if (!acc.view) return res.status(403).json({ error: 'Not allowed' });
 
     const force = String(req.query.refresh || '') === '1';
-    const [credits, d] = await Promise.all([maintReadCredits(force), getDB()]);
+    const [sheetData, d] = await Promise.all([maintReadCredits(force), getDB()]);
+    const credits = (sheetData && sheetData.credits) || [];
+    const sheetDeposits = (sheetData && sheetData.deposits) || [];
     await ensureMaintenanceTab(d).catch(() => {});
     const rawExp = await d.findAll('Maintenance_Expenses').catch(() => []);
     // image_data list me NAHI bhejte — page bhaari ho jaata hai. Alag
@@ -6027,8 +6079,27 @@ app.get('/api/maintenance', requireAuth, async (req, res) => {
     // Maintenance 2 se nikli rows (ledger 'm2') yahan NAHI aati — wo paisa
     // pehle hi ghat chuka jab wo Maintenance se us bande ko diya gaya tha.
     const expenses = allExp.filter(e => e.ledger === '');
+
+    // Deposits sheet ki rows ko app ki rows jaisa hi bana dete hain, taaki
+    // Maintenance 2 ki Received list me dono ek saath dikhein.
+    // id "dep-" se shuru hoti hai — ye DB ki row nahi hai, isliye ise app se
+    // mitaya nahi ja sakta (sheet me theek karni ho to sheet me karo).
+    const depositRows = sheetDeposits.map(dp => ({
+      id: 'dep-' + dp.sheetRow,
+      spentOn: dp.date,
+      amount: dp.amount,
+      description: dp.label ? ('Deposit — ' + dp.label) : 'Deposit',
+      person: dp.person,
+      ledger: 'dep',          // 'm2' nahi, isliye Received me ginti hai
+      hasImage: false, imageName: '',
+      by: 'Deposits sheet', createdAt: dp.date,
+      fromSheet: true
+    }));
+
     // 'in' Maintenance ki apni jodi hui rakam hai — kisi bande ka hisaab nahi
-    const personExpenses = allExp.filter(e => e.person && e.ledger !== 'in');
+    const personExpenses = allExp.filter(e => e.person && e.ledger !== 'in')
+      .concat(depositRows)
+      .sort((a, b) => String(b.spentOn || b.createdAt).localeCompare(String(a.spentOn || a.createdAt)));
 
     // Haath se jodi rakam ko sheet wali row jaisa hi bana dete hain, taaki
     // Received ki list me dono ek saath, ek jaisi dikhein
