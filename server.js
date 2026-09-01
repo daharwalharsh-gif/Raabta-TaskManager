@@ -5985,9 +5985,15 @@ async function ensureMaintenanceTab(d) {
 //   person -> Bappi/Bajji: hamesha APNE khaate se, doosre ke naam par nahi
 function maintEntryFor(acc, person, ledger) {
   const p = MAINT_PERSONS.includes(String(person || '').trim()) ? String(person).trim() : '';
-  if (acc.view === 'person') return { person: acc.person, ledger: 'm2' };
-  if (acc.view === 'main')   return { person: p, ledger: '' };
-  return { person: p, ledger: (String(ledger || '').trim() === 'm2' && p) ? 'm2' : '' };
+  const L = String(ledger || '').trim();
+  // Paisa aa raha hai ya ja raha hai. 'in' = Maintenance me jodi rakam,
+  // 'm2in' = kisi bande ke apne khaate me jodi rakam.
+  const isIn = (L === 'in' || L === 'm2in');
+  if (acc.view === 'person') return { person: acc.person, ledger: isIn ? 'm2in' : 'm2' };
+  if (acc.view === 'main')   return { person: isIn ? '' : p, ledger: isIn ? 'in' : '' };
+  if (L === 'm2in') return { person: p, ledger: p ? 'm2in' : 'in' };
+  if (L === 'in')   return { person: '', ledger: 'in' };
+  return { person: p, ledger: (L === 'm2' && p) ? 'm2' : '' };
 }
 
 // GET /api/maintenance — cards ka data + dono list (aaya / gaya)
@@ -6020,10 +6026,21 @@ app.get('/api/maintenance', requireAuth, async (req, res) => {
     // MAINTENANCE ka Spent = wo rows jo Maintenance se nikli (ledger khali).
     // Maintenance 2 se nikli rows (ledger 'm2') yahan NAHI aati — wo paisa
     // pehle hi ghat chuka jab wo Maintenance se us bande ko diya gaya tha.
-    const expenses = allExp.filter(e => e.ledger !== 'm2');
-    const personExpenses = allExp.filter(e => e.person);
+    const expenses = allExp.filter(e => e.ledger === '');
+    // 'in' Maintenance ki apni jodi hui rakam hai — kisi bande ka hisaab nahi
+    const personExpenses = allExp.filter(e => e.person && e.ledger !== 'in');
 
-    const totalIn = credits.reduce((s, c) => s + c.amount, 0);
+    // Haath se jodi rakam ko sheet wali row jaisa hi bana dete hain, taaki
+    // Received ki list me dono ek saath, ek jaisi dikhein
+    const manualCredits = allExp.filter(e => e.ledger === 'in').map(e => ({
+      date: e.spentOn, name: e.description || 'Added by hand',
+      mode: 'Added by hand', amount: e.amount,
+      id: e.id, manual: true, by: e.by
+    }));
+    // Nayi entry sabse upar — haath se jodi hui pehle, phir sheet ki
+    const allCredits = manualCredits.concat(credits.slice().reverse());
+
+    const totalIn = allCredits.reduce((s, c) => s + c.amount, 0);
     const totalOut = expenses.reduce((s, e) => s + e.amount, 0);
 
     // Har naam ka apna chhota khaata:
@@ -6058,7 +6075,7 @@ app.get('/api/maintenance', requireAuth, async (req, res) => {
     res.json({
       maintView: acc.view, myPerson: '',
       totalIn, totalOut, balance: totalIn - totalOut,
-      credits: credits.slice().reverse(),   // nayi entry sabse upar
+      credits: allCredits,   // haath se jodi hui + sheet wali, nayi upar
       expenses,
       persons: MAINT_PERSONS,
       personExpenses,

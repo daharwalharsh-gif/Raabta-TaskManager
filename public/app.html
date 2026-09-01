@@ -613,6 +613,13 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
   #maintViewTabs{display:flex;width:100%;gap:8px;margin-bottom:14px;}
   #maintViewTabs .tab{flex:1;text-align:center;font-size:12px;padding:9px 6px;}
 
+  /* Refresh / Add / Withdraw — phone par neeche ek hi line me, barabar */
+  #page-maintenance .page-header{flex-direction:column;align-items:stretch;gap:10px;}
+  #page-maintenance .page-header > div{display:flex;gap:6px;width:100%;}
+  #page-maintenance .page-header > div .btn{
+    flex:1;padding:10px 4px;font-size:11px;white-space:nowrap;
+  }
+
   /* Naam ka filter + pills */
   #maint2Filter{width:100%;font-size:13px;}
   #maint2PersonPills{width:100%;margin-top:2px;}
@@ -1573,6 +1580,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       <h2>Maintenance</h2>
       <div style="display:flex;gap:8px;align-items:center">
         <button class="btn btn-outline" onclick="refreshMaintView()" id="maintRefreshBtn">↻ Refresh</button>
+        <button class="btn btn-outline" id="maintAddBtn" onclick="openMaintExpense('in')" style="color:#15803d;border-color:#bbf7d0;font-weight:700">＋ Add Amount</button>
         <button class="btn btn-primary" id="maintWithdrawBtn" onclick="openMaintExpense()">＋ Withdraw Amount</button>
       </div>
     </div>
@@ -1771,12 +1779,12 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     </div>
 
     <div style="margin-bottom:12px">
-      <label style="display:block;font-size:11px;font-weight:600;color:#64748b;margin-bottom:4px;text-transform:uppercase">Where it was used *</label>
+      <label id="maintExpDescLabel" style="display:block;font-size:11px;font-weight:600;color:#64748b;margin-bottom:4px;text-transform:uppercase">Where it was used *</label>
       <textarea id="maintExpDesc" rows="3" placeholder="e.g. AC repair at shop, paid to technician"
         style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;font-family:'Inter',sans-serif;outline:none;box-sizing:border-box;resize:vertical"></textarea>
     </div>
 
-    <div style="margin-bottom:12px">
+    <div style="margin-bottom:12px" id="maintExpPersonBlock">
       <label id="maintExpPersonLabel" style="display:block;font-size:11px;font-weight:600;color:#64748b;margin-bottom:4px;text-transform:uppercase">Name (optional)</label>
       <select id="maintExpPerson" onchange="onMaintPersonChange()"
         style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;font-family:'Inter',sans-serif;outline:none;box-sizing:border-box;background:#fff">
@@ -6091,6 +6099,8 @@ function applyMaintAccess() {
   // se. Jiske paas tab hi nahi, usse button bhi nahi.
   const wBtn = document.getElementById('maintWithdrawBtn');
   if (wBtn) wBtn.style.display = v ? '' : 'none';
+  const aBtn = document.getElementById('maintAddBtn');
+  if (aBtn) aBtn.style.display = v ? '' : 'none';
   // Person ko seedha Maintenance 2 par le jao
   if (v === 'person' && _maintView !== 2) switchMaintView(2, t2);
   if (v === 'main' && _maintView !== 1) switchMaintView(1, t1);
@@ -6162,14 +6172,21 @@ function renderMaintenance() {
       <tr>
         <td data-lbl="Date" style="white-space:nowrap">${maintDate(c.date)}</td>
         <td data-lbl="Name">${maintEsc(c.name)}</td>
-        <td data-lbl="Mode" style="white-space:nowrap">${maintEsc(c.mode || '')}</td>
+        <td data-lbl="Mode" style="white-space:nowrap">${c.manual
+          ? `<span style="font-size:11px;background:#dcfce7;color:#15803d;padding:2px 8px;border-radius:10px;font-weight:700">Added by hand</span>${isAdmin
+              ? ` <button class="btn btn-outline" style="font-size:11px;padding:2px 7px;color:#dc2626;border-color:#fecaca" onclick="deleteMaintExpense('${c.id}')">🗑</button>` : ''}`
+          : maintEsc(c.mode || '')}</td>
         <td data-lbl="Amount" class="m-amt" style="white-space:nowrap;text-align:right;font-weight:700;color:#16a34a">${maintMoney(c.amount)}</td>
       </tr>`).join('');
   }
 }
 
-// ── Amount nikaalne ka modal ──
-function openMaintExpense() {
+// Modal do kaam karta hai: 'out' = paisa nikalna, 'in' = paisa jodna
+let _maintTxn = 'out';
+
+// ── Amount nikaalne / jodne ka modal ──
+function openMaintExpense(kind) {
+  _maintTxn = (kind === 'in') ? 'in' : 'out';
   document.getElementById('maintExpErr').style.display = 'none';
   document.getElementById('maintExpAmount').value = '';
   document.getElementById('maintExpDesc').value = '';
@@ -6204,14 +6221,27 @@ function openMaintExpense() {
       psel.disabled = false;
     }
   }
+  const isIn = (_maintTxn === 'in');
+  // Maintenance me rakam jodte waqt naam ka koi matlab nahi — chhupa dete hain
+  const pblock = document.getElementById('maintExpPersonBlock');
+  if (pblock) pblock.style.display = (isIn && !isM2) ? 'none' : '';
+
   const plabel = document.getElementById('maintExpPersonLabel');
   if (plabel) plabel.textContent = isM2 ? 'Name *' : 'Name (optional)';
   const title = document.getElementById('maintExpTitle');
-  if (title) title.textContent = isM2 ? '💸 Withdraw from a person' : '💸 Withdraw Amount';
+  if (title) title.textContent = isIn ? '➕ Add Amount'
+    : (isM2 ? '💸 Withdraw from a person' : '💸 Withdraw Amount');
+  const dlbl = document.getElementById('maintExpDescLabel');
+  if (dlbl) dlbl.textContent = isIn ? 'Where it came from *' : 'Where it was used *';
+  const dta = document.getElementById('maintExpDesc');
+  if (dta) dta.placeholder = isIn ? 'e.g. cash received at office, money returned'
+                                  : 'e.g. AC repair at shop, paid to technician';
   const intro = document.getElementById('maintExpIntro');
-  if (intro) intro.textContent = isM2
-    ? 'This money comes out of that person\'s own balance (what they already received). The main Maintenance balance stays the same.'
-    : 'Enter how much you are taking out of the balance and where it was used. Pick a name if the money went to Bappi ji or Bajji ji.';
+  if (intro) intro.textContent = isIn
+    ? (isM2 ? 'This adds money to that person\'s own balance. The main Maintenance balance stays the same.'
+            : 'This adds to Total Received (Office Cash), on top of what comes from the sheet.')
+    : (isM2 ? 'This money comes out of that person\'s own balance (what they already received). The main Maintenance balance stays the same.'
+            : 'Enter how much you are taking out of the balance and where it was used. Pick a name if the money went to Bappi ji or Bajji ji.');
   // Balance ki dono line onMaintPersonChange khud set karta hai — view 1 me
   // main balance, view 2 me us bande ka. Yahan dobara set karenge to M2 ka
   // sahi number main balance se dab jaata hai (29 Aug me yahi bug tha).
@@ -6280,7 +6310,8 @@ async function saveMaintExpense() {
     const r = await api('/api/maintenance/expense', 'POST', {
       amount, spentOn, description,
       person: psel ? psel.value : '',
-      ledger: (_maintView === 2) ? 'm2' : '',
+      ledger: (_maintTxn === 'in') ? ((_maintView === 2) ? 'm2in' : 'in')
+                                   : ((_maintView === 2) ? 'm2' : ''),
       imageName: _maintImageMeta.name,
       imageType: _maintImageMeta.type,
       imageData: _maintImageB64
@@ -6505,9 +6536,15 @@ function onMaintPersonChange() {
   if (!sel || !hint) return;
   const n = sel.value;
   const isM2 = (_maintView === 2);
+  const isIn = (_maintTxn === 'in');
   const L = (_maintData.personLedgers || {})[n] || { received: 0, spent: 0, balance: 0 };
 
-  if (isM2) {
+  if (isIn) {
+    hint.innerHTML = isM2
+      ? (n ? `Adds to <strong>${maintEsc(n)}</strong>'s balance. The main Maintenance balance stays the same.`
+           : '<span style="color:#dc2626">Pick a name first — this money goes into that person\'s balance.</span>')
+      : 'Adds to <strong>Total Received (Office Cash)</strong> — the balance goes up.';
+  } else if (isM2) {
     // Us bande ke apne khaate se — main Maintenance balance ko haath nahi lagta
     hint.innerHTML = n
       ? `Comes out of <strong>${maintEsc(n)}</strong>'s own balance. The main Maintenance balance stays the same.`
@@ -6527,7 +6564,7 @@ function onMaintPersonChange() {
   if (lblNow) lblNow.textContent = isM2 ? (n ? maintEsc(n) + "'s balance" : 'Their balance') : 'Current balance';
   if (nowEl) nowEl.textContent = maintMoney(base);
 
-  const after = base - amt;
+  const after = isIn ? (base + amt) : (base - amt);
   const el = document.getElementById('maintExpBalAfter');
   if (el) {
     el.textContent = maintMoney(after);
