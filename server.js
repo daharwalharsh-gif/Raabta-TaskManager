@@ -5856,6 +5856,7 @@ async function maintFetchCredits() {
       sheetRow: i + 1,
       date: String(r[0] || '').trim(),             // A — timestamp
       name,
+      mode,                                        // F — Payment Mode
       amount
     });
   }
