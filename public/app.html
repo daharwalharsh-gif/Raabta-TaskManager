@@ -6087,9 +6087,10 @@ function applyMaintAccess() {
   // Ashok ko sirf pehla, Bappi/Bajji ko sirf doosra — button hi chhupa dete hain
   if (t1) t1.style.display = (v === 'person') ? 'none' : '';
   if (t2) t2.style.display = (v === 'main') ? 'none' : '';
-  // Withdraw sirf admin — doer sirf dekh sakte hain
+  // Withdraw ab doer ko bhi — Ashok Maintenance se, Bappi/Bajji apne khaate
+  // se. Jiske paas tab hi nahi, usse button bhi nahi.
   const wBtn = document.getElementById('maintWithdrawBtn');
-  if (wBtn) wBtn.style.display = (ME.role === 'admin') ? '' : 'none';
+  if (wBtn) wBtn.style.display = v ? '' : 'none';
   // Person ko seedha Maintenance 2 par le jao
   if (v === 'person' && _maintView !== 2) switchMaintView(2, t2);
   if (v === 'main' && _maintView !== 1) switchMaintView(1, t1);
@@ -6195,6 +6196,13 @@ function openMaintExpense() {
                           : ('<option value="">— None (Maintenance) —</option>' + opts);
     const f = document.getElementById('maint2Filter');
     psel.value = (isM2 && f && f.value) ? f.value : '';
+    // Bappi/Bajji ka apna login — naam wahi rahega, badla nahi ja sakta
+    if (ME.maintView === 'person') {
+      psel.value = ME.maintPerson || psel.value;
+      psel.disabled = true;
+    } else {
+      psel.disabled = false;
+    }
   }
   const plabel = document.getElementById('maintExpPersonLabel');
   if (plabel) plabel.textContent = isM2 ? 'Name *' : 'Name (optional)';

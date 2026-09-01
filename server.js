@@ -5979,6 +5979,17 @@ async function ensureMaintenanceTab(d) {
   }
 }
 
+// Entry kis naam par aur kis khaate me jayegi — role dekh kar.
+//   admin  -> jo bheja wahi (dono taraf ki entry daal sakta hai)
+//   main   -> Ashok: hamesha Maintenance ka kharch; naam optional (kisko diya)
+//   person -> Bappi/Bajji: hamesha APNE khaate se, doosre ke naam par nahi
+function maintEntryFor(acc, person, ledger) {
+  const p = MAINT_PERSONS.includes(String(person || '').trim()) ? String(person).trim() : '';
+  if (acc.view === 'person') return { person: acc.person, ledger: 'm2' };
+  if (acc.view === 'main')   return { person: p, ledger: '' };
+  return { person: p, ledger: (String(ledger || '').trim() === 'm2' && p) ? 'm2' : '' };
+}
+
 // GET /api/maintenance — cards ka data + dono list (aaya / gaya)
 app.get('/api/maintenance', requireAuth, async (req, res) => {
   try {
@@ -6080,8 +6091,17 @@ app.get('/api/maintenance/expense/:id/image', requireAuth, async (req, res) => {
 });
 
 // POST /api/maintenance/expense — naya kharch
-app.post('/api/maintenance/expense', requireAuth, requireAdmin, async (req, res) => {
+// Admin ke saath doer bhi entry daal sakte hain (Harsh, 1 Sep): Ashok
+// Maintenance ke balance se, Bappi/Bajji apne hi khaate se. Kaun kaunsi
+// entry daal sakta hai ye SERVER yahin tay karta hai — browser ke bheje
+// ledger/person par bharosa nahi, warna koi bhi doosre ke naam par nikal le.
+app.post('/api/maintenance/expense', requireAuth, async (req, res) => {
   try {
+    const d0 = await getDB();
+    const me = await d0.findOne('Users', { id: String(req.session.userId) });
+    const acc = maintAccessFor(me);
+    if (!acc.view) return res.status(403).json({ error: 'Not allowed' });
+
     const { spentOn, amount, description, imageName, imageType, imageData, person, ledger } = req.body || {};
     const amt = maintNum(amount);
     if (!amt || amt <= 0) return res.status(400).json({ error: 'Amount sahi daalo' });
@@ -6094,11 +6114,11 @@ app.post('/api/maintenance/expense', requireAuth, requireAdmin, async (req, res)
       spent_on: String(spentOn || '').trim() || nowStr.split(' ')[0],
       amount: String(amt),
       description: String(description).trim(),
-      // Sirf list wala naam maanenge — kuch aur aaye to khali (normal Maintenance)
-      person: MAINT_PERSONS.includes(String(person || '').trim()) ? String(person).trim() : '',
+      // Naam aur khaata — role dekh kar server khud tay karta hai
+      person: maintEntryFor(acc, person, ledger).person,
       // 'm2' tabhi jab naam bhi ho — bina naam ke Maintenance 2 ki entry
       // ban hi nahi sakti (kiske khaate se katega?)
-      ledger: (String(ledger || '').trim() === 'm2' && MAINT_PERSONS.includes(String(person || '').trim())) ? 'm2' : '',
+      ledger: maintEntryFor(acc, person, ledger).ledger,
       image_name: String(imageName || '').slice(0, 250),
       image_type: String(imageType || '').slice(0, 110),
       image_data: String(imageData || ''),
