@@ -1824,6 +1824,13 @@ function whatsAppReminderScheduler() {
   setInterval(() => {
     runFMSNotifications().catch(e => console.error('  FMS notify tick error:', e.message));
   }, 3 * 60 * 1000);
+  // Maintenance balance par nazar — kharch app se hota hai to wahin check ho
+  // jaata hai, par sheet se bhi hisaab badalta hai, isliye har 30 min bhi.
+  setInterval(() => {
+    checkMaintLowBalance('har 30 min').catch(e => console.error('  maint low tick error:', e.message));
+  }, 30 * 60 * 1000);
+  setTimeout(() => checkMaintLowBalance('startup').catch(() => {}), 45 * 1000);
+
   selfKeepAlive();   // app khud ko jagati rahegi
   console.log(`  WhatsApp reminder scheduler started (daily ${label} IST, Monday skip, catch-up till 7PM)`);
 }
@@ -6046,6 +6053,75 @@ function maintEntryFor(acc, person, ledger) {
   return { person: p, ledger: (L === 'm2' && p) ? 'm2' : '' };
 }
 
+// ── BALANCE KAM HO TO RAHUL SIR KO ALERT (Harsh, 1 Sep) ──────────────
+// SIRF Maintenance ka balance dekhte hain (Maintenance 2 se koi lena-dena
+// nahi). 1000 ya usse neeche aate hi ek message. Dobara-dobara na jaye
+// isliye App_State me nishaan rakhte hain — balance wapas upar jaane par
+// nishaan hat jaata hai, to agli baar girne par phir alert jayega.
+const MAINT_LOW_LIMIT = 1000;
+const MAINT_LOW_PHONE = '9810487778';      // Rahul sir
+const MAINT_LOW_KEY = 'maint_low_alert';
+
+// Maintenance ka aaj ka hisaab — wahi formula jo cards par dikhta hai
+async function maintBalanceNow() {
+  const [sheetData, d] = await Promise.all([maintReadCredits(false), getDB()]);
+  const credits = (sheetData && sheetData.credits) || [];
+  await ensureMaintenanceTab(d).catch(() => {});
+  const rows = await d.findAll('Maintenance_Expenses').catch(() => []);
+
+  let totalIn = credits.reduce((s, c) => s + maintNum(c.amount), 0);
+  let totalOut = 0;
+  rows.forEach(r => {
+    const led = String(r.ledger || '').trim();
+    const amt = maintNum(r.amount);
+    if (led === 'in') totalIn += amt;        // haath se jodi rakam
+    else if (led === '') totalOut += amt;    // Maintenance ka kharch
+    // 'm2' / 'm2in' / 'dep' kisi bande ka apna khaata — yahan nahi ginte
+  });
+  return { totalIn, totalOut, balance: totalIn - totalOut };
+}
+
+function maintRupees(n) {
+  return '\u20B9' + (Number(n) || 0).toLocaleString('en-IN');
+}
+
+async function checkMaintLowBalance(why) {
+  try {
+    const d = await getDB();
+    await ensureAppStateTab(d);
+    const found = await d.findWhere('App_State', { key_name: MAINT_LOW_KEY });
+    const cur = found && found[0];
+    const wasLow = String((cur && cur.value) || '').startsWith('low');
+
+    const b = await maintBalanceNow();
+    const isLow = b.balance <= MAINT_LOW_LIMIT;
+    const nowStr = new Date(Date.now() + 330 * 60000).toISOString().replace('T', ' ').split('.')[0];
+
+    if (isLow && !wasLow) {
+      const msg =
+        '\u26A0\uFE0F *Maintenance Balance Alert*\n\n' +
+        'Office Cash ka balance *' + maintRupees(b.balance) + '* reh gaya hai.\n' +
+        '(Alert limit: ' + maintRupees(MAINT_LOW_LIMIT) + ')\n\n' +
+        'Total Received: ' + maintRupees(b.totalIn) + '\n' +
+        'Total Spent: ' + maintRupees(b.totalOut) + '\n\n' +
+        '\u2014 Raabta Task Manager';
+      await queueWhatsApp(MAINT_LOW_PHONE, msg, 'maint-low',
+        'maint-low-' + nowStr.split(' ')[0], 'Rahul Sir');
+      const val = 'low|' + b.balance + '|' + nowStr;
+      if (cur) await d.update('App_State', cur.id, { value: val, updated_at: nowStr });
+      else await d.insert('App_State', { key_name: MAINT_LOW_KEY, value: val, updated_at: nowStr });
+      console.log('  \u26A0\uFE0F Maintenance balance ' + b.balance + ' — Rahul sir ko alert bheja (' + (why || '') + ')');
+    } else if (!isLow && wasLow) {
+      // Balance wapas upar — nishaan hata do, agli baar girne par phir jayega
+      const val = 'ok|' + b.balance + '|' + nowStr;
+      if (cur) await d.update('App_State', cur.id, { value: val, updated_at: nowStr });
+      console.log('  Maintenance balance wapas ' + b.balance + ' — alert dobara chalu');
+    }
+  } catch (e) {
+    console.error('  checkMaintLowBalance error:', e.message);
+  }
+}
+
 // GET /api/maintenance — cards ka data + dono list (aaya / gaya)
 app.get('/api/maintenance', requireAuth, async (req, res) => {
   try {
@@ -6215,6 +6291,9 @@ app.post('/api/maintenance/expense', requireAuth, async (req, res) => {
       created_at: nowStr
     });
     res.json({ success: true, id: row && row.id });
+    // Entry ke turant baad dekh lo — balance limit se neeche to nahi gaya.
+    // Jawab bhej chuke hain, isliye user ko rukna nahi padta.
+    checkMaintLowBalance('nayi entry ke baad').catch(() => {});
   } catch (err) {
     console.error('  maintenance expense add error:', err.message);
     res.status(500).json({ error: err.message });
