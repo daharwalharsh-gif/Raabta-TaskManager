@@ -729,6 +729,10 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
   #tasksContent tbody td.t-action .action-btn{
     margin-left:0 !important;font-size:11px;padding:6px 11px;border-radius:8px;
   }
+  /* Khali khaana ("Remarks —" jaisi bekaar line) card me dikhta hi nahi.
+     Desktop par table ka khana khali nahi chhoda ja sakta, isliye wahan
+     "—" jaisa tha waisa hi rehta hai. */
+  #tasksContent tbody td.t-blank{display:none !important;}
 
   /* ── ALL TASKS ka upar wala hissa ── */
   #page-alltasks .page-header{flex-direction:column;align-items:stretch;gap:10px;}
@@ -3860,11 +3864,11 @@ function renderTaskRow(t, isAdmin) {
   return `<tr${wasReported ? ' class="row-reported" title="Doer ne report bheji thi — Reopen ke baad wapas Pending"' : ''}>
       <td class="t-action" style="white-space:nowrap">${actionBtns}</td>
       <td class="t-desc">${t.description||''}${t.report_note ? ` <span style="font-size:10px;color:#c2410c">📝 ${t.report_note}</span>` : ''}</td>
-      <td class="t-doer" data-lbl="Doer">${t.assignedToName||''}</td>
-      <td class="t-assignee" data-lbl="Assignee">${t.assignedByName||''}</td>
-      <td class="t-on" data-lbl="Assigned On" style="white-space:nowrap;font-size:12px;color:#64748b">${fmtDate(t.assigned_on||'')||'—'}</td>
+      <td class="t-doer${t.assignedToName ? '' : ' t-blank'}" data-lbl="Doer">${t.assignedToName||''}</td>
+      <td class="t-assignee${t.assignedByName ? '' : ' t-blank'}" data-lbl="Assignee">${t.assignedByName||''}</td>
+      <td class="t-on${t.assigned_on ? '' : ' t-blank'}" data-lbl="Assigned On" style="white-space:nowrap;font-size:12px;color:#64748b">${fmtDate(t.assigned_on||'')||'—'}</td>
       <td class="t-due" data-lbl="Due Date" style="white-space:nowrap">${fmtDate(t.due_date||'')||''}</td>
-      <td class="t-remarks" data-lbl="Remarks" style="color:#64748b">${t.remarks||'—'}</td>
+      <td class="t-remarks${t.remarks ? '' : ' t-blank'}" data-lbl="Remarks" style="color:#64748b">${t.remarks||'—'}</td>
       <td class="t-status"><span class="status-badge ${t.status}">${statusLabel}</span></td>
     </tr>`;
 }
