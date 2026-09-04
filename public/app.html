@@ -3832,6 +3832,25 @@ function renderTasksTable() {
       const x = normDate(a.due_date || ''), y = normDate(b.due_date || '');
       return _dueSort === 'desc' ? y.localeCompare(x) : x.localeCompare(y);
     });
+  } else {
+    // Bina click kiye (Harsh, 1 Sep): Dashboard jaisa hi tarteeb —
+    // AAJ ke task sabse UPAR, phir aane wale (nazdeek ki date pehle), aur
+    // PURANE sabse NICHE (taaza overdue pehle, sabse purana bilkul aakhir).
+    // Bina-date wale sabse aakhir. Delegation aur Checklist dono par lagta hai.
+    // Date par click karke purana asc/desc ab bhi mil jaata hai.
+    const todayStr = new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
+      .toISOString().split('T')[0];
+    // normDate = Excel serial theek karta hai, dashDateKey = 9/7/2026 aur
+    // 09-07-2026 ko YYYY-MM-DD banata hai. Dono chahiye — sheet me teeno roop hain.
+    const dOf = t => dashDateKey(normDate(t.due_date || t.date || ''));
+    tasks = [...tasks].sort((a, b) => {
+      const da = dOf(a), db = dOf(b);
+      const rank = d => !d ? 3 : (d === todayStr ? 0 : (d > todayStr ? 1 : 2));
+      const ra = rank(da), rb = rank(db);
+      if (ra !== rb) return ra - rb;                 // aaj > aane wale > purane > bina-date
+      if (ra === 1) return da.localeCompare(db);     // aane wale: nazdeek pehle
+      return db.localeCompare(da);                   // purane: taaza pehle
+    });
   }
 
   const theadHtml = `<thead><tr>
