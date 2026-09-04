@@ -667,6 +667,87 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
   .utb-actions .btn{font-size:10px;padding:4px 8px;}
   .flat-tasks-table{overflow-x:auto;-webkit-overflow-scrolling:touch;}
 
+  /* ══════════════════════════════════════
+     ALL TASKS — PHONE VIEW
+     8 column phone par ghus hi nahi sakte the, baazu me scroll karna padta
+     tha aur likha itna chhota ki padha na jaye. Ab har task ek card:
+     upar kaam, phir status aur date, neeche button. (Maintenance wala hi
+     tarika — column ka naam har value ke aage data-lbl se aata hai.)
+  ══════════════════════════════════════ */
+  #tasksContent .flat-tasks-table{
+    overflow-x:visible !important;background:transparent !important;
+    box-shadow:none !important;border-radius:0 !important;
+  }
+  #tasksContent .flat-tasks-table > div{overflow-x:visible !important;}
+  #tasksContent table{min-width:0 !important;width:100% !important;}
+  #tasksContent thead{display:none !important;}
+  #tasksContent table,#tasksContent tbody{display:block !important;width:auto !important;}
+
+  #tasksContent tbody tr{
+    display:flex !important;flex-direction:column;
+    background:#fff;border:1px solid #e8edf4 !important;border-radius:14px;
+    margin:0 0 10px;padding:13px 14px 11px 16px;
+    box-shadow:0 2px 10px rgba(0,0,0,.06);
+    position:relative;overflow:hidden;
+  }
+  #tasksContent tbody tr::before{
+    content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:#cbd5e1;
+  }
+  /* Report bhej chuke task — wahi peela nishaan, par card par */
+  #tasksContent tbody tr.row-reported{background:#fffbeb;border-color:#fde68a !important;}
+  #tasksContent tbody tr.row-reported::before{background:#f59e0b;}
+  #tasksContent tbody tr.row-reported td{
+    background:transparent !important;border:none !important;
+  }
+
+  #tasksContent tbody td{
+    display:block !important;width:auto !important;
+    border:none !important;padding:2px 0 !important;
+    font-size:12px;color:#475569;line-height:1.5;white-space:normal !important;
+  }
+  #tasksContent tbody td[data-lbl]::before{
+    content:attr(data-lbl);display:inline-block;min-width:84px;
+    font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;
+  }
+
+  /* Kram: kaam > status > date > baaki > button */
+  #tasksContent tbody td.t-desc{
+    order:1;font-size:13.5px;font-weight:600;color:#0f172a;
+    line-height:1.45;padding:0 0 7px !important;
+  }
+  #tasksContent tbody td.t-status{order:2;padding-bottom:7px !important;}
+  #tasksContent tbody td.t-due{order:3;font-weight:700;color:#0f172a;}
+  #tasksContent tbody td.t-doer{order:4;}
+  #tasksContent tbody td.t-assignee{order:5;}
+  #tasksContent tbody td.t-on{order:6;}
+  #tasksContent tbody td.t-remarks{order:7;}
+  #tasksContent tbody td.t-action{
+    order:8;display:flex !important;flex-wrap:wrap;gap:6px;align-items:center;
+    padding-top:10px !important;margin-top:7px;
+    border-top:1px solid #f1f5f9 !important;white-space:normal !important;
+  }
+  #tasksContent tbody td.t-action .action-btn{
+    margin-left:0 !important;font-size:11px;padding:6px 11px;border-radius:8px;
+  }
+
+  /* ── ALL TASKS ka upar wala hissa ── */
+  #page-alltasks .page-header{flex-direction:column;align-items:stretch;gap:10px;}
+  #page-alltasks .page-header > div{width:100%;}
+  #taskSearch{width:100% !important;box-sizing:border-box;font-size:16px;}
+  /* Button do-do ki line me, poori chaudai */
+  #page-alltasks .page-header > div:last-child{
+    display:flex;flex-wrap:wrap;gap:6px;
+  }
+  #page-alltasks .page-header > div:last-child > .btn{
+    flex:1 1 calc(50% - 3px);justify-content:center;text-align:center;
+    font-size:11px;padding:9px 6px;
+  }
+  #page-alltasks .page-header > div:last-child > span,
+  #page-alltasks .page-header > div:last-child > div{flex:1 1 100%;}
+  /* display ko haath NAHI lagate -- ye JS chhupata/dikhata hai (sirf admin ko) */
+  #hrExportWrap{gap:6px;}
+  #hrExportDoer{flex:1;min-width:0 !important;font-size:13px;}
+
   /* ── MODALS — premium bottom sheet ── */
   .modal-overlay{align-items:flex-end;padding:0;}
   .modal{
@@ -3777,14 +3858,14 @@ function renderTaskRow(t, isAdmin) {
   const wasReported = t.status === 'pending' && !isChecklist
     && (t.was_reported == 1 || !!t.report_note || !!t.hasAttachments);
   return `<tr${wasReported ? ' class="row-reported" title="Doer ne report bheji thi — Reopen ke baad wapas Pending"' : ''}>
-      <td style="white-space:nowrap">${actionBtns}</td>
-      <td>${t.description||''}${t.report_note ? ` <span style="font-size:10px;color:#c2410c">📝 ${t.report_note}</span>` : ''}</td>
-      <td>${t.assignedToName||''}</td>
-      <td>${t.assignedByName||''}</td>
-      <td style="white-space:nowrap;font-size:12px;color:#64748b">${fmtDate(t.assigned_on||'')||'—'}</td>
-      <td style="white-space:nowrap">${fmtDate(t.due_date||'')||''}</td>
-      <td style="color:#64748b">${t.remarks||'—'}</td>
-      <td><span class="status-badge ${t.status}">${statusLabel}</span></td>
+      <td class="t-action" style="white-space:nowrap">${actionBtns}</td>
+      <td class="t-desc">${t.description||''}${t.report_note ? ` <span style="font-size:10px;color:#c2410c">📝 ${t.report_note}</span>` : ''}</td>
+      <td class="t-doer" data-lbl="Doer">${t.assignedToName||''}</td>
+      <td class="t-assignee" data-lbl="Assignee">${t.assignedByName||''}</td>
+      <td class="t-on" data-lbl="Assigned On" style="white-space:nowrap;font-size:12px;color:#64748b">${fmtDate(t.assigned_on||'')||'—'}</td>
+      <td class="t-due" data-lbl="Due Date" style="white-space:nowrap">${fmtDate(t.due_date||'')||''}</td>
+      <td class="t-remarks" data-lbl="Remarks" style="color:#64748b">${t.remarks||'—'}</td>
+      <td class="t-status"><span class="status-badge ${t.status}">${statusLabel}</span></td>
     </tr>`;
 }
 
