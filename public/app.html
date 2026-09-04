@@ -1153,9 +1153,10 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
           title="Jin checklist tasks me Assigned By 'Harsh' hai, unhe 'Rahul Sir' kar do">🔁 Harsh → Rahul Sir</button>
         <!-- Doer-wise checklist CSV export — sirf harsh@gmail.com ko dikhta hai -->
         <span id="hrExportWrap" style="display:none;align-items:center;gap:6px">
-          <select id="hrExportDoer"
+          <select id="hrExportDoer" onchange="onDoerFilterChange()"
+            title="Doer chuno — list usi ki ho jayegi, aur CSV bhi usi ki niklegi"
             style="padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;outline:none;background:#fff;min-width:150px">
-            <option value="">-- Select Doer --</option>
+            <option value="">-- Select Doer (All) --</option>
           </select>
           <button class="btn btn-outline" onclick="exportDoerChecklistCSV()"
             style="color:#059669;border-color:#a7f3d0" title="Is doer ke saare checklist tasks (pure saal ke) CSV me download">⬇ Export Checklist CSV</button>
@@ -3730,7 +3731,7 @@ async function loadAllTasks() {
     if (allowed && sel && sel.options.length <= 1) {
       const users = await api('/api/users');
       if (Array.isArray(users)) {
-        sel.innerHTML = '<option value="">-- Select Doer --</option>' +
+        sel.innerHTML = '<option value="">-- Select Doer (All) --</option>' +
           users.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''))
             .map(u => `<option value="${u.id}">${u.name}</option>`).join('');
       }
@@ -3878,6 +3879,10 @@ function renderTasksTable() {
   // PC gets view-only — see ME.role==='pc' branch in actionBtns below
   const search = (document.getElementById('taskSearch')?.value||'').toLowerCase();
   const userFilterVal = document.getElementById('tasksUserFilter')?.value || 'all';
+  // Doer wala dropdown (Harsh, 4 Sep): pehle ye sirf CSV export ke liye tha,
+  // isliye chunne par list waisi ki waisi rehti thi. Ab list bhi usi doer ki
+  // ho jaati hai. Khali chhodo = sabke task.
+  const doerFilterVal = document.getElementById('hrExportDoer')?.value || '';
   const dateFrom = document.getElementById('tasksDateFrom')?.value || '';
   const dateTo = document.getElementById('tasksDateTo')?.value || '';
   const container = document.getElementById('tasksContent');
@@ -3901,13 +3906,18 @@ function renderTasksTable() {
       (t.status||'').toLowerCase().includes(search) ||
       (t.priority||'').toLowerCase().includes(search);
     const matchUser = userFilterVal === 'all' || String(t.assignedToId) === String(userFilterVal);
+    const matchDoer = !doerFilterVal || String(t.assignedToId) === String(doerFilterVal);
     const matchDateFrom = !dateFrom || (t.due_date && t.due_date >= dateFrom);
     const matchDateTo = !dateTo || (t.due_date && t.due_date <= dateTo);
-    return matchStatus && matchSearch && matchUser && matchDateFrom && matchDateTo;
+    return matchStatus && matchSearch && matchUser && matchDoer && matchDateFrom && matchDateTo;
   });
 
   if (!tasks.length) {
-    container.innerHTML = `<div class="empty" style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;">No tasks found</div>`;
+    const who = doerFilterVal
+      ? (document.getElementById('hrExportDoer')?.selectedOptions[0]?.textContent || '')
+      : '';
+    container.innerHTML = `<div class="empty" style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;">${
+      who ? `${who} ka koi task nahi mila` : 'No tasks found'}</div>`;
     return;
   }
 
@@ -4021,6 +4031,12 @@ function toggleDueDateSort() {
 }
 
 // ── All Tasks doer-wise grouping ──
+// Doer chunte hi list turant badal jaye — pehle page se shuru
+function onDoerFilterChange() {
+  allTasksPage = 1;
+  renderTasksTable();
+}
+
 function toggleTasksGroup() {
   _tasksGroupBy = !_tasksGroupBy;
   const btn = document.getElementById('groupByDoerBtn');
