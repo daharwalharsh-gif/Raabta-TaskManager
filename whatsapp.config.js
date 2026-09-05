@@ -74,5 +74,9 @@ module.exports = {
   // isi ko bar-bar confirm kiya hai.
   reminderTimes: [ { h: 10, m: 15 }, { h: 17, m: 0 } ],   // 10:15 AM & 5:00 PM
   timeoutMs:    60000,   // naya API 0.4s me jawab deta hai; buffer ke liye same rakha
-  appUrl:       process.env.APP_URL || ''
+  // Self keep-alive ka pata. Ye .env me set nahi tha, isliye keep-alive
+  // band pada tha aur Hostinger par app so jaati thi — 10:15 ka tick chalta
+  // hi nahi tha aur subah ka reminder tabhi jaata jab koi app kholta
+  // (5 Sep 2026 ko pakda). Ab yahin likha hai, taaki set karna na pade.
+  appUrl:       process.env.APP_URL || 'https://red-gazelle-125683.hostingersite.com'
 };

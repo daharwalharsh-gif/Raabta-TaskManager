@@ -1763,9 +1763,12 @@ function selfKeepAlive() {
     console.log('  Self keep-alive OFF (NODE_ENV production nahi hai)');
     return;
   }
-  const base = String(process.env.APP_URL || '').trim().replace(/\/+$/, '').replace(/\/app$/, '');
+  // Pehle .env, warna whatsapp.config.js ka appUrl — env par nirbhar nahi
+  // rehna, warna set na hone par app so jaati hai aur slot nikal jaata hai
+  const base = String(process.env.APP_URL || WA.appUrl || '').trim()
+    .replace(/\/+$/, '').replace(/\/app$/, '');
   if (!base) {
-    console.log('  Self keep-alive OFF — .env me APP_URL set karo (warna app so jayegi aur slot miss hoga)');
+    console.log('  Self keep-alive OFF — whatsapp.config.js me appUrl daalo (warna app so jayegi aur slot miss hoga)');
     return;
   }
   const url = `${base}/api/cron/wa-reminders`;
