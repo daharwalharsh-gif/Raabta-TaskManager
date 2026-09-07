@@ -3601,7 +3601,7 @@ function toggleDashDateSort() {
 // string-sort me August ke upar chadh jaate the (string me "9" > "2").
 function dashDateKey(raw) {
   const s = String(raw || '').trim();
-  if (!s) return '';
+  if (!s || s.includes('NaN')) return '';   // kharab date = bina date
   if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);          // ISO
   let m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);              // D/M/YYYY
   if (m) return m[3] + '-' + String(m[2]).padStart(2, '0') + '-' + String(m[1]).padStart(2, '0');
@@ -4523,15 +4523,46 @@ function updateChecklistPreview() {
 }
 
 function getEndDate(startDate, freq, count) {
-  const d = new Date(startDate);
+  const iso = toIsoDate(startDate);
+  if (!iso) return '';
+  const d = new Date(iso);
   const intervals = {daily:1, weekly:7, alternative_week:14, monthly:30, quarterly:90, yearly:365};
   d.setDate(d.getDate() + (intervals[freq] * (count-1)));
   return d.toISOString().split('T')[0];
 }
 
+// Start date kisi bhi roop me aa sakti hai — date picker se 2026-09-07,
+// par CSV paste se 07-09-2026 / 7/9/2026 bhi. Jo samajh na aaye uske liye
+// khali lauta do.
+// 7 Sep 2026: yahi na hone ki wajah se ek CSV import me start date parse
+// nahi hui, `new Date(...)` Invalid Date ban gayi, aur 168 checklist rows
+// due_date = "NaN-NaN-NaN" ke saath ban gayin. Invalid Date par
+// `d.getFullYear() > startYear` bhi false rehta hai (NaN > NaN), isliye
+// loop bhi nahi ruka tha.
+function toIsoDate(raw) {
+  const s = String(raw == null ? '' : raw).trim();
+  if (!s) return '';
+  let y, mo, da;
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (m) { y = +m[1]; mo = +m[2]; da = +m[3]; }
+  else {
+    m = s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/);   // DD-MM-YYYY
+    if (!m) return '';
+    da = +m[1]; mo = +m[2]; y = +m[3];
+  }
+  if (!(y >= 1970 && y <= 2100) || mo < 1 || mo > 12 || da < 1 || da > 31) return '';
+  const d = new Date(Date.UTC(y, mo - 1, da));
+  // 31-02 jaisi date agle mahine me chali jaati hai — wo bhi nahi chalegi
+  if (d.getUTCFullYear() !== y || d.getUTCMonth() !== mo - 1 || d.getUTCDate() !== da) return '';
+  return y + '-' + String(mo).padStart(2, '0') + '-' + String(da).padStart(2, '0');
+}
+
 function generateDates(startDate, freq, weekOffStr, extraOffStr) {
   const dates = [];
-  const d = new Date(startDate+'T00:00:00');
+  const iso = toIsoDate(startDate);
+  if (!iso) return dates;              // samajh nahi aayi -> ek bhi task nahi
+  const d = new Date(iso+'T00:00:00');
+  if (isNaN(d.getTime())) return dates;
   const startYear = d.getFullYear();   // generate forward only, within the start year
   const counts = {daily:365, weekly:52, alternative_week:26, monthly:12, quarterly:4, yearly:1};
   const count = counts[freq];
@@ -4742,6 +4773,7 @@ async function uploadCSVC() {
   const allUsers = await api('/api/users');
 
   let totalTasks = 0, skipped = 0;
+  const badDates = [];   // jin rows ki date samajh nahi aayi
   const validFreqs = ['daily','weekly','alternative_week','monthly','quarterly','yearly'];
 
   showToast('⏳ Generating tasks, please wait…');
@@ -4776,7 +4808,13 @@ async function uploadCSVC() {
     const extraOff = user.extra_off || '';
     const dates    = generateDates(start_date, frequency, weekOff, extraOff);
 
-    if (!dates.length) { skipped++; continue; }
+    // Date samajh nahi aayi (ya frequency galat) — is row ko chhod do.
+    // Pehle yahan Invalid Date bhi nikal jaati thi aur "NaN-NaN-NaN" wale
+    // task ban jaate the.
+    if (!dates.length) {
+      badDates.push(`${user_email} — "${start_date}"`);
+      skipped++; continue;
+    }
 
     const result = await api('/api/tasks/bulk-checklist','POST',{
       desc: description,
@@ -4791,6 +4829,10 @@ async function uploadCSVC() {
     else skipped++;
   }
 
+  if (badDates.length) {
+    showToast(`⚠️ ${badDates.length} row ki date samajh nahi aayi — ` +
+      `DD-MM-YYYY ya YYYY-MM-DD me likho. Jaise: ${badDates[0]}`, 'warning');
+  }
   showToast(`✅ ${totalTasks} tasks generated!${skipped ? ` (${skipped} rows skipped)` : ''}`);
   closeModal('checklistModal');
   loadDashboard();
@@ -5914,6 +5956,7 @@ function switchCRMTab(tab, el) {
 function crmDateKey(d) {
   if (!d) return '';
   d = String(d).trim();
+  if (d.includes('NaN')) return '';         // kharab date = bina date
   if (/^\d{4}-\d{2}-\d{2}/.test(d)) return d.slice(0, 10);
   const m = d.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/);
   if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
@@ -6741,6 +6784,9 @@ function showToast(msg,type='success') {
 function normDate(d) {
   if (d === null || d === undefined) return '';
   const s = String(d).trim();
+  // Purane kharab rows me date literally "NaN-NaN-NaN" likhi hai — usse
+  // khali maano, taaki screen par "—" aaye, NaN nahi
+  if (!s || s.includes('NaN')) return '';
   if (/^\d{5}$/.test(s)) {                       // Excel serial (~1970-2070)
     const n = parseInt(s, 10);
     if (n > 20000 && n < 60000) {

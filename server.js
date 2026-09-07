@@ -2342,11 +2342,29 @@ app.post('/api/tasks', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// due_date sirf asli YYYY-MM-DD ho — "NaN-NaN-NaN", "abc", 31-02 kuch nahi.
+// 7 Sep 2026: browser se NaN wali date aa gayi thi aur 168 rows kharab ban
+// gayi thin. Ab aakhri taala yahan hai — client me bug ho tab bhi DB saaf.
+function isRealDate(v) {
+  const m = String(v == null ? '' : v).trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return false;
+  const y = +m[1], mo = +m[2], da = +m[3];
+  if (y < 1970 || y > 2100 || mo < 1 || mo > 12 || da < 1 || da > 31) return false;
+  const d = new Date(Date.UTC(y, mo - 1, da));
+  return d.getUTCFullYear() === y && d.getUTCMonth() === mo - 1 && d.getUTCDate() === da;
+}
+
 app.post('/api/tasks/bulk-checklist', requireAuth, requireAdmin, async (req, res) => {
   try {
     const db = await getDB();
-    const { desc, assignedTo, priority, remarks, dates, frequency } = req.body;
-    if (!desc || !assignedTo || !dates || !dates.length) return res.status(400).json({ error: 'Missing fields' });
+    const { desc, assignedTo, priority, remarks, dates: rawDates, frequency } = req.body;
+    if (!desc || !assignedTo || !rawDates || !rawDates.length) return res.status(400).json({ error: 'Missing fields' });
+    const dates = rawDates.filter(isRealDate);
+    if (!dates.length) {
+      return res.status(400).json({
+        error: 'Date theek nahi hai — koi bhi task nahi banaya. Start date DD-MM-YYYY ya YYYY-MM-DD me do.'
+      });
+    }
     const freq = (frequency || '').toLowerCase().trim();
     const nowStr = new Date().toISOString().replace('T', ' ').split('.')[0];
     const doerNm = await doerNameFor(assignedTo);
