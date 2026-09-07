@@ -5971,6 +5971,13 @@ async function checklistPeek(name) {
       kul: mine.length,
       khule: open.length,
       khali_date: mine.filter(t => !String(t.due_date == null ? '' : t.due_date).trim()).length,
+      ek_hi_din_par: (() => {
+        // kaunsi date par kitne task — agar 168 ek hi din par hain to yahin dikh jayega
+        const c = {};
+        open.forEach(t => { const v = String(t.due_date || '').trim(); c[v] = (c[v] || 0) + 1; });
+        return Object.entries(c).sort((a, b) => b[1] - a[1]).slice(0, 5)
+          .map(([dt, n]) => `${dt}: ${n}`);
+      })(),
       namune: open.slice(0, 5).map(t => ({
         id: t.id, due_date: t.due_date, kis_kism_ka: typeof t.due_date,
         status: t.status, frequency: t.frequency
