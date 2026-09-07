@@ -5924,6 +5924,25 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
       const rows = await d.findWhere('App_State', { key_name: 'checklist_blank_date_fix_v3' });
       dateFix = (rows && rows.length) ? (rows[0].value || 'done') : 'abhi nahi chala';
     } catch { /* koi baat nahi */ }
+    // Checklist ki due_date ka haal — kitni theek, kitni khali/NaN.
+    // (7 Sep 2026: screen par "—" dikh raha tha par DB me kuch rows theek
+    // thin — ginti kiye bina andaza lagana galat tha.)
+    let dateHealth = null;
+    try {
+      const d = await getDB();
+      const all = await d.findAll('Checklist_Tasks');
+      let okc = 0, nan = 0, blank = 0, other = 0;
+      const samples = [];
+      all.forEach(t => {
+        const v = String(t.due_date == null ? '' : t.due_date).trim();
+        if (!v) blank++;
+        else if (v.includes('NaN')) nan++;
+        else if (/^\d{4}-\d{2}-\d{2}$/.test(v)) okc++;
+        else { other++; if (samples.length < 3) samples.push(v.slice(0, 30)); }
+      });
+      dateHealth = `kul ${all.length} | theek ${okc} | NaN ${nan} | khali ${blank} | ajeeb ${other}` +
+                   (samples.length ? ` (jaise: ${samples.join(' , ')})` : '');
+    } catch { /* koi baat nahi */ }
     // Atke hue message ab bhej do
     drainWhatsAppOutbox().catch(() => {});
 
@@ -5936,6 +5955,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
       outbox,
       backfill,
       checklistDateFix: dateFix,
+      checklistDateHealth: dateHealth,
       status: slot
         ? (sentToday ? 'is slot ka reminder aaj ja chuka hai' : 'slot-window-me-hai (pass chal raha)')
         : 'outside-slot-window',
