@@ -5880,6 +5880,33 @@ async function appStateValue(key) {
   } catch { return null; }
 }
 
+// Jinki date ajeeb hai unka namuna — kis doer ki, kaunsi id, kya likha hai.
+// (7 Sep: screen par "—" dikh raha tha; bina namune dekhe do baar galat
+// natija nikala. Ab pehle dekh lete hain.)
+async function checklistOddSample(limit) {
+  try {
+    const d = await getDB();
+    const all = await d.findAll('Checklist_Tasks');
+    const odd = all.filter(t => {
+      const v = String(t.due_date == null ? '' : t.due_date).trim();
+      return v && !/^\d{4}-\d{2}-\d{2}$/.test(v);
+    });
+    const byDoer = {};
+    odd.forEach(t => {
+      const n = t.doer_name || ('id ' + t.assigned_to);
+      byDoer[n] = (byDoer[n] || 0) + 1;
+    });
+    return {
+      kitni: odd.length,
+      kis_kis_ki: byDoer,
+      namune: odd.slice(0, limit || 6).map(t => ({
+        id: t.id, due_date: t.due_date, frequency: t.frequency,
+        status: t.status, doer: t.doer_name || ''
+      }))
+    };
+  } catch (e) { return { error: e.message }; }
+}
+
 // Checklist ki due_date ka haal — kitni theek, kitni khali/NaN
 async function checklistDateHealth() {
   try {
@@ -5910,6 +5937,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
       return res.json({
         skipped: 'monday', now: istTime,
         checklistDateHealth: await checklistDateHealth(),
+        checklistOdd: await checklistOddSample(6),
         checklistDateFix: await appStateValue('checklist_blank_date_fix_v3'),
         keepAlive: _keepAliveUrl ? `ON — har 4 min self-ping (${_keepAliveUrl})` : 'OFF'
       });
@@ -5978,6 +6006,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
       backfill,
       checklistDateFix: dateFix,
       checklistDateHealth: dateHealth,
+      checklistOdd: await checklistOddSample(6),
       status: slot
         ? (sentToday ? 'is slot ka reminder aaj ja chuka hai' : 'slot-window-me-hai (pass chal raha)')
         : 'outside-slot-window',
