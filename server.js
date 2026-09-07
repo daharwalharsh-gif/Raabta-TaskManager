@@ -5907,6 +5907,28 @@ async function checklistOddSample(limit) {
   } catch (e) { return { error: e.message }; }
 }
 
+// Kisi ek doer ki checklist rows jhaank kar dekho — sirf id/date/status.
+// Description NAHI bhejte (endpoint public hai). Diagnose ke liye:
+//   /api/cron/wa-reminders?peek=ravi
+async function checklistPeek(name) {
+  try {
+    const d = await getDB();
+    const all = await d.findAll('Checklist_Tasks');
+    const q = String(name || '').toLowerCase();
+    const mine = all.filter(t => String(t.doer_name || '').toLowerCase().includes(q));
+    const open = mine.filter(t => t.status === 'pending' || t.status === 'revised');
+    return {
+      kul: mine.length,
+      khule: open.length,
+      khali_date: mine.filter(t => !String(t.due_date == null ? '' : t.due_date).trim()).length,
+      namune: open.slice(0, 5).map(t => ({
+        id: t.id, due_date: t.due_date, kis_kism_ka: typeof t.due_date,
+        status: t.status, frequency: t.frequency
+      }))
+    };
+  } catch (e) { return { error: e.message }; }
+}
+
 // Checklist ki due_date ka haal — kitni theek, kitni khali/NaN
 async function checklistDateHealth() {
   try {
@@ -5938,6 +5960,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
         skipped: 'monday', now: istTime,
         checklistDateHealth: await checklistDateHealth(),
         checklistOdd: await checklistOddSample(6),
+        checklistPeek: req.query.peek ? await checklistPeek(String(req.query.peek)) : undefined,
         checklistDateFix: await appStateValue('checklist_blank_date_fix_v3'),
         keepAlive: _keepAliveUrl ? `ON — har 4 min self-ping (${_keepAliveUrl})` : 'OFF'
       });
@@ -6007,6 +6030,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
       checklistDateFix: dateFix,
       checklistDateHealth: dateHealth,
       checklistOdd: await checklistOddSample(6),
+      checklistPeek: req.query.peek ? await checklistPeek(String(req.query.peek)) : undefined,
       status: slot
         ? (sentToday ? 'is slot ka reminder aaj ja chuka hai' : 'slot-window-me-hai (pass chal raha)')
         : 'outside-slot-window',
