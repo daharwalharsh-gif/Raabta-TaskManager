@@ -2689,6 +2689,56 @@ function seriesFrom(startYmd, freq, count) {
   return out;
 }
 
+// ── ULTI LIKHI DATE SEEDHI KARO (DD-MM-YYYY -> YYYY-MM-DD) ──────
+// 7 Sep 2026 ki ginti: 4999 checklist rows me se 84 ki due_date
+// "08-09-2026" jaisi thi (HR ki 82, Reet ki 2), baaki 4915 theek.
+// Ye sirf dikhne ki baat nahi -- poora app date ko YYYY-MM-DD maan kar
+// SEEDHE compare karta hai (sort, overdue, reminder ka cutoff). "08-09-2026"
+// me pehla akshar '0' hai, isliye wo har cutoff se chhoti nikalti hai aur
+// row hamesha "due" lagti hai. Isliye DB me hi seedhi kar dete hain.
+//
+// DD-MM-YYYY hai ya MM-DD-YYYY? Rows ka apna kram batata hai: ek monthly
+// batch me 08-09-2026, 08-10-2026, 08-11-2026, 08-12-2026 — mahina badal
+// raha hai, din nahi. Yaani DD pehle.
+function flipToIso(v) {
+  const m = String(v == null ? '' : v).trim().match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/);
+  if (!m) return '';
+  const da = +m[1], mo = +m[2], y = +m[3];
+  if (mo < 1 || mo > 12 || da < 1 || da > 31) return '';
+  const d = new Date(Date.UTC(y, mo - 1, da));
+  if (d.getUTCFullYear() !== y || d.getUTCMonth() !== mo - 1 || d.getUTCDate() !== da) return '';
+  return y + '-' + String(mo).padStart(2, '0') + '-' + String(da).padStart(2, '0');
+}
+
+async function fixChecklistDateFormat() {
+  const MARKER = 'checklist_date_format_fix_v1';
+  try {
+    const d = await getDB();
+    await ensureAppStateTab(d);
+    const done = await d.findWhere('App_State', { key_name: MARKER });
+    if (done && done.length) return;
+
+    const all = await d.findAll('Checklist_Tasks').catch(() => []);
+    const nowStr = new Date(Date.now() + 330 * 60000).toISOString().replace('T', ' ').split('.')[0];
+
+    let fixed = 0, chhodi = 0;
+    for (const t of all) {
+      const v = String(t.due_date == null ? '' : t.due_date).trim();
+      if (!v || /^\d{4}-\d{2}-\d{2}$/.test(v)) continue;   // pehle se theek
+      const iso = flipToIso(v);
+      if (!iso) { chhodi++; continue; }                      // samajh na aaye to haath mat lagao
+      try { await d.update('Checklist_Tasks', t.id, { due_date: iso }); fixed++; }
+      catch { chhodi++; }
+    }
+
+    const msg = `${fixed} ulti date seedhi ki` + (chhodi ? `, ${chhodi} samajh nahi aayi (chhod di)` : '');
+    await d.insert('App_State', { key_name: MARKER, value: msg, updated_at: nowStr });
+    console.log('  \u2705 checklist date format: ' + msg);
+  } catch (e) {
+    console.error('  fixChecklistDateFormat error (agli baar retry hogi):', e.message);
+  }
+}
+
 async function repairNaNChecklistDates() {
   const MARKER = 'checklist_blank_date_fix_v3';
   try {
@@ -5962,6 +6012,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
         checklistOdd: await checklistOddSample(6),
         checklistPeek: req.query.peek ? await checklistPeek(String(req.query.peek)) : undefined,
         checklistDateFix: await appStateValue('checklist_blank_date_fix_v3'),
+        checklistFormatFix: await appStateValue('checklist_date_format_fix_v1'),
         keepAlive: _keepAliveUrl ? `ON — har 4 min self-ping (${_keepAliveUrl})` : 'OFF'
       });
     }
@@ -6028,6 +6079,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
       outbox,
       backfill,
       checklistDateFix: dateFix,
+      checklistFormatFix: await appStateValue('checklist_date_format_fix_v1'),
       checklistDateHealth: dateHealth,
       checklistOdd: await checklistOddSample(6),
       checklistPeek: req.query.peek ? await checklistPeek(String(req.query.peek)) : undefined,
@@ -6749,6 +6801,7 @@ async function seedAdminIfNeeded() {
       .then(() => runOneTimeMigrations())
       .then(() => setTimeout(() => backfillChecklistDoerName().catch(() => {}), 25 * 1000))
       .then(() => setTimeout(() => repairNaNChecklistDates().catch(() => {}), 35 * 1000))
+      .then(() => setTimeout(() => fixChecklistDateFormat().catch(() => {}), 45 * 1000))
       // Outbox aane se pehle jo assign-alert gum ho gaye — ek baar bhej do
       .then(() => setTimeout(() => backfillMissedAssignAlerts().catch(() => {}), 45 * 1000))
       .then(() => setTimeout(() => resetTimedOutOutbox().catch(() => {}), 55 * 1000))
