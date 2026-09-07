@@ -5871,12 +5871,49 @@ app.post('/api/admin/run-reminders', requireAuth, requireAdmin, async (req, res)
 // hai (scheduler ke saath shared _waFiredSlots se dedup — double kabhi nahi).
 // Wahi catch-up logic jo scheduler aur request-hook use karte hain, taaki
 // teeno raste ek jaise chalein. Status bhi wapas bhejta hai (diagnose ke liye).
+// App_State me rakhi kisi ek value ko padho (marker chala ya nahi)
+async function appStateValue(key) {
+  try {
+    const d = await getDB();
+    const rows = await d.findWhere('App_State', { key_name: key });
+    return (rows && rows.length) ? (rows[0].value || 'done') : 'abhi nahi chala';
+  } catch { return null; }
+}
+
+// Checklist ki due_date ka haal — kitni theek, kitni khali/NaN
+async function checklistDateHealth() {
+  try {
+    const d = await getDB();
+    const all = await d.findAll('Checklist_Tasks');
+    let okc = 0, nan = 0, blank = 0, other = 0;
+    const samples = [];
+    all.forEach(t => {
+      const v = String(t.due_date == null ? '' : t.due_date).trim();
+      if (!v) blank++;
+      else if (v.includes('NaN')) nan++;
+      else if (/^\d{4}-\d{2}-\d{2}$/.test(v)) okc++;
+      else { other++; if (samples.length < 3) samples.push(v.slice(0, 30)); }
+    });
+    return `kul ${all.length} | theek ${okc} | NaN ${nan} | khali ${blank} | ajeeb ${other}` +
+           (samples.length ? ` (jaise: ${samples.join(' , ')})` : '');
+  } catch { return null; }
+}
+
 app.get('/api/cron/wa-reminders', async (req, res) => {
   try {
     if (!WA.enabled || !WA.url || !WA.apiKey) return res.json({ skipped: 'not-configured' });
     const ist = new Date(Date.now() + 330 * 60000);
     const istTime = ist.toISOString().replace('T', ' ').slice(0, 16) + ' IST';
-    if (ist.getUTCDay() === 1) return res.json({ skipped: 'monday', now: istTime });
+    if (ist.getUTCDay() === 1) {
+      // Reminder Monday ko nahi jaate (Harsh ka niyam) — par diagnose ki
+      // baatein phir bhi batao, warna Monday ko kuch dekha hi nahi ja sakta
+      return res.json({
+        skipped: 'monday', now: istTime,
+        checklistDateHealth: await checklistDateHealth(),
+        checklistDateFix: await appStateValue('checklist_blank_date_fix_v3'),
+        keepAlive: _keepAliveUrl ? `ON — har 4 min self-ping (${_keepAliveUrl})` : 'OFF'
+      });
+    }
     // Background me chalao — Aumpfy slow hai (~50s/msg), request ko mat latkao
     checkAndFireDueSlots()
       .then(r => console.log('  WA reminders (cron):', JSON.stringify(r)))
@@ -5927,22 +5964,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
     // Checklist ki due_date ka haal — kitni theek, kitni khali/NaN.
     // (7 Sep 2026: screen par "—" dikh raha tha par DB me kuch rows theek
     // thin — ginti kiye bina andaza lagana galat tha.)
-    let dateHealth = null;
-    try {
-      const d = await getDB();
-      const all = await d.findAll('Checklist_Tasks');
-      let okc = 0, nan = 0, blank = 0, other = 0;
-      const samples = [];
-      all.forEach(t => {
-        const v = String(t.due_date == null ? '' : t.due_date).trim();
-        if (!v) blank++;
-        else if (v.includes('NaN')) nan++;
-        else if (/^\d{4}-\d{2}-\d{2}$/.test(v)) okc++;
-        else { other++; if (samples.length < 3) samples.push(v.slice(0, 30)); }
-      });
-      dateHealth = `kul ${all.length} | theek ${okc} | NaN ${nan} | khali ${blank} | ajeeb ${other}` +
-                   (samples.length ? ` (jaise: ${samples.join(' , ')})` : '');
-    } catch { /* koi baat nahi */ }
+    const dateHealth = await checklistDateHealth();
     // Atke hue message ab bhej do
     drainWhatsAppOutbox().catch(() => {});
 
