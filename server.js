@@ -2647,49 +2647,16 @@ app.post('/api/tasks/checklist-reassign-assigner', requireAuth, requireAdmin, as
 // Purane checklist rows me doer_name khali hai — ek baar bhar dete hain.
 // MySQL par ek hi UPDATE...JOIN se (6000+ rows bhi pal bhar me), warna
 // row-by-row. Marker se sirf ek baar chalta hai.
-// ── PURANI "NaN-NaN-NaN" DATE THEEK KARO (Harsh, 7 Sep 2026) ────────
-// Kuch checklist rows ki due_date literally "NaN-NaN-NaN" hai — CSV import
-// me start date parse nahi hui thi (wo bug ab band hai). Un rows me asli
-// date kahin bachi nahi, sirf `created_at` (jab upload hua) bacha hai.
-// Harsh ne kaha: "date to mention karo jo us time usne upload kiya hoga".
-// Isliye: har batch ki SHURUAAT upload wale din se, aur aage ki dates uski
-// apni frequency ke hisaab se — jaisi banni chahiye thi.
-// Ek batch = ek hi doer + ek hi description + ek hi frequency + ek hi
-// created_at. Row ka kram id se (jis kram me bani thin).
-
-// "2026-09-07 05:12:33" -> {y,m,d}. Na samjhe to null.
-function ymdFromStamp(stamp) {
-  const m = String(stamp || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (!m) return null;
-  return { y: +m[1], mo: +m[2], d: +m[3] };
-}
-
-// Ek batch ke liye utni dates jitni rows hain — frequency ke hisaab se aage
-// badhte hue. 'daily' me Sunday chhodte hain, bilkul jaise app banata hai.
-function seriesFrom(startYmd, freq, count) {
-  const out = [];
-  const d = new Date(Date.UTC(startYmd.y, startYmd.mo - 1, startYmd.d));
-  const iso = () => d.toISOString().split('T')[0];
-  let safety = count * 14 + 40;
-  while (out.length < count && safety-- > 0) {
-    if (freq === 'daily' && d.getUTCDay() === 0) {   // Sunday chhodo
-      d.setUTCDate(d.getUTCDate() + 1);
-      continue;
-    }
-    out.push(iso());
-    if (freq === 'daily')                    d.setUTCDate(d.getUTCDate() + 1);
-    else if (freq === 'weekly')              d.setUTCDate(d.getUTCDate() + 7);
-    else if (freq === 'alternative_week')    d.setUTCDate(d.getUTCDate() + 14);
-    else if (freq === 'monthly')             d.setUTCMonth(d.getUTCMonth() + 1);
-    else if (freq === 'quarterly')           d.setUTCMonth(d.getUTCMonth() + 3);
-    else if (freq === 'yearly')              d.setUTCFullYear(d.getUTCFullYear() + 1);
-    else                                     d.setUTCDate(d.getUTCDate() + 1);   // pata nahi to roz
-  }
-  return out;
-}
-
+// ── KHALI DATE WALE CHECKLIST TASK ── KAL KI DATE DAAL DO ──────
+// Kuch checklist rows ki due_date "NaN-NaN-NaN" ban gayi thi (CSV import me
+// start date parse nahi hui thi — wo bug ab band hai), aur kuch bilkul
+// khali hain. Screen par dono "—" dikhti hain.
+// Harsh (7 Sep 2026): "sab me kal ki date daal do, jo blank date show ho
+// rahi hai." Asli date kahin bachi nahi thi, isliye sabko KAL par laga dete
+// hain — taaki kaam dobara samne aa jaye.
+// Sirf Checklist_Tasks — delegation ko haath nahi lagate.
 async function repairNaNChecklistDates() {
-  const MARKER = 'checklist_nan_date_fix_v1';
+  const MARKER = 'checklist_blank_date_fix_v2';
   try {
     const d = await getDB();
     await ensureAppStateTab(d);
@@ -2697,40 +2664,41 @@ async function repairNaNChecklistDates() {
     if (done && done.length) return;
 
     const all = await d.findAll('Checklist_Tasks').catch(() => []);
-    const bad = all.filter(t => String(t.due_date || '').includes('NaN'));
+    // "Blank dikhne wali" = khali bhi, aur NaN wali bhi
+    const bad = all.filter(t => {
+      const v = String(t.due_date == null ? '' : t.due_date).trim();
+      return !v || v.includes('NaN');
+    });
+
     const nowStr = new Date(Date.now() + 330 * 60000).toISOString().replace('T', ' ').split('.')[0];
+    // Kal, IST ke hisaab se
+    const tomorrow = new Date(Date.now() + 330 * 60000 + 86400000).toISOString().split('T')[0];
 
     if (!bad.length) {
-      await d.insert('App_State', { key_name: MARKER, value: 'kuch kharab row mili hi nahi', updated_at: nowStr });
-      console.log('  checklist NaN-date: koi kharab row nahi mili');
+      await d.insert('App_State', { key_name: MARKER, value: 'koi khali-date row mili hi nahi', updated_at: nowStr });
+      console.log('  checklist blank-date: koi row nahi mili');
       return;
     }
 
-    // Batch banao — ek hi doer + kaam + frequency + upload waqt
-    const batches = {};
-    bad.forEach(t => {
-      const key = [t.assigned_to, t.description, t.frequency, t.created_at].join('|~|');
-      (batches[key] = batches[key] || []).push(t);
-    });
-
-    let fixed = 0, skipped = 0;
-    for (const key of Object.keys(batches)) {
-      const rows = batches[key].sort((a, b) => (parseInt(a.id) || 0) - (parseInt(b.id) || 0));
-      const start = ymdFromStamp(rows[0].created_at);
-      if (!start) { skipped += rows.length; continue; }   // upload ka waqt bhi nahi — chhod do
-      const freq = String(rows[0].frequency || '').toLowerCase().trim();
-      const dates = seriesFrom(start, freq, rows.length);
-      for (let i = 0; i < rows.length; i++) {
-        if (!dates[i]) { skipped++; continue; }
-        await d.update('Checklist_Tasks', rows[i].id, { due_date: dates[i] }).catch(() => { skipped++; });
-        fixed++;
+    let fixed = 0, failed = 0;
+    if (d.pool) {
+      // MySQL — ek hi query, sabse tez
+      const [r] = await d.pool.query(
+        'UPDATE `Checklist_Tasks` SET due_date = ? ' +
+        "WHERE due_date IS NULL OR TRIM(due_date) = '' OR due_date LIKE '%NaN%'",
+        [tomorrow]
+      );
+      fixed = (r && r.affectedRows) || 0;
+    } else {
+      for (const t of bad) {
+        try { await d.update('Checklist_Tasks', t.id, { due_date: tomorrow }); fixed++; }
+        catch { failed++; }
       }
     }
 
-    const msg = `${fixed} row theek ki` + (skipped ? `, ${skipped} chhodi` : '') +
-                ` (${Object.keys(batches).length} batch)`;
+    const msg = `${fixed} row par ${tomorrow} lagayi` + (failed ? `, ${failed} nahi ho payi` : '');
     await d.insert('App_State', { key_name: MARKER, value: msg, updated_at: nowStr });
-    console.log('  ✅ checklist NaN-date: ' + msg);
+    console.log('  \u2705 checklist blank-date: ' + msg);
   } catch (e) {
     console.error('  repairNaNChecklistDates error (agli baar retry hogi):', e.message);
   }
@@ -5914,7 +5882,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
     let dateFix = null;
     try {
       const d = await getDB();
-      const rows = await d.findWhere('App_State', { key_name: 'checklist_nan_date_fix_v1' });
+      const rows = await d.findWhere('App_State', { key_name: 'checklist_blank_date_fix_v2' });
       dateFix = (rows && rows.length) ? (rows[0].value || 'done') : 'abhi nahi chala';
     } catch { /* koi baat nahi */ }
     // Atke hue message ab bhej do
