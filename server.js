@@ -1778,7 +1778,10 @@ function selfKeepAlive() {
   }
   const url = `${base}/api/cron/wa-reminders`;
   _keepAliveUrl = url;
-  const EVERY_MIN = 4;   // Hostinger ~5+ min idle par sulata hai, usse pehle jagao
+  // 8 Sep 2026: 4 min ka gap Hostinger ke idle-timeout ke bahut kareeb tha --
+  // ek bhi ping late/fail hua to app so jaati thi aur subah ka slot nikal
+  // jaata tha. 2 min par do ping fail hone par bhi guzaara ho jayega.
+  const EVERY_MIN = 2;
 
   const ping = async () => {
     try {
