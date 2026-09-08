@@ -1756,6 +1756,11 @@ function waRequestHook(req, res, next) {
 // minute me ek request bhejti hai — traffic bana rehta hai, app jaagti rehti
 // hai, aur slot apne aap chal jaata hai (kisi bahri cron ki zaroorat nahi).
 let _keepAliveUrl = null;   // diagnostic endpoint ise dikhata hai
+// Ye process kab shuru hua. Agar subah har baar naya process milta hai to
+// matlab Hostinger ne raat me app ko sula/maar diya tha -- aur soyi hui app
+// khud ko ping nahi kar sakti, isliye 10:15 ka tick nikal jaata hai.
+// (8 Sep 2026 ko yahi shak hua, isliye ginti ke liye daala.)
+const _bootAt = Date.now();
 function selfKeepAlive() {
   // Sirf live server par — local machine par chala to test karte waqt asli
   // reminders chale jaate
@@ -5921,6 +5926,15 @@ app.post('/api/admin/run-reminders', requireAuth, requireAdmin, async (req, res)
 // hai (scheduler ke saath shared _waFiredSlots se dedup — double kabhi nahi).
 // Wahi catch-up logic jo scheduler aur request-hook use karte hain, taaki
 // teeno raste ek jaise chalein. Status bhi wapas bhejta hai (diagnose ke liye).
+// "2 ghante 13 min" jaisa — app kab se chal rahi hai
+function uptimeText() {
+  const ms = Date.now() - _bootAt;
+  const min = Math.floor(ms / 60000);
+  const h = Math.floor(min / 60);
+  return (h ? h + ' ghante ' : '') + (min % 60) + ' min se chal rahi hai' +
+         ' (boot: ' + new Date(_bootAt + 330 * 60000).toISOString().replace('T', ' ').slice(0, 16) + ' IST)';
+}
+
 // App_State me rakhi kisi ek value ko padho (marker chala ya nahi)
 async function appStateValue(key) {
   try {
@@ -6020,7 +6034,8 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
         checklistPeek: req.query.peek ? await checklistPeek(String(req.query.peek)) : undefined,
         checklistDateFix: await appStateValue('checklist_blank_date_fix_v3'),
         checklistFormatFix: await appStateValue('checklist_date_format_fix_v1'),
-        keepAlive: _keepAliveUrl ? `ON — har 4 min self-ping (${_keepAliveUrl})` : 'OFF'
+        keepAlive: _keepAliveUrl ? `ON — har 4 min self-ping (${_keepAliveUrl})` : 'OFF',
+        uptime: uptimeText(), pid: process.pid
       });
     }
     // Background me chalao — Aumpfy slow hai (~50s/msg), request ko mat latkao
@@ -6106,7 +6121,11 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
         : ((process.env.NODE_ENV || '').toLowerCase() !== 'production'
             ? 'OFF — NODE_ENV production nahi hai'
             : 'OFF — .env me APP_URL set karo, phir restart'),
-      keptAlive: true
+      keptAlive: true,
+      // App kitni der se chal rahi hai + kaunsa process. Subah agar uptime
+      // chand minute ka ho, to app raat me soyi thi -- wahi slot miss hone
+      // ki asli wajah hai.
+      uptime: uptimeText(), pid: process.pid
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
