@@ -2918,8 +2918,11 @@ async function init() {
     if (ME.role === 'admin' || ME.role === 'hod' || ME.role === 'pc') {
       document.getElementById('nav-records').style.display = 'flex';
     }
-    // CRM tab — sirf admin aur pc@raabtajewels.com ko dikhta hai
-    if (ME.role === 'admin' || (ME.email || '').toLowerCase() === 'pc@raabtajewels.com') {
+    // PC tab — admin ko hamesha, aur in emails ko (chahe role 'user' ho).
+    // Server par bhi yahi list hai (PC_EMAILS) — dono saath badalni hain,
+    // warna tab to dikhega par data 403 de dega.
+    const PC_EMAILS = ['pc@raabtajewels.com', 'nishant@raabtajewels.com'];
+    if (ME.role === 'admin' || PC_EMAILS.includes((ME.email || '').trim().toLowerCase())) {
       document.getElementById('nav-crm').style.display = 'flex';
     }
     // Maintenance tab kise dikhe (server ka maintView flag batata hai):

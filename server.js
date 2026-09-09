@@ -1761,6 +1761,8 @@ let _keepAliveUrl = null;   // diagnostic endpoint ise dikhata hai
 // khud ko ping nahi kar sakti, isliye 10:15 ka tick nikal jaata hai.
 // (8 Sep 2026 ko yahi shak hua, isliye ginti ke liye daala.)
 const _bootAt = Date.now();
+// Self-ping ka gap — ek hi jagah, taaki status me bhi wahi number dikhe
+const KEEP_ALIVE_MIN = 2;
 function selfKeepAlive() {
   // Sirf live server par — local machine par chala to test karte waqt asli
   // reminders chale jaate
@@ -1781,7 +1783,7 @@ function selfKeepAlive() {
   // 8 Sep 2026: 4 min ka gap Hostinger ke idle-timeout ke bahut kareeb tha --
   // ek bhi ping late/fail hua to app so jaati thi aur subah ka slot nikal
   // jaata tha. 2 min par do ping fail hone par bhi guzaara ho jayega.
-  const EVERY_MIN = 2;
+  const EVERY_MIN = KEEP_ALIVE_MIN;
 
   const ping = async () => {
     try {
@@ -2197,15 +2199,19 @@ app.get('/api/tasks', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// PC tab kaun dekh sakta hai. Admin ko hamesha; aur in emails ko, chahe
+// unka role normal 'user' ho. Naya banda dena ho to bas yahan naam jodo
+// (frontend ki list bhi isi ke saath badalni hai — PC_EMAILS).
+// Harsh, 9 Sep 2026: Nishant ko bhi PC tab dena hai.
+const PC_EMAILS = ['pc@raabtajewels.com', 'nishant@raabtajewels.com'];
+
 // CRM data — SABHI doers ke pending/revised tasks (delegation + checklist).
-// Sirf admin ya pc@raabtajewels.com ke liye (CRM tab wahi dekhte hain) —
-// pc account ka role 'user' ho tab bhi yahan sabka data milta hai.
 app.get('/api/crm/tasks', requireAuth, async (req, res) => {
   try {
     let allowed = req.session.role === 'admin';
     if (!allowed) {
       const me = await db.findOne('Users', { id: String(req.session.userId) });
-      allowed = ((me?.email || '').trim().toLowerCase() === 'pc@raabtajewels.com');
+      allowed = PC_EMAILS.includes((me?.email || '').trim().toLowerCase());
     }
     if (!allowed) return res.status(403).json({ error: 'Not allowed' });
 
@@ -6120,7 +6126,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
       // Self keep-alive: app khud ko jagati rehti hai — iske bina Hostinger
       // app ko sula deta hai aur slot miss ho jaata hai
       keepAlive: _keepAliveUrl
-        ? `ON — har 4 min self-ping (${_keepAliveUrl})`
+        ? `ON — har ${KEEP_ALIVE_MIN} min self-ping (${_keepAliveUrl})`
         : ((process.env.NODE_ENV || '').toLowerCase() !== 'production'
             ? 'OFF — NODE_ENV production nahi hai'
             : 'OFF — .env me APP_URL set karo, phir restart'),
