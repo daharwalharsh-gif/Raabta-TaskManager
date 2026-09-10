@@ -5980,6 +5980,29 @@ async function checklistOddSample(limit) {
   } catch (e) { return { error: e.message }; }
 }
 
+// Jin task ka doer resolve nahi hota (Users me wo id hai hi nahi, ya
+// assigned_to khali hai) -- All Tasks/PC me unka group "-" ban jaata hai.
+// 10 Sep 2026: Harsh ne aisa hi ek group dekha, isliye ye jhaank.
+async function orphanDoers() {
+  try {
+    const d = await getDB();
+    const [chl, del, users] = await Promise.all([
+      d.findAll('Checklist_Tasks'), d.findAll('Delegation_Tasks'), d.findAll('Users')
+    ]);
+    const known = new Set(users.map(u => String(u.id)));
+    const pick = (rows, kind) => rows
+      .filter(t => (t.status === 'pending' || t.status === 'revised'))
+      .filter(t => !known.has(String(t.assigned_to || '')))
+      .map(t => ({
+        kind, id: t.id, assigned_to: t.assigned_to, doer_name: t.doer_name || '',
+        assigned_by: t.assigned_by, due_date: t.due_date, status: t.status,
+        desc: String(t.description || '').slice(0, 40)
+      }));
+    const all = pick(chl, 'checklist').concat(pick(del, 'delegation'));
+    return { kitne: all.length, users_me_kitni_ids: known.size, namune: all.slice(0, 10) };
+  } catch (e) { return { error: e.message }; }
+}
+
 // Kisi ek doer ki checklist rows jhaank kar dekho — sirf id/date/status.
 // Description NAHI bhejte (endpoint public hai). Diagnose ke liye:
 //   /api/cron/wa-reminders?peek=ravi
@@ -6041,6 +6064,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
         checklistDateHealth: await checklistDateHealth(),
         checklistOdd: await checklistOddSample(6),
         checklistPeek: req.query.peek ? await checklistPeek(String(req.query.peek)) : undefined,
+        orphanDoers: req.query.orphans ? await orphanDoers() : undefined,
         checklistDateFix: await appStateValue('checklist_blank_date_fix_v3'),
         checklistFormatFix: await appStateValue('checklist_date_format_fix_v1'),
         keepAlive: _keepAliveUrl ? `ON — har 4 min self-ping (${_keepAliveUrl})` : 'OFF',
@@ -6114,6 +6138,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
       checklistDateHealth: dateHealth,
       checklistOdd: await checklistOddSample(6),
       checklistPeek: req.query.peek ? await checklistPeek(String(req.query.peek)) : undefined,
+      orphanDoers: req.query.orphans ? await orphanDoers() : undefined,
       status: slot
         ? (sentToday ? 'is slot ka reminder aaj ja chuka hai' : 'slot-window-me-hai (pass chal raha)')
         : 'outside-slot-window',
