@@ -6409,8 +6409,8 @@ async function checkMaintLowBalance(why) {
         '\u26A0\uFE0F *Maintenance Balance Alert*\n\n' +
         'Office Cash ka balance *' + maintRupees(b.balance) + '* reh gaya hai.\n' +
         '(Alert limit: ' + maintRupees(MAINT_LOW_LIMIT) + ')\n\n' +
-        'Total Received: ' + maintRupees(b.totalIn) + '\n' +
-        'Total Spent: ' + maintRupees(b.totalOut) + '\n\n' +
+        // Harsh, 10 Sep 2026: Received/Spent ki do line hata di \u2014 message me
+        // sirf abhi ka balance aur limit chahiye, aur kuch nahi.
         '\u2014 Raabta Task Manager';
       await queueWhatsApp(MAINT_LOW_PHONE, msg, 'maint-low',
         'maint-low-' + nowStr.split(' ')[0], 'Rahul Sir');
