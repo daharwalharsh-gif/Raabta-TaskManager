@@ -4241,6 +4241,29 @@ app.put('/api/users/:id', requireAuth, requireAdmin, async (req, res) => {
 app.delete('/api/users/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
     if (parseInt(req.params.id) === req.session.userId) return res.status(400).json({ error: 'Cannot delete yourself' });
+
+    // Harsh (10 Sep 2026): "pehle warning aaye." Shivam ka account hatane par
+    // uske 18 khule task bina doer ke reh gaye the aur list me "-" dikh raha
+    // tha. Ab pehle batate hain ki kitne khule task hain; jaan-boojh kar aage
+    // badhna ho to ?force=1 ke saath dobara request aati hai.
+    if (String(req.query.force || '') !== '1') {
+      const uid = String(req.params.id);
+      const [chl, del] = await Promise.all([
+        db.findAll('Checklist_Tasks').catch(() => []),
+        db.findAll('Delegation_Tasks').catch(() => [])
+      ]);
+      const isOpen = t => t.status === 'pending' || t.status === 'revised';
+      const mine = t => String(t.assigned_to || '') === uid;
+      const chlN = chl.filter(t => mine(t) && isOpen(t)).length;
+      const delN = del.filter(t => mine(t) && isOpen(t)).length;
+      if (chlN + delN > 0) {
+        return res.status(409).json({
+          needsConfirm: true, openTasks: chlN + delN, checklist: chlN, delegation: delN,
+          error: `Is bande ke ${chlN + delN} khule task hain (checklist ${chlN}, delegation ${delN}).`
+        });
+      }
+    }
+
     await deleteRow('Users', req.params.id);
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -5980,6 +6003,71 @@ async function checklistOddSample(limit) {
   } catch (e) { return { error: e.message }; }
 }
 
+// ── BINA DOER WALE PENDING TASK HATA DO (ek baar) ──────────────
+// Harsh (10 Sep 2026): "Shivam user delete kiya hai, task bhi uske."
+// Jis bande ka account hi nahi raha, uske khule task rakhne ka matlab nahi.
+//
+// SAAVDHANI: ye rows sach me DELETE hoti hain. Isliye hatane se PEHLE unki
+// poori nakal App_State me rakh dete hain (key: checklist_orphan_backup_v1),
+// taaki zarurat pade to wapas daali ja sakein.
+// Sirf wahi rows jinka assigned_to Users me hai hi nahi, AUR status
+// pending/revised ho. Completed/closed ko haath nahi lagate — wo hisaab-kitab
+// (MIS) ka record hai.
+async function removeOrphanOpenTasks() {
+  const MARKER = 'orphan_open_tasks_removed_v1';
+  const BACKUP = 'checklist_orphan_backup_v1';
+  try {
+    const d = await getDB();
+    await ensureAppStateTab(d);
+    const done = await d.findWhere('App_State', { key_name: MARKER });
+    if (done && done.length) return;
+
+    const [chl, del, users] = await Promise.all([
+      d.findAll('Checklist_Tasks'), d.findAll('Delegation_Tasks'), d.findAll('Users')
+    ]);
+    const known = new Set(users.map(u => String(u.id)));
+    const isOpen = t => t.status === 'pending' || t.status === 'revised';
+    const orphan = t => !known.has(String(t.assigned_to || ''));
+
+    const chlRows = chl.filter(t => isOpen(t) && orphan(t));
+    const delRows = del.filter(t => isOpen(t) && orphan(t));
+    const nowStr = new Date(Date.now() + 330 * 60000).toISOString().replace('T', ' ').split('.')[0];
+
+    if (!chlRows.length && !delRows.length) {
+      await d.insert('App_State', { key_name: MARKER, value: 'koi bina-doer wala khula task nahi mila', updated_at: nowStr });
+      console.log('  orphan tasks: koi nahi mila');
+      return;
+    }
+
+    // Pehle nakal, phir hatana
+    try {
+      await d.insert('App_State', {
+        key_name: BACKUP,
+        value: JSON.stringify({ at: nowStr, checklist: chlRows, delegation: delRows }),
+        updated_at: nowStr
+      });
+    } catch (e) {
+      console.error('  orphan tasks: nakal nahi bani, isliye kuch NAHI hataya:', e.message);
+      return;   // nakal na bane to delete bhi mat karo
+    }
+
+    let gaye = 0, atke = 0;
+    for (const t of chlRows) {
+      try { await d.delete('Checklist_Tasks', t.id); gaye++; } catch { atke++; }
+    }
+    for (const t of delRows) {
+      try { await d.delete('Delegation_Tasks', t.id); gaye++; } catch { atke++; }
+    }
+
+    const msg = `${gaye} bina-doer wale khule task hataye` + (atke ? `, ${atke} nahi hate` : '') +
+                ` (nakal ${BACKUP} me rakhi hai)`;
+    await d.insert('App_State', { key_name: MARKER, value: msg, updated_at: nowStr });
+    console.log('  \u2705 orphan tasks: ' + msg);
+  } catch (e) {
+    console.error('  removeOrphanOpenTasks error (agli baar retry hogi):', e.message);
+  }
+}
+
 // Jin task ka doer resolve nahi hota (Users me wo id hai hi nahi, ya
 // assigned_to khali hai) -- All Tasks/PC me unka group "-" ban jaata hai.
 // 10 Sep 2026: Harsh ne aisa hi ek group dekha, isliye ye jhaank.
@@ -6067,6 +6155,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
         orphanDoers: req.query.orphans ? await orphanDoers() : undefined,
         checklistDateFix: await appStateValue('checklist_blank_date_fix_v3'),
         checklistFormatFix: await appStateValue('checklist_date_format_fix_v1'),
+        orphanCleanup: await appStateValue('orphan_open_tasks_removed_v1'),
         keepAlive: _keepAliveUrl ? `ON — har 4 min self-ping (${_keepAliveUrl})` : 'OFF',
         uptime: uptimeText(), pid: process.pid
       });
@@ -6135,6 +6224,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
       backfill,
       checklistDateFix: dateFix,
       checklistFormatFix: await appStateValue('checklist_date_format_fix_v1'),
+      orphanCleanup: await appStateValue('orphan_open_tasks_removed_v1'),
       checklistDateHealth: dateHealth,
       checklistOdd: await checklistOddSample(6),
       checklistPeek: req.query.peek ? await checklistPeek(String(req.query.peek)) : undefined,
@@ -6862,6 +6952,7 @@ async function seedAdminIfNeeded() {
       .then(() => setTimeout(() => backfillChecklistDoerName().catch(() => {}), 25 * 1000))
       .then(() => setTimeout(() => repairNaNChecklistDates().catch(() => {}), 35 * 1000))
       .then(() => setTimeout(() => fixChecklistDateFormat().catch(() => {}), 45 * 1000))
+      .then(() => setTimeout(() => removeOrphanOpenTasks().catch(() => {}), 55 * 1000))
       // Outbox aane se pehle jo assign-alert gum ho gaye — ek baar bhej do
       .then(() => setTimeout(() => backfillMissedAssignAlerts().catch(() => {}), 45 * 1000))
       .then(() => setTimeout(() => resetTimedOutOutbox().catch(() => {}), 55 * 1000))

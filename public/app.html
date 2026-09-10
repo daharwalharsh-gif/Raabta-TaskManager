@@ -5107,7 +5107,21 @@ async function handleApproval(id, action) {
 
 async function deleteUser(id) {
   if (!confirm('Delete this user?')) return;
-  const r=await api(`/api/users/${id}`,'DELETE');
+  let r = await api(`/api/users/${id}`,'DELETE');
+  // Server pehle batata hai ki is bande ke kitne khule task hain (Harsh,
+  // 10 Sep). Tab tak user delete NAHI hota -- haan bolo tabhi hota hai.
+  if (r && r.needsConfirm) {
+    const ok = confirm([
+      r.error,
+      '',
+      'Delete karne par ye task bina doer ke reh jayenge aur list me "—" dikhenge.',
+      'Behtar hai pehle inhe kisi aur ko transfer kar do.',
+      '',
+      'Phir bhi delete karein?'
+    ].join('\n'));
+    if (!ok) return;
+    r = await api(`/api/users/${id}?force=1`,'DELETE');
+  }
   if (r.error) return alert(r.error);
   loadUsers();
 }
