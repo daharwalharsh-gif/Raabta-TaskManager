@@ -1470,6 +1470,29 @@ function waDelegationMsg({ assigneeName, assignerName, desc, dueDate, priority, 
   return lines.join('\n');
 }
 
+// Approver ko — jab task delegate hote waqt "Approval Required: Yes" chuna
+// jaye aur koi approver select ho. Harsh, 11 Sep 2026: "ush ke paas bhi
+// message jana chahiye ki aap ko ye task approve karna hai, ye doer hai."
+function waApproverMsg({ approverName, doerName, assignerName, desc, dueDate, priority, remarks }) {
+  const url = process.env.APP_URL || '';
+  const lines = [
+    '*Raabta Task Manager*',
+    '',
+    `Hello ${approverName || 'there'},`,
+    'You have been set as the *approver* for a delegation task.',
+    '',
+    `*Task:* ${desc}`,
+    `*Doer:* ${doerName || '-'}`,
+    `*Assigned By:* ${assignerName || 'Admin'}`,
+    `*Due Date:* ${dueDate}`,
+    `*Priority:* ${priority || 'low'}`
+  ];
+  if (remarks) lines.push(`*Remarks:* ${remarks}`);
+  lines.push('', 'When the doer marks it as Done, the approval request will come to you.');
+  if (url) lines.push(`Open: ${url}`);
+  return lines.join('\n');
+}
+
 function waChecklistMsg({ assigneeName, desc, dueText, count }) {
   const url = process.env.APP_URL || '';
   const lines = [
@@ -2321,6 +2344,26 @@ app.post('/api/tasks', requireAuth, async (req, res) => {
             priority: priority || 'low', approval: approval || 'no', remarks: remarks || ''
           }), 'assign-delegation', '', waTarget.name);
         }).catch(e => console.error('  WA notify error:', e.message));
+
+        // Approver ko bhi — sirf jab approval 'yes' ho aur koi approver
+        // chuna gaya ho. Approver hi doer ho to dobara nahi bhejte (usse
+        // pehle hi upar wala message ja chuka hai).
+        if (WA.notifyOnAssign && approval === 'yes' && approverId
+            && String(parseInt(approverId)) !== String(targetUser)) {
+          (async () => {
+            const doer = await db.findOne('Users', { id: String(targetUser) });
+            const creator = await db.findOne('Users', { id: String(req.session.userId) });
+            const waApr = await getWhatsAppTarget(parseInt(approverId));
+            if (!waApr) return;
+            await queueWhatsApp(waApr.phone, waApproverMsg({
+              approverName: waApr.name,
+              doerName: (doer && doer.name) || '',
+              assignerName: (creator && creator.name) || 'Admin',
+              desc, dueDate: date, priority: priority || 'low', remarks: remarks || ''
+            }), 'assign-approver', '', waApr.name);
+          })().catch(e => console.error('  WA approver notify error:', e.message));
+        }
+
         // Email — in parallel
         getNotifyTarget(parseInt(targetUser)).then(target => {
           if (!target) return;
