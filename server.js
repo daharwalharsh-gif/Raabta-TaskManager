@@ -6127,6 +6127,51 @@ async function removeOrphanOpenTasks() {
   }
 }
 
+// Aaj reminder KIS-KIS ko jayega, aur kaun chhoot raha hai aur kyun.
+// Harsh (11 Sep): "har number par proper message ja raha hai na, koi skip to
+// nahi hota?" -- ginti se jawab dene ke liye. Wahi shartein jo asli pass
+// lagata hai: pending task + due_date aaj se 2 din ke andar.
+async function reminderWho() {
+  try {
+    const d = await getDB();
+    const [del, chl, users] = await Promise.all([
+      d.findAll('Delegation_Tasks'), d.findAll('Checklist_Tasks'), d.findAll('Users')
+    ]);
+    const cutoff = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const isPending = t => t.status === 'pending' && t.due_date && t.due_date <= cutoff;
+    const byUser = {};
+    [...del, ...chl].forEach(t => {
+      if (!isPending(t)) return;
+      const uid = String(t.assigned_to);
+      byUser[uid] = (byUser[uid] || 0) + 1;
+    });
+    const userMap = {};
+    users.forEach(u => { userMap[String(u.id)] = u; });
+    const excluded = new Set((WA.reminderExcludePhones || []).map(normalizePhone).filter(Boolean));
+
+    const milega = [], binaPhone = [], chhoda = [], userHiNahi = [];
+    Object.keys(byUser).forEach(uid => {
+      const u = userMap[uid];
+      if (!u) { userHiNahi.push({ assigned_to: uid, tasks: byUser[uid] }); return; }
+      const ph = u.phone ? normalizePhone(u.phone) : '';
+      if (!ph) { binaPhone.push({ name: u.name, tasks: byUser[uid] }); return; }
+      if (excluded.has(ph)) { chhoda.push({ name: u.name, phone: ph }); return; }
+      milega.push({ name: u.name, phone: ph, tasks: byUser[uid] });
+    });
+
+    return {
+      kul_users: users.length,
+      jinke_pending_task_hain: Object.keys(byUser).length,
+      MESSAGE_MILEGA: milega.length,
+      bina_phone_ke_chhoot_gaye: binaPhone.length,
+      bina_phone_naam: binaPhone.map(x => x.name + ' (' + x.tasks + ' task)'),
+      jaan_bujh_kar_chhoda: chhoda,
+      user_hi_nahi_mila: userHiNahi,
+      milne_wale: milega.map(x => x.name + ' — ' + x.phone + ' (' + x.tasks + ' task)')
+    };
+  } catch (e) { return { error: e.message }; }
+}
+
 // Jin task ka doer resolve nahi hota (Users me wo id hai hi nahi, ya
 // assigned_to khali hai) -- All Tasks/PC me unka group "-" ban jaata hai.
 // 10 Sep 2026: Harsh ne aisa hi ek group dekha, isliye ye jhaank.
@@ -6212,6 +6257,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
         checklistOdd: await checklistOddSample(6),
         checklistPeek: req.query.peek ? await checklistPeek(String(req.query.peek)) : undefined,
         orphanDoers: req.query.orphans ? await orphanDoers() : undefined,
+        reminderWho: req.query.who ? await reminderWho() : undefined,
         checklistDateFix: await appStateValue('checklist_blank_date_fix_v3'),
         checklistFormatFix: await appStateValue('checklist_date_format_fix_v1'),
         orphanCleanup: await appStateValue('orphan_open_tasks_removed_v1'),
@@ -6288,6 +6334,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
       checklistOdd: await checklistOddSample(6),
       checklistPeek: req.query.peek ? await checklistPeek(String(req.query.peek)) : undefined,
       orphanDoers: req.query.orphans ? await orphanDoers() : undefined,
+      reminderWho: req.query.who ? await reminderWho() : undefined,
       status: slot
         ? (sentToday ? 'is slot ka reminder aaj ja chuka hai' : 'slot-window-me-hai (pass chal raha)')
         : 'outside-slot-window',
