@@ -694,9 +694,22 @@ const mailTransporter = nodemailer.createTransport({
   connectionTimeout: 15000, greetingTimeout: 15000, socketTimeout: 20000
 });
 
+// Harsh, 11 Sep 2026: "only mail Leave request / approval par hi jaye."
+// Task assign aur daily reminder ki mail band. Isliye ab har mail ki ek
+// KISM hoti hai, aur sirf is list wali jaati hain. Koi nayi mail likhe aur
+// kism na de, to wo apne aap BAND rahegi — chup-chaap nikal nahi jayegi.
+const MAIL_KINDS_ON = [
+  'leave-request',    // employee ne leave maangi — HR ko
+  'leave-decision',   // leave approve/reject hui — employee ko
+  'test'              // admin ka test button (setup jaanchne ke liye)
+];
+
 // Status object wapas karta hai (diagnose ke liye) — throw kabhi nahi karta,
 // taaki koi bhi mail fail ho to app ka flow na ruke.
-async function sendMail(to, subject, html) {
+async function sendMail(to, subject, html, kind) {
+  if (!MAIL_KINDS_ON.includes(kind)) {
+    return { skipped: 'is kism ki mail band hai: ' + (kind || 'bina-kism') };
+  }
   if (!EMAIL_ENABLED) return { skipped: 'email-disabled', hint: '.env me EMAIL_ENABLED=true karo' };
   if (!to) return { skipped: 'no-recipient' };
   if (!process.env.SMTP_USER) return { skipped: 'smtp-not-configured', hint: '.env me SMTP_USER set nahi hai' };
@@ -876,7 +889,8 @@ async function runDelegationReminders() {
         ? `${totalForEmail} pending task${totalForEmail > 1 ? 's' : ''} for ${userNames[0]}`
         : `${totalForEmail} pending task${totalForEmail > 1 ? 's' : ''} (${userNames.length} users)`;
       try {
-        await sendMail(email, subject, reminderEmailHtml(byUser, todayStr));
+        // BAND (Harsh, 11 Sep): daily reminder sirf WhatsApp par jata hai
+        await sendMail(email, subject, reminderEmailHtml(byUser, todayStr), 'daily-reminder');
         for (const tid of taskIds) {
           try { await db.update('Delegation_Tasks', tid, { last_reminder_date: todayStr }); } catch (e) { /* skip */ }
         }
@@ -2367,6 +2381,7 @@ app.post('/api/tasks', requireAuth, async (req, res) => {
         // Email — in parallel
         getNotifyTarget(parseInt(targetUser)).then(target => {
           if (!target) return;
+          // BAND (Harsh, 11 Sep): task assign ki mail nahi jaati, sirf WhatsApp
           return sendMail(
             target.email,
             `New Task Assigned: ${(desc || '').slice(0, 60)}`,
@@ -2374,7 +2389,8 @@ app.post('/api/tasks', requireAuth, async (req, res) => {
               assigneeName: target.name, assignerName,
               desc, dueDate: date,
               priority: priority || 'low', approval: approval || 'no', remarks: remarks || ''
-            })
+            }),
+            'task-assign'
           );
         }).catch(e => console.error('  Email notify error:', e.message));
       })();
@@ -3482,7 +3498,7 @@ app.post('/api/leaves', requireAuth, async (req, res) => {
       const days = Math.round((new Date(to_date) - new Date(from_date)) / 86400000) + 1;
       const subject = `Leave Request — ${employee?.name || 'Employee'} (${from_date} to ${to_date})`;
       const html = leaveRequestEmailHtml({ employeeName: employee?.name, fromDate: from_date, toDate: to_date, days, reason });
-      for (const to of targets) await sendMail(to, subject, html);
+      for (const to of targets) await sendMail(to, subject, html, 'leave-request');
     })().catch(e => console.error('  Leave request email failed:', e.message));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -3552,7 +3568,7 @@ app.put('/api/leaves/:id', requireAuth, async (req, res) => {
         const subject = `Leave Request ${label} — ${leave.from_date} to ${leave.to_date}`;
         const ok = [], bad = [];
         for (const to of tos) {
-          const r = await sendMail(to, subject, html);
+          const r = await sendMail(to, subject, html, 'leave-decision');
           if (r && r.ok) ok.push(to);
           else bad.push(`${to}: ${(r && (r.error || r.skipped)) || 'unknown'}`);
         }
@@ -6920,8 +6936,9 @@ app.get('/api/admin/test-email', requireAuth, requireAdmin, async (req, res) => 
           <h2 style="color:#16a34a;margin-top:0">✅ Email setup kaam kar raha hai</h2>
           <p>Ye test mail Raabta Task Manager se bheji gayi hai.</p>
           <p style="color:#64748b;font-size:13px">Ab leave apply hone par HR ko, aur approve/reject par employee ko mail jayegi.</p>
+          <p style="color:#64748b;font-size:13px">Task assign / daily reminder ki mail band hai — wo sirf WhatsApp par jaate hain.</p>
         </div>
-      </div>`);
+      </div>`, 'test');
 
     res.json({
       setup, to,
