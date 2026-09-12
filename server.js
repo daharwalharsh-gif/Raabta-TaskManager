@@ -474,13 +474,22 @@ const MYSQL_SCHEMA = {
     waiting_approval: "VARCHAR(5) DEFAULT '0'", remarks: "TEXT", frequency: "VARCHAR(20) DEFAULT ''",
     last_reminder_date: "VARCHAR(40) DEFAULT ''", created_at: "VARCHAR(40) DEFAULT ''",
     attachments: "LONGTEXT", report_note: "TEXT",
-    was_reported: "VARCHAR(5) DEFAULT '0'"
+    was_reported: "VARCHAR(5) DEFAULT '0'",
+    // 12 Sep 2026: Harsh ne poochha "task auto Done kyun ho gaya, kisne kiya?"
+    // -- aur DB me iska koi record tha hi nahi. Ab har status-badlav ke saath
+    // ye teen likhe jaate hain, taaki agli baar jawab ginti se mile.
+    status_changed_at: "VARCHAR(40) DEFAULT ''",
+    status_changed_by: "VARCHAR(20) DEFAULT ''",
+    status_changed_by_name: "VARCHAR(120) DEFAULT ''"
   },
   Checklist_Tasks: {
     description: "TEXT", assigned_to: "VARCHAR(20) DEFAULT ''", assigned_by: "VARCHAR(20) DEFAULT ''",
     due_date: "VARCHAR(40) DEFAULT ''", status: "VARCHAR(20) DEFAULT 'pending'",
     priority: "VARCHAR(20) DEFAULT 'low'", remarks: "TEXT", frequency: "VARCHAR(20) DEFAULT ''",
     created_at: "VARCHAR(40) DEFAULT ''",
+    status_changed_at: "VARCHAR(40) DEFAULT ''",
+    status_changed_by: "VARCHAR(20) DEFAULT ''",
+    status_changed_by_name: "VARCHAR(120) DEFAULT ''",
     // Sirf DB me padhne ki aasani ke liye (Harsh, 1 Sep): assigned_to me ID
     // hoti hai (13, 24...) jise dekh kar pata nahi chalta kaun hai. Ye column
     // usi bande ka NAAM rakhta hai. App kahin ise padhta nahi — assigned_to
@@ -2534,7 +2543,7 @@ app.put('/api/tasks/:id/status', requireAuth, async (req, res) => {
         return res.json({ success: true, needsApproval: true });
       }
       // was_reported: Reopen ke baad Pending me row highlight karne ke liye
-      await db.update(tabName, req.params.id, { status: 'report', waiting_approval: '0', was_reported: '1', ...attUpd });
+      await db.update(tabName, req.params.id, stamp(req, { status: 'report', waiting_approval: '0', was_reported: '1', ...attUpd }));
       return res.json({ success: true });
     }
 
@@ -2542,7 +2551,7 @@ app.put('/api/tasks/:id/status', requireAuth, async (req, res) => {
       // Cancel pending approvals
       const pendingApprovals = await db.findWhere('Task_Approvals', { task_id: req.params.id, task_type: type, status: 'pending' });
       for (const a of pendingApprovals) await deleteRow('Task_Approvals', a.id);
-      const upd = { status: 'completed', ...attUpd };
+      const upd = stamp(req, { status: 'completed', ...attUpd });
       if (type === 'delegation') upd.waiting_approval = '0';
       await db.update(tabName, req.params.id, upd);
       return res.json({ success: true, needsApproval: false });
@@ -2564,7 +2573,7 @@ app.put('/api/tasks/:id/status', requireAuth, async (req, res) => {
       return res.json({ success: true, needsApproval: true });
     }
 
-    const upd = { status, ...attUpd };
+    const upd = stamp(req, { status, ...attUpd });
     if (type === 'delegation') upd.waiting_approval = '0';
     if (newDate && status === 'revised') upd.due_date = newDate;
     await db.update(tabName, req.params.id, upd);
@@ -2597,6 +2606,17 @@ app.get('/api/tasks/:id/detail', requireAuth, requireAdmin, async (req, res) => 
     res.json({ task: { ...task, id: parseInt(task.id) } });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
+// Status badalte waqt saath me ye bhi likho: kab, kisne. Pehle ye kahin
+// record hi nahi hota tha, isliye "task auto Done kaise ho gaya" ka jawab
+// dena namumkin tha (Harsh, 12 Sep 2026).
+function stamp(req, extra) {
+  return Object.assign({
+    status_changed_at: new Date(Date.now() + 330 * 60000).toISOString().replace('T', ' ').split('.')[0],
+    status_changed_by: String((req && req.session && req.session.userId) || ''),
+    status_changed_by_name: String((req && req.session && req.session.name) || '')
+  }, extra || {});
+}
 
 app.put('/api/tasks/:id/edit', requireAuth, requireAdmin, async (req, res) => {
   try {
@@ -3464,7 +3484,7 @@ app.put('/api/approvals/:id', requireAuth, async (req, res) => {
       // action_type hi naya status ban jaata hai. 'report' approve hua to task
       // Report tab me aata hai — was_reported bhi lagta hai (Reopen ke baad
       // Pending me highlight isi se hota hai).
-      const upd = { status: appr.action_type, waiting_approval: '0' };
+      const upd = stamp(req, { status: appr.action_type, waiting_approval: '0' });
       if (appr.action_type === 'report') upd.was_reported = '1';
       await db.update(tabName, appr.task_id, upd);
       // New-task approval (action_type 'pending'): ab jaake doer ko task dikha hai,
@@ -6158,6 +6178,51 @@ async function removeOrphanOpenTasks() {
   }
 }
 
+// Delegation task ka haal — kitne kis status me, aur jo completed hain unme
+// se kitno ka record hai ki kisne kiya. Harsh (12 Sep 2026): "task auto done
+// kyun hua, bina kisi ke kiye?" -- jawab ginti se dena hai, andaze se nahi.
+async function delegationAudit() {
+  try {
+    const d = await getDB();
+    const [del, appr, users] = await Promise.all([
+      d.findAll('Delegation_Tasks'), d.findAll('Task_Approvals'), d.findAll('Users')
+    ]);
+    const nameOf = {};
+    users.forEach(u => { nameOf[String(u.id)] = u.name; });
+
+    const ginti = {};
+    del.forEach(t => { const st = t.status || '(khali)'; ginti[st] = (ginti[st] || 0) + 1; });
+
+    const done = del.filter(t => t.status === 'completed' || t.status === 'closed');
+    const recordHai = done.filter(t => t.status_changed_at);
+    // Kaunse completed task approval se hue (uska record Task_Approvals me hai)
+    const apprDone = new Set(appr.filter(a => a.status === 'approved').map(a => String(a.task_id)));
+
+    // Sabse naye approval — kisne, kab
+    const lastAppr = appr.slice().sort((a, b) =>
+      String(b.created_at || '').localeCompare(String(a.created_at || ''))).slice(0, 8);
+
+    return {
+      kul_delegation: del.length,
+      status_ki_ginti: ginti,
+      completed_ya_closed: done.length,
+      inme_se_jinka_record_hai: recordHai.length,
+      inme_se_jo_approval_se_hue: done.filter(t => apprDone.has(String(t.id))).length,
+      naye_record: recordHai.slice(-8).map(t => ({
+        id: t.id, kab: t.status_changed_at,
+        kisne: t.status_changed_by_name || nameOf[String(t.status_changed_by)] || t.status_changed_by,
+        status: t.status, kaam: String(t.description || '').slice(0, 45)
+      })),
+      aakhri_approvals: lastAppr.map(a => ({
+        task_id: a.task_id, kism: a.action_type, status: a.status,
+        maanga: nameOf[String(a.requested_by)] || a.requested_by,
+        kisse: nameOf[String(a.requested_to)] || a.requested_to,
+        kab: a.created_at
+      }))
+    };
+  } catch (e) { return { error: e.message }; }
+}
+
 // Aaj reminder KIS-KIS ko jayega, aur kaun chhoot raha hai aur kyun.
 // Harsh (11 Sep): "har number par proper message ja raha hai na, koi skip to
 // nahi hota?" -- ginti se jawab dene ke liye. Wahi shartein jo asli pass
@@ -6289,6 +6354,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
         checklistPeek: req.query.peek ? await checklistPeek(String(req.query.peek)) : undefined,
         orphanDoers: req.query.orphans ? await orphanDoers() : undefined,
         reminderWho: req.query.who ? await reminderWho() : undefined,
+        delegationAudit: req.query.deleg ? await delegationAudit() : undefined,
         checklistDateFix: await appStateValue('checklist_blank_date_fix_v3'),
         checklistFormatFix: await appStateValue('checklist_date_format_fix_v2'),
         orphanCleanup: await appStateValue('orphan_open_tasks_removed_v1'),
@@ -6366,6 +6432,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
       checklistPeek: req.query.peek ? await checklistPeek(String(req.query.peek)) : undefined,
       orphanDoers: req.query.orphans ? await orphanDoers() : undefined,
       reminderWho: req.query.who ? await reminderWho() : undefined,
+      delegationAudit: req.query.deleg ? await delegationAudit() : undefined,
       status: slot
         ? (sentToday ? 'is slot ka reminder aaj ja chuka hai' : 'slot-window-me-hai (pass chal raha)')
         : 'outside-slot-window',
