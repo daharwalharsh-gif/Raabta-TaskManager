@@ -2314,8 +2314,11 @@ app.get('/api/my-checklist-reminders', requireAuth, async (req, res) => {
 
 app.post('/api/tasks', requireAuth, async (req, res) => {
   try {
-    const { type, desc, assignedTo, approverEmail, approverId, date, priority, approval, remarks } = req.body;
-    if (!desc || !date) return res.status(400).json({ error: 'Description and date required' });
+    const { type, desc, assignedTo, approverEmail, approverId, date: rawDate, priority, approval, remarks } = req.body;
+    if (!desc || !rawDate) return res.status(400).json({ error: 'Description and date required' });
+    // Date hamesha YYYY-MM-DD me hi DB me jaye (12 Sep 2026 ka fix)
+    const date = toIsoDateSrv(rawDate);
+    if (!date) return res.status(400).json({ error: `Date theek nahi hai: "${rawDate}" — YYYY-MM-DD ya DD-MM-YYYY me do` });
     const role = req.session.role;
     const targetUser = (role === 'admin' || role === 'hod' || role === 'user') && assignedTo
       ? String(parseInt(assignedTo)) : String(req.session.userId);
@@ -2418,6 +2421,29 @@ app.post('/api/tasks', requireAuth, async (req, res) => {
 // due_date sirf asli YYYY-MM-DD ho — "NaN-NaN-NaN", "abc", 31-02 kuch nahi.
 // 7 Sep 2026: browser se NaN wali date aa gayi thi aur 168 rows kharab ban
 // gayi thin. Ab aakhri taala yahan hai — client me bug ho tab bhi DB saaf.
+// Date ko hamesha YYYY-MM-DD me badlo. "12-09-2026" / "12/09/2026" (DD pehle)
+// bhi chalega. Samajh na aaye to khali -- phir caller mana kar dega.
+// 12 Sep 2026: 26 nayi rows phir se "12-09-2026" jaisi ban gayi thin, kyunki
+// single-task banane aur edit karne wale raaste date ko bina dekhe DB me daal
+// dete the. Poora app date ko YYYY-MM-DD maan kar SEEDHE compare karta hai
+// (sort, overdue, reminder ka cutoff), isliye ulti date hisaab bigaad deti hai.
+function toIsoDateSrv(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (!s) return '';
+  let y, mo, da;
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (m) { y = +m[1]; mo = +m[2]; da = +m[3]; }
+  else {
+    m = s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/);   // DD-MM-YYYY
+    if (!m) return '';
+    da = +m[1]; mo = +m[2]; y = +m[3];
+  }
+  if (y < 1970 || y > 2100 || mo < 1 || mo > 12 || da < 1 || da > 31) return '';
+  const d = new Date(Date.UTC(y, mo - 1, da));
+  if (d.getUTCFullYear() !== y || d.getUTCMonth() !== mo - 1 || d.getUTCDate() !== da) return '';
+  return y + '-' + String(mo).padStart(2, '0') + '-' + String(da).padStart(2, '0');
+}
+
 function isRealDate(v) {
   const m = String(v == null ? '' : v).trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!m) return false;
@@ -2574,8 +2600,11 @@ app.get('/api/tasks/:id/detail', requireAuth, requireAdmin, async (req, res) => 
 
 app.put('/api/tasks/:id/edit', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const { type, desc, date, priority, approval, remarks } = req.body;
+    const { type, desc, date: rawDate, priority, approval, remarks } = req.body;
     const tabName = getTabName(type || 'delegation');
+    // Edit se bhi ulti date andar na aaye (12 Sep 2026 ka fix)
+    const date = toIsoDateSrv(rawDate);
+    if (!date) return res.status(400).json({ error: `Date theek nahi hai: "${rawDate}" — YYYY-MM-DD ya DD-MM-YYYY me do` });
     const upd = { description: desc, due_date: date, remarks: remarks || '' };
     if (type === 'delegation') { upd.priority = priority || 'low'; upd.approval = approval || 'no'; }
     await db.update(tabName, req.params.id, upd);
@@ -2784,7 +2813,9 @@ function flipToIso(v) {
 }
 
 async function fixChecklistDateFormat() {
-  const MARKER = 'checklist_date_format_fix_v1';
+  // v2: 12 Sep ko 26 nayi ulti dates mil gayi thin (source ab band ho chuka),
+  // isliye ek baar aur chalana hai
+  const MARKER = 'checklist_date_format_fix_v2';
   try {
     const d = await getDB();
     await ensureAppStateTab(d);
@@ -6259,7 +6290,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
         orphanDoers: req.query.orphans ? await orphanDoers() : undefined,
         reminderWho: req.query.who ? await reminderWho() : undefined,
         checklistDateFix: await appStateValue('checklist_blank_date_fix_v3'),
-        checklistFormatFix: await appStateValue('checklist_date_format_fix_v1'),
+        checklistFormatFix: await appStateValue('checklist_date_format_fix_v2'),
         orphanCleanup: await appStateValue('orphan_open_tasks_removed_v1'),
         keepAlive: _keepAliveUrl ? `ON — har 4 min self-ping (${_keepAliveUrl})` : 'OFF',
         uptime: uptimeText(), pid: process.pid
@@ -6328,7 +6359,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
       outbox,
       backfill,
       checklistDateFix: dateFix,
-      checklistFormatFix: await appStateValue('checklist_date_format_fix_v1'),
+      checklistFormatFix: await appStateValue('checklist_date_format_fix_v2'),
       orphanCleanup: await appStateValue('orphan_open_tasks_removed_v1'),
       checklistDateHealth: dateHealth,
       checklistOdd: await checklistOddSample(6),
