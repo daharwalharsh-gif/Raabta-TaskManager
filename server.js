@@ -6178,6 +6178,31 @@ async function removeOrphanOpenTasks() {
   }
 }
 
+// DB me column sach me bane ya nahi — phpMyAdmin kholne ki zarurat na pade.
+// Harsh (12 Sep): "db me bhi kar diya hai na ki kisne done kiya, main pakad
+// saku?" -- iska jawab dikha kar dena chahiye, keh kar nahi.
+async function tableCols() {
+  try {
+    const d = await getDB();
+    const out = {};
+    for (const t of ['Delegation_Tasks', 'Checklist_Tasks']) {
+      if (d.pool) {
+        const [rows] = await d.pool.query(
+          'SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS ' +
+          'WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION', [t]);
+        out[t] = rows.map(r => r.COLUMN_NAME);
+      } else {
+        const all = await d.findAll(t);
+        out[t] = all.length ? Object.keys(all[0]) : [];
+      }
+    }
+    const chahiye = ['status_changed_at', 'status_changed_by', 'status_changed_by_name'];
+    out.NAYE_COLUMN_BANE = chahiye.every(c => (out['Delegation_Tasks'] || []).includes(c))
+      ? 'HAAN — teeno ban gaye' : 'NAHI — abhi nahi bane';
+    return out;
+  } catch (e) { return { error: e.message }; }
+}
+
 // Delegation task ka haal — kitne kis status me, aur jo completed hain unme
 // se kitno ka record hai ki kisne kiya. Harsh (12 Sep 2026): "task auto done
 // kyun hua, bina kisi ke kiye?" -- jawab ginti se dena hai, andaze se nahi.
@@ -6355,6 +6380,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
         orphanDoers: req.query.orphans ? await orphanDoers() : undefined,
         reminderWho: req.query.who ? await reminderWho() : undefined,
         delegationAudit: req.query.deleg ? await delegationAudit() : undefined,
+        tableCols: req.query.cols ? await tableCols() : undefined,
         checklistDateFix: await appStateValue('checklist_blank_date_fix_v3'),
         checklistFormatFix: await appStateValue('checklist_date_format_fix_v2'),
         orphanCleanup: await appStateValue('orphan_open_tasks_removed_v1'),
@@ -6433,6 +6459,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
       orphanDoers: req.query.orphans ? await orphanDoers() : undefined,
       reminderWho: req.query.who ? await reminderWho() : undefined,
       delegationAudit: req.query.deleg ? await delegationAudit() : undefined,
+      tableCols: req.query.cols ? await tableCols() : undefined,
       status: slot
         ? (sentToday ? 'is slot ka reminder aaj ja chuka hai' : 'slot-window-me-hai (pass chal raha)')
         : 'outside-slot-window',
