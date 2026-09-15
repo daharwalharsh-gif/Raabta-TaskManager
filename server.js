@@ -2804,7 +2804,13 @@ app.post('/api/tasks/fix-doer-mismatch', requireAuth, requireAdmin, async (req, 
     const byName = {};
     users.forEach(u => { (byName[norm(u.name)] = byName[norm(u.name)] || []).push(u); });
 
-    const badlenge = [], dograhe = [], chhode = [];
+    // ?labels=1 -> task KISI KO NAHI HILATE. Sirf doer_name ko assigned_to
+    // wale bande ke naam par taaza kar dete hain. Ye un rows ke liye hai
+    // jinka banda wahi hai par naam badal diya gaya tha (jaise "Naresh" ->
+    // "NARESH VERMA") -- wahan task hilana bilkul galat hota.
+    const labelsOnly = String(req.query.labels || req.body?.labels || '') === '1';
+
+    const badlenge = [], naamBadla = [], kaiUser = [], chhode = [], labelTheek = [];
     for (const t of chl) {
       const likha = String(t.doer_name || '').trim();
       if (!likha) continue;
@@ -2812,8 +2818,14 @@ app.post('/api/tasks/fix-doer-mismatch', requireAuth, requireAdmin, async (req, 
       if (abhiWala && norm(abhiWala.name) === norm(likha)) continue;   // pehle se theek
       if (!withDone && t.status === 'completed') { chhode.push(t.id); continue; }
       const match = byName[norm(likha)] || [];
-      // Ek hi naam ke do user hain to khud se chunna galat hoga -- haath na lagao
-      if (match.length !== 1) { dograhe.push({ id: t.id, naam: likha, kitne_user: match.length }); continue; }
+      if (match.length === 0) {
+        // Is naam ka koi user hai hi nahi -> banda wahi hai, naam badla tha.
+        // Task HILANA NAHI -- sirf purana label taaza karna hai.
+        if (abhiWala) labelTheek.push({ id: t.id, purana_label: likha, naya_label: abhiWala.name });
+        else naamBadla.push({ id: t.id, naam: likha, wajah: 'assigned_to bhi Users me nahi -- ?orphans=1 dekho' });
+        continue;
+      }
+      if (match.length > 1) { kaiUser.push({ id: t.id, naam: likha, kitne_user: match.length }); continue; }
       badlenge.push({
         id: t.id,
         naam: likha,
@@ -2822,7 +2834,12 @@ app.post('/api/tasks/fix-doer-mismatch', requireAuth, requireAdmin, async (req, 
       });
     }
 
-    if (apply) {
+    if (apply && labelsOnly) {
+      for (const l of labelTheek) {
+        await db.update('Checklist_Tasks', l.id, { doer_name: l.naya_label });
+      }
+      console.log(`  doer-label refresh: ${labelTheek.length} checklist row ka purana naam taaza kiya (task kisi ka nahi hila)`);
+    } else if (apply) {
       for (const b of badlenge) {
         await db.update('Checklist_Tasks', b.id, { assigned_to: b.naya_id, doer_name: b.naam });
       }
@@ -2830,11 +2847,15 @@ app.post('/api/tasks/fix-doer-mismatch', requireAuth, requireAdmin, async (req, 
     }
 
     res.json({
-      chala: apply ? 'HAAN -- badal diye' : 'NAHI (dry-run) -- sirf dikhaya hai, badalne ke liye ?apply=1 lagao',
-      theek_kiye: apply ? badlenge.length : 0,
-      badlenge: badlenge.length,
-      namune: badlenge.slice(0, 20),
-      ek_naam_ke_kai_user: dograhe.slice(0, 20),
+      chala: apply
+        ? (labelsOnly ? 'HAAN -- sirf purane naam taaza kiye, task kisi ka nahi hila' : 'HAAN -- task sahi doer par bhej diye')
+        : 'NAHI (dry-run) -- kuch nahi badla. Task hilane ke liye ?apply=1, sirf naam taaza karne ke liye ?apply=1&labels=1',
+      TASK_HILENGE: badlenge.length,
+      task_hilne_ke_namune: badlenge.slice(0, 20),
+      SIRF_NAAM_PURANA_HAI_task_sahi_jagah: labelTheek.length,
+      naam_taaza_karne_ke_namune: labelTheek.slice(0, 10),
+      ek_naam_ke_kai_user_chhode: kaiUser.slice(0, 20),
+      doer_hi_nahi_mila: naamBadla.slice(0, 10),
       completed_chhode: withDone ? 0 : chhode.length
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -6410,6 +6431,8 @@ async function doerMismatch() {
     const byId = {};
     users.forEach(u => { byId[String(u.id)] = String(u.name || ''); });
     const norm = s => String(s || '').trim().toLowerCase();
+    const byName = {};
+    users.forEach(u => { (byName[norm(u.name)] = byName[norm(u.name)] || []).push(u); });
 
     const bad = [];
     for (const t of chl) {
@@ -6432,10 +6455,28 @@ async function doerMismatch() {
       const k = `${b.DB_me_likha_hai} -> ${b.TASK_ISKO_DIKH_RAHA_HAI}`;
       jodi[k] = (jodi[k] || 0) + 1;
     });
+
+    // ── Har jodi ka faisla: NAAM BADLA hai ya SACH ME GALAT AADMI? ──
+    // Ye farak sabse zaroori hai, aur ginti se hi pata chalta hai:
+    //   likha hua naam Users me hai HI NAHI  -> us bande ka naam badal diya
+    //       gaya tha. Task sahi aadmi ke paas hi hai, bas doer_name purana
+    //       pada hai. Task HILANA NAHI hai -- sirf label purana hai.
+    //   likha hua naam ek ALAG user ka hai   -> task sach me galat aadmi ke
+    //       paas hai. Yahi wo cheez hai jo theek honi chahiye.
+    const faisla = Object.keys(jodi).map(k => {
+      const likha = k.split(' -> ')[0];
+      const match = byName[norm(likha)] || [];
+      let kya;
+      if (match.length === 0) kya = 'NAAM BADLA LAGTA HAI -- "' + likha + '" naam ka koi user hai hi nahi. Task sahi aadmi ke paas hai, sirf purana label pada hai. HILANA NAHI.';
+      else if (match.length > 1) kya = 'ISI NAAM KE ' + match.length + ' USER HAIN -- khud se nahi chun sakte, haath nahi lagayenge.';
+      else kya = 'ASLI GADBAD -- "' + likha + '" (id ' + match[0].id + ') ek alag user hai. Task galat aadmi ke paas hai.';
+      return { jodi: k, kitne: jodi[k], faisla: kya };
+    }).sort((a, b) => b.kitne - a.kitne);
+
     return {
       kitne_galat: bad.length,
       kul_checklist: chl.length,
-      jodiyan: Object.entries(jodi).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k}: ${n} task`),
+      FAISLA: faisla,
       namune: bad.slice(0, 15)
     };
   } catch (e) { return { error: e.message }; }
