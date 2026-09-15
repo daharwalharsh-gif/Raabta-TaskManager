@@ -3056,6 +3056,83 @@ async function backfillChecklistDoerName() {
   }
 }
 
+// Ek bande ka naam badla -> uske checklist task ka doer_name bhi wahi kar do.
+// SIRF label badalta hai. assigned_to ko HAATH NAHI LAGATA, isliye kisi ka
+// task kisi aur ke paas nahi jaata -- ye pakka hai.
+async function syncDoerName(userId, naya) {
+  const d = await getDB();
+  if (d.pool) {
+    const [r] = await d.pool.query(
+      'UPDATE `Checklist_Tasks` SET `doer_name` = ? WHERE `assigned_to` = ? AND `doer_name` <> ?',
+      [String(naya), String(userId), String(naya)]
+    );
+    d._invalidate && d._invalidate('Checklist_Tasks');
+    return (r && r.affectedRows) || 0;
+  }
+  const tasks = await d.findAll('Checklist_Tasks');
+  let n = 0;
+  for (const t of tasks) {
+    if (String(t.assigned_to) !== String(userId)) continue;
+    if (String(t.doer_name || '') === String(naya)) continue;
+    await d.update('Checklist_Tasks', t.id, { doer_name: naya }).catch(() => {});
+    n++;
+  }
+  return n;
+}
+
+// ── PURANE LABEL EK BAAR THEEK KARO ──
+// Jin rows ka doer_name us bande ke ABHI wale naam se nahi milta, unka label
+// taaza kar do. 15 Sep 2026 ko 182 aisi rows thin (165 sirf "Naresh" ->
+// "NARESH VERMA" ke rename ki wajah se).
+//
+// DHYAN: ye SIRF doer_name likhta hai. assigned_to ko chhuta tak nahi --
+// yaani kisi ka task kisi aur ke paas nahi jaata, na koi task pending/done
+// hota hai. Label jhooth bolna band kar deta hai, bas.
+//
+// Jo task SACH ME galat aadmi ke paas hai (jaise "Ravi Kant" likha hai par
+// ek alag zinda user "Ravi Kant" bhi maujood hai) -- unhe ye NAHI chhedta.
+// Wo faisla aadmi ka hai, isliye wo /api/tasks/fix-doer-mismatch se alag se
+// hota hai, haath se.
+async function resyncChecklistDoerLabels() {
+  const MARKER = 'checklist_doer_name_resync_v1';
+  try {
+    const d = await getDB();
+    await ensureAppStateTab(d);
+    const done = await d.findWhere('App_State', { key_name: MARKER });
+    if (done && done.length) return;
+
+    const [tasks, users] = await Promise.all([d.findAll('Checklist_Tasks'), d.findAll('Users')]);
+    const norm = s => String(s || '').trim().toLowerCase();
+    const byId = {}, byName = {};
+    users.forEach(u => { byId[String(u.id)] = String(u.name || ''); });
+    users.forEach(u => { (byName[norm(u.name)] = byName[norm(u.name)] || []).push(u); });
+
+    let taaza = 0, chhode = 0;
+    for (const t of tasks) {
+      const likha = String(t.doer_name || '').trim();
+      if (!likha) continue;
+      const abhiKaNaam = byId[String(t.assigned_to)];
+      if (abhiKaNaam === undefined) continue;             // orphan -- alag masla
+      if (norm(likha) === norm(abhiKaNaam)) continue;     // pehle se theek
+      // Likha hua naam kisi ZINDA user ka hai -> ye rename nahi, asli gadbad
+      // ho sakti hai. Aadmi khud faisla kare, hum label badal kar saboot nahi
+      // mitayenge.
+      if ((byName[norm(likha)] || []).length > 0) { chhode++; continue; }
+      await d.update('Checklist_Tasks', t.id, { doer_name: abhiKaNaam }).catch(() => {});
+      taaza++;
+    }
+
+    const msg = `${taaza} purane label taaza kiye` + (chhode ? `, ${chhode} chhode (wo rename nahi -- haath se dekhne hain)` : '');
+    await d.insert('App_State', {
+      key_name: MARKER, value: msg,
+      updated_at: new Date().toISOString().replace('T', ' ').split('.')[0]
+    });
+    console.log(`  ✅ checklist doer label resync: ${msg}`);
+  } catch (e) {
+    console.error('  resyncChecklistDoerLabels error (agli baar retry hogi):', e.message);
+  }
+}
+
 async function runOneTimeMigrations() {
   // Checklist tasks ka "Assigned By: Harsh" -> "Rahul Sir"
   const MARKER = 'migration_checklist_harsh_to_rahul_v1';
@@ -4442,8 +4519,26 @@ app.put('/api/users/:id', requireAuth, requireAdmin, async (req, res) => {
     const { name, email, notification_email, role, password, phone, department, week_off, extra_off } = req.body;
     const upd = { name, email, notification_email: notification_email || '', role, phone: phone || '', department: department || '', week_off: week_off || '', extra_off: extra_off || '' };
     if (password) upd.password = password;
+    // NAAM BADLA to uske checklist task ka doer_name bhi saath badlo.
+    // Pehle ye nahi hota tha: "Naresh" ka naam "NARESH VERMA" kar diya gaya
+    // aur uske 165 task me doer_name "Naresh" hi pada reh gaya. phpMyAdmin me
+    // dekhne par lagta tha ki task kisi aur ka hai -- jabki task sahi bande
+    // ke paas hi tha. (15 Sep 2026)
+    const puraana = await db.findOne('Users', { id: req.params.id });
+    const naamBadla = puraana && name && String(puraana.name || '').trim() !== String(name).trim();
     await db.update('Users', req.params.id, upd);
-    res.json({ success: true });
+    let labelBadle = 0;
+    if (naamBadla) {
+      try {
+        labelBadle = await syncDoerName(req.params.id, name);
+        console.log(`  user rename "${puraana.name}" -> "${name}": ${labelBadle} checklist row ka doer_name bhi badla`);
+      } catch (e) {
+        // Label badalna sirf padhne ki aasani ke liye hai -- fail ho to bhi
+        // rename ruke nahi. App to assigned_to hi padhti hai.
+        console.error('  doer_name sync fail:', e.message);
+      }
+    }
+    res.json({ success: true, doerLabelUpdated: labelBadle });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -7350,6 +7445,10 @@ async function seedAdminIfNeeded() {
     getDB()
       .then(() => runOneTimeMigrations())
       .then(() => setTimeout(() => backfillChecklistDoerName().catch(() => {}), 25 * 1000))
+      // Khali label bharne ke BAAD purane/galat label taaza karo (30s par,
+      // taaki backfill pehle nipat jaye). Sirf doer_name -- task kisi ka
+      // nahi hilta.
+      .then(() => setTimeout(() => resyncChecklistDoerLabels().catch(() => {}), 30 * 1000))
       .then(() => setTimeout(() => repairNaNChecklistDates().catch(() => {}), 35 * 1000))
       .then(() => setTimeout(() => fixChecklistDateFormat().catch(() => {}), 45 * 1000))
       .then(() => setTimeout(() => removeOrphanOpenTasks().catch(() => {}), 55 * 1000))
