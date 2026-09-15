@@ -2369,6 +2369,11 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     <input type="hidden" id="editTType"/>
     <div class="alert error" id="editTaskErr"></div>
     <div class="form-group">
+      <label>Doer</label>
+      <select id="editTDoer"></select>
+      <div style="font-size:11px;color:#94a3b8;margin-top:4px">Doer badla to task usi ke naam par chala jayega.</div>
+    </div>
+    <div class="form-group">
       <label>Description</label>
       <textarea id="editTDesc" style="min-height:70px;width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;outline:none;resize:vertical"></textarea>
     </div>
@@ -4339,6 +4344,21 @@ async function openEditTask(id, type) {
   document.getElementById('editTRemarks').value = t.remarks || '';
   document.getElementById('editTaskErr').style.display = 'none';
 
+  // Doer ki list + abhi wala doer select. assigned_to hi wo ID hai jisse app
+  // tay karti hai ki task kisko dikhega, isliye wahi preselect karte hain.
+  // Sabse upar khali option ZAROORI hai: kuch purane task ka doer Users me
+  // hai hi nahi (orphan). Bina khali option ke browser chupchaap list ka
+  // pehla banda chun leta, aur Save dabate hi task us begunah ke naam par
+  // chala jaata -- wahi galti jo theek karne baithe hain.
+  const doerSel = document.getElementById('editTDoer');
+  const users = await api('/api/users');
+  doerSel.innerHTML = '<option value="">Select Doer</option>' +
+    users.map(u => `<option value="${u.id}">${u.name}</option>`).join('');
+  doerSel.value = String(t.assigned_to || '');
+  if (!doerSel.value) {
+    showToast('Is task ka doer Users me nahi mila — naya doer chuno','warning');
+  }
+
   // Show/hide priority for delegation only
   const isDeleg = type === 'delegation';
   document.getElementById('editTPriorityWrap').style.display = isDeleg ? 'block' : 'none';
@@ -4355,13 +4375,15 @@ async function saveEditTask() {
   const desc    = document.getElementById('editTDesc').value.trim();
   const date    = document.getElementById('editTDate').value;
   const remarks = document.getElementById('editTRemarks').value.trim();
+  const doer    = document.getElementById('editTDoer').value;
   const err     = document.getElementById('editTaskErr');
   err.style.display = 'none';
 
   if (!desc) { err.textContent='Description required'; err.style.display='block'; return; }
   if (!date)  { err.textContent='Date required'; err.style.display='block'; return; }
+  if (!doer)  { err.textContent='Doer required'; err.style.display='block'; return; }
 
-  const body = { desc, date, remarks, type };
+  const body = { desc, date, remarks, type, assignedTo: doer };
   if (type === 'delegation') {
     body.priority = document.getElementById('editTPriority').value;
   }
@@ -4713,6 +4735,43 @@ function formatDate(d) {
 // ══════════════════════════════════════════════════════
 // BULK UPLOAD
 // ══════════════════════════════════════════════════════
+
+// Poora CSV text -> rows[] (har row me fields ka array).
+// 15 Sep 2026: pehle yahan seedha line.split(',') tha. Excel jis field me
+// comma hota hai use quote me lapet kar deta hai ("safai karein, order
+// karein"), par split(',') quote samajhta hi nahi tha -- description pehle
+// comma par kat jaati thi aur bacha hua hissa remarks me chala jaata tha
+// (ya gayab). Ye parser quote ke andar wale comma aur newline ko field ka
+// hissa maanta hai, aur "" ko ek asli quote.
+function parseCsv(text) {
+  const rows = [];
+  let row = [], cur = '', inQ = false;
+  const s = String(text).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (inQ) {
+      if (ch === '"') {
+        if (s[i + 1] === '"') { cur += '"'; i++; }   // "" = ek asli quote
+        else inQ = false;
+      } else cur += ch;
+    } else if (ch === '"') inQ = true;
+    else if (ch === ',') { row.push(cur); cur = ''; }
+    else if (ch === '\n') { row.push(cur); rows.push(row); row = []; cur = ''; }
+    else cur += ch;
+  }
+  if (cur !== '' || row.length) { row.push(cur); rows.push(row); }
+  // khali lines hata do (aakhir me newline aksar hota hai)
+  return rows.map(r => r.map(v => v.trim())).filter(r => r.some(v => v !== ''));
+}
+
+// Email se user dhoondo -- chhote/bade akshar aur aage-peeche ki space se
+// farak na pade, warna row chupchaap skip ho jaati thi.
+function findUserByEmail(users, email) {
+  const k = String(email || '').trim().toLowerCase();
+  if (!k) return null;
+  return users.find(u => String(u.email || '').trim().toLowerCase() === k) || null;
+}
+
 function downloadSample() {
   const csv = `doer_email,due_date,priority,description,remarks\npriyanka@test.com,2026-04-01,high,Complete sales report,Follow up needed\npooja@test.com,2026-04-02,medium,Prepare presentation,`;
   downloadFile(csv,'delegation_sample.csv');
@@ -4742,16 +4801,15 @@ async function uploadCSV() {
   const file = document.getElementById('bulkFile').files[0];
   if (!file) { showToast('Please select a CSV file','error'); return; }
   const text = await file.text();
-  const lines = text.trim().split('\n').slice(1);
-  if (!lines.length) { showToast('CSV is empty','error'); return; }
+  const rows = parseCsv(text).slice(1);
+  if (!rows.length) { showToast('CSV is empty','error'); return; }
   // Fetch users once
   const allUsers = await api('/api/users');
   let count = 0, skipped = 0;
-  for (const line of lines) {
-    if (!line.trim()) continue;
-    const [doer_email,due_date,priority,description,remarks] = line.split(',').map(s=>s.trim());
+  for (const cells of rows) {
+    const [doer_email,due_date,priority,description,remarks] = cells;
     if (!doer_email||!description) { skipped++; continue; }
-    const doer = allUsers.find(u=>u.email===doer_email);
+    const doer = findUserByEmail(allUsers, doer_email);
     if (!doer) { skipped++; continue; }
     await api('/api/tasks','POST',{type:'delegation',desc:description,assignedTo:doer.id,date:due_date,priority,approval:'no',remarks});
     count++;
@@ -4765,14 +4823,14 @@ async function uploadCSVC() {
   const file = document.getElementById('bulkFileC').files[0];
   if (!file) { showToast('Please select a CSV file','error'); return; }
   const text = await file.text();
-  const lines = text.trim().split('\n');
-  if (lines.length < 2) { showToast('CSV is empty','error'); return; }
+  const rows = parseCsv(text);
+  if (rows.length < 2) { showToast('CSV is empty','error'); return; }
 
   // Detect format: new (frequency) vs old (due_date)
-  const header = lines[0].toLowerCase().replace(/\s/g,'');
+  const header = rows[0].join(',').toLowerCase().replace(/\s/g,'');
   const isNewFormat = header.includes('frequency') || header.includes('start_date');
 
-  const dataLines = lines.slice(1);
+  const dataLines = rows.slice(1);
   const allUsers = await api('/api/users');
 
   let totalTasks = 0, skipped = 0;
@@ -4781,30 +4839,28 @@ async function uploadCSVC() {
 
   showToast('⏳ Generating tasks, please wait…');
 
-  for (const line of dataLines) {
-    if (!line.trim()) continue;
-
+  for (const cells of dataLines) {
     let user_email, frequency, start_date, description, remarks;
 
     if (isNewFormat) {
       // New format: user_email, frequency, start_date, description, remarks
-      [user_email, frequency, start_date, description, remarks] = line.split(',').map(s => s.trim());
+      [user_email, frequency, start_date, description, remarks] = cells;
       if (!user_email || !description || !frequency || !start_date) { skipped++; continue; }
       frequency = frequency.toLowerCase();
       if (!validFreqs.includes(frequency)) { skipped++; continue; }
     } else {
       // Old format fallback: user_email, due_date, priority, description, remarks
       let due_date, priority;
-      [user_email, due_date, priority, description, remarks] = line.split(',').map(s => s.trim());
+      [user_email, due_date, priority, description, remarks] = cells;
       if (!user_email || !description) { skipped++; continue; }
-      const user = allUsers.find(u => u.email === user_email);
+      const user = findUserByEmail(allUsers, user_email);
       if (!user) { skipped++; continue; }
       await api('/api/tasks','POST',{type:'checklist',desc:description,assignedTo:user.id,date:due_date,priority,remarks});
       totalTasks++;
       continue;
     }
 
-    const user = allUsers.find(u => u.email === user_email);
+    const user = findUserByEmail(allUsers, user_email);
     if (!user) { skipped++; continue; }
 
     const weekOff  = user.week_off  || '';

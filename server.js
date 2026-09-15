@@ -2620,13 +2620,27 @@ function stamp(req, extra) {
 
 app.put('/api/tasks/:id/edit', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const { type, desc, date: rawDate, priority, approval, remarks } = req.body;
+    const { type, desc, date: rawDate, priority, approval, remarks, assignedTo } = req.body;
     const tabName = getTabName(type || 'delegation');
     // Edit se bhi ulti date andar na aaye (12 Sep 2026 ka fix)
     const date = toIsoDateSrv(rawDate);
     if (!date) return res.status(400).json({ error: `Date theek nahi hai: "${rawDate}" — YYYY-MM-DD ya DD-MM-YYYY me do` });
     const upd = { description: desc, due_date: date, remarks: remarks || '' };
     if (type === 'delegation') { upd.priority = priority || 'low'; upd.approval = approval || 'no'; }
+    // DOER BADALNA (15 Sep 2026): pehle ye endpoint assignedTo padhta hi nahi
+    // tha aur Edit modal me Doer ka field bhi nahi tha -- yaani task ka doer
+    // badalne ka koi rasta hi nahi tha. Isi wajah se "assign Kavita ko kiya,
+    // dikh Anand ko raha hai" wali shikayat aayi: doer purana hi pada rehta
+    // tha. Ab doer yahin se badalta hai. assigned_to hi wo ek jagah hai jise
+    // poori app padhti hai (doer_name sirf DB me padhne ki aasani ke liye
+    // hai), isliye dono saath badalte hain -- warna DB me naam kuch aur aur
+    // task kisi aur ko dikhta.
+    if (assignedTo != null && String(assignedTo).trim()) {
+      const newDoer = await db.findOne('Users', { id: String(assignedTo).trim() });
+      if (!newDoer) return res.status(400).json({ error: 'Doer nahi mila' });
+      upd.assigned_to = String(newDoer.id);
+      if (tabName === 'Checklist_Tasks') upd.doer_name = newDoer.name || '';
+    }
     await db.update(tabName, req.params.id, upd);
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -2759,6 +2773,70 @@ app.post('/api/tasks/checklist-reassign-assigner', requireAuth, requireAdmin, as
     for (const t of target) await db.update('Checklist_Tasks', t.id, { assigned_by: to });
     console.log(`  Checklist assigned_by ${from} -> ${to}: ${target.length} tasks updated`);
     res.json({ success: true, updated: target.length });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── "Likha Kavita, dikh Anand ko" wale task theek karo ──
+// Checklist row me doer DO jagah likha hota hai: assigned_to (ID -- app SIRF
+// ise padhti hai) aur doer_name (naam -- sirf phpMyAdmin me dekhne ke liye).
+// phpMyAdmin me doer_name badal dene se task doosre bande ko NAHI jaata,
+// kyunki app use padhti hi nahi -- assigned_to purana hi pada rehta hai.
+// Harsh ne 15 Sep 2026 ko yahi pakda: "assign doer hai Kavita aur show ho
+// raha hai Anand ko."
+//
+// Ye endpoint un rows ka assigned_to us bande par le jaata hai JO NAAM ROW
+// ME LIKHA HAI -- yaani jo likha hai wahi dikhne lagega.
+//
+// DEFAULT DRY-RUN hai: bina ?apply=1 ke kuch nahi badalta, sirf batata hai
+// kya-kya badlega. Completed task ko haath nahi lagate (purana record aur
+// MIS hil jaata) -- sirf khule task, jab tak ?withDone=1 na do.
+app.post('/api/tasks/fix-doer-mismatch', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const apply    = String(req.query.apply || req.body?.apply || '') === '1';
+    const withDone = String(req.query.withDone || req.body?.withDone || '') === '1';
+    const [chl, users] = await Promise.all([
+      db.findAll('Checklist_Tasks'), db.findAll('Users')
+    ]);
+    const norm = s => String(s || '').trim().toLowerCase();
+    const byId = {};
+    users.forEach(u => { byId[String(u.id)] = u; });
+    // naam -> saare users jinka wahi naam hai (ek naam ke do bande ho sakte hain)
+    const byName = {};
+    users.forEach(u => { (byName[norm(u.name)] = byName[norm(u.name)] || []).push(u); });
+
+    const badlenge = [], dograhe = [], chhode = [];
+    for (const t of chl) {
+      const likha = String(t.doer_name || '').trim();
+      if (!likha) continue;
+      const abhiWala = byId[String(t.assigned_to)];
+      if (abhiWala && norm(abhiWala.name) === norm(likha)) continue;   // pehle se theek
+      if (!withDone && t.status === 'completed') { chhode.push(t.id); continue; }
+      const match = byName[norm(likha)] || [];
+      // Ek hi naam ke do user hain to khud se chunna galat hoga -- haath na lagao
+      if (match.length !== 1) { dograhe.push({ id: t.id, naam: likha, kitne_user: match.length }); continue; }
+      badlenge.push({
+        id: t.id,
+        naam: likha,
+        purana: abhiWala ? abhiWala.name : `(id ${t.assigned_to} -- Users me hai hi nahi)`,
+        naya_id: String(match[0].id)
+      });
+    }
+
+    if (apply) {
+      for (const b of badlenge) {
+        await db.update('Checklist_Tasks', b.id, { assigned_to: b.naya_id, doer_name: b.naam });
+      }
+      console.log(`  doer-mismatch fix: ${badlenge.length} checklist task sahi doer par bheje`);
+    }
+
+    res.json({
+      chala: apply ? 'HAAN -- badal diye' : 'NAHI (dry-run) -- sirf dikhaya hai, badalne ke liye ?apply=1 lagao',
+      theek_kiye: apply ? badlenge.length : 0,
+      badlenge: badlenge.length,
+      namune: badlenge.slice(0, 20),
+      ek_naam_ke_kai_user: dograhe.slice(0, 20),
+      completed_chhode: withDone ? 0 : chhode.length
+    });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -6316,6 +6394,53 @@ async function orphanDoers() {
   } catch (e) { return { error: e.message }; }
 }
 
+// ── "Likha Kavita hai, dikh Anand ko raha hai" wale task dhoondo ──
+// Checklist row me DO jagah doer ka zikr hota hai:
+//   assigned_to  -> ID. App SIRF isse tay karti hai ki task kisko dikhega.
+//   doer_name    -> naam. Sirf phpMyAdmin me padhne ke liye.
+// Dono alag ho jayein to DB me naam kuch aur dikhta hai aur task kisi aur ko
+// milta hai -- Harsh ne 15 Sep 2026 ko yahi pakda. Ye function wahi rows
+// ginta hai. Sirf padhta hai, kuch badalta nahi.
+async function doerMismatch() {
+  try {
+    const d = await getDB();
+    const [chl, users] = await Promise.all([
+      d.findAll('Checklist_Tasks'), d.findAll('Users')
+    ]);
+    const byId = {};
+    users.forEach(u => { byId[String(u.id)] = String(u.name || ''); });
+    const norm = s => String(s || '').trim().toLowerCase();
+
+    const bad = [];
+    for (const t of chl) {
+      const likha = String(t.doer_name || '').trim();
+      if (!likha) continue;                       // khali hai to compare kya karein
+      const dikhta = byId[String(t.assigned_to)];
+      if (dikhta === undefined) continue;         // orphan -- uske liye ?orphans=1 hai
+      if (norm(likha) === norm(dikhta)) continue; // dono ek hi -- theek hai
+      bad.push({
+        id: t.id,
+        DB_me_likha_hai: likha,
+        TASK_ISKO_DIKH_RAHA_HAI: dikhta,
+        status: t.status,
+        due_date: t.due_date
+      });
+    }
+    // Kis jodi me kitni baar -- "Kavita -> Anand: 37" jaisa
+    const jodi = {};
+    bad.forEach(b => {
+      const k = `${b.DB_me_likha_hai} -> ${b.TASK_ISKO_DIKH_RAHA_HAI}`;
+      jodi[k] = (jodi[k] || 0) + 1;
+    });
+    return {
+      kitne_galat: bad.length,
+      kul_checklist: chl.length,
+      jodiyan: Object.entries(jodi).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k}: ${n} task`),
+      namune: bad.slice(0, 15)
+    };
+  } catch (e) { return { error: e.message }; }
+}
+
 // Kisi ek doer ki checklist rows jhaank kar dekho — sirf id/date/status.
 // Description NAHI bhejte (endpoint public hai). Diagnose ke liye:
 //   /api/cron/wa-reminders?peek=ravi
@@ -6378,6 +6503,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
         checklistOdd: await checklistOddSample(6),
         checklistPeek: req.query.peek ? await checklistPeek(String(req.query.peek)) : undefined,
         orphanDoers: req.query.orphans ? await orphanDoers() : undefined,
+        doerMismatch: req.query.mismatch ? await doerMismatch() : undefined,
         reminderWho: req.query.who ? await reminderWho() : undefined,
         delegationAudit: req.query.deleg ? await delegationAudit() : undefined,
         tableCols: req.query.cols ? await tableCols() : undefined,
@@ -6457,6 +6583,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
       checklistOdd: await checklistOddSample(6),
       checklistPeek: req.query.peek ? await checklistPeek(String(req.query.peek)) : undefined,
       orphanDoers: req.query.orphans ? await orphanDoers() : undefined,
+      doerMismatch: req.query.mismatch ? await doerMismatch() : undefined,
       reminderWho: req.query.who ? await reminderWho() : undefined,
       delegationAudit: req.query.deleg ? await delegationAudit() : undefined,
       tableCols: req.query.cols ? await tableCols() : undefined,
