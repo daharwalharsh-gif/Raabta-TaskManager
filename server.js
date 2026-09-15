@@ -6577,6 +6577,56 @@ async function doerMismatch() {
   } catch (e) { return { error: e.message }; }
 }
 
+// ── "Task daale the, dikh hi nahi rahe" ka jawab ──
+// Email ya naam do, aur saaf pata chalta hai: user mila ya nahi, uske kitne
+// task hain, kitne AAJ dikhne wale hain aur kitne AAGE KI DATE ke hain.
+// Checklist ka main view aaj-se-aage wale task chhupa deta hai, isliye upload
+// ke baad aksar lagta hai "task bane hi nahi" -- jabki bane hote hain, bas
+// unki date abhi aayi nahi hoti. (15 Sep 2026)
+//   /api/cron/wa-reminders?doer=rajpootvishalr11@gmail.com
+async function doerJhaank(q) {
+  try {
+    const d = await getDB();
+    const [chl, users] = await Promise.all([d.findAll('Checklist_Tasks'), d.findAll('Users')]);
+    const k = String(q || '').trim().toLowerCase();
+    if (!k) return { error: 'naam ya email do' };
+    const mila = users.filter(u =>
+      String(u.email || '').trim().toLowerCase() === k ||
+      String(u.name || '').trim().toLowerCase().includes(k));
+    if (!mila.length) {
+      return {
+        MILA: 'NAHI -- is email/naam ka koi user hi nahi hai',
+        dhoonda: q,
+        iska_matlab: 'Bulk upload aisi rows ko chupchaap skip kar deta hai -- task bante hi nahi'
+      };
+    }
+    const todayStr = today();
+    const out = mila.map(u => {
+      const mine = chl.filter(t => String(t.assigned_to) === String(u.id));
+      const open = mine.filter(t => t.status === 'pending' || t.status === 'revised');
+      const aaj  = open.filter(t => String(t.due_date || '') <= todayStr);
+      const aage = open.filter(t => String(t.due_date || '') > todayStr);
+      const hist = {};
+      aage.forEach(t => { const v = String(t.due_date || ''); hist[v] = (hist[v] || 0) + 1; });
+      return {
+        user: `${u.name} (id ${u.id})`,
+        email: u.email,
+        week_off: u.week_off || '(koi nahi)',
+        kul_checklist: mine.length,
+        khule: open.length,
+        AAJ_DIKHNE_WALE: aaj.length,
+        AAGE_KI_DATE_WALE_abhi_chhupe: aage.length,
+        aage_ki_dates: Object.entries(hist).sort().slice(0, 15).map(([dt, n]) => `${dt}: ${n}`),
+        sabse_naye_12: mine.slice(-12).map(t => ({
+          id: t.id, due_date: t.due_date, freq: t.frequency, status: t.status,
+          kaam: String(t.description || '').slice(0, 45)
+        }))
+      };
+    });
+    return { aaj: todayStr, kitne_user_mile: out.length, mile: out };
+  } catch (e) { return { error: e.message }; }
+}
+
 // Kisi ek doer ki checklist rows jhaank kar dekho — sirf id/date/status.
 // Description NAHI bhejte (endpoint public hai). Diagnose ke liye:
 //   /api/cron/wa-reminders?peek=ravi
@@ -6640,6 +6690,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
         checklistPeek: req.query.peek ? await checklistPeek(String(req.query.peek)) : undefined,
         orphanDoers: req.query.orphans ? await orphanDoers() : undefined,
         doerMismatch: req.query.mismatch ? await doerMismatch() : undefined,
+        doerJhaank: req.query.doer ? await doerJhaank(String(req.query.doer)) : undefined,
         reminderWho: req.query.who ? await reminderWho() : undefined,
         delegationAudit: req.query.deleg ? await delegationAudit() : undefined,
         tableCols: req.query.cols ? await tableCols() : undefined,
@@ -6720,6 +6771,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
       checklistPeek: req.query.peek ? await checklistPeek(String(req.query.peek)) : undefined,
       orphanDoers: req.query.orphans ? await orphanDoers() : undefined,
       doerMismatch: req.query.mismatch ? await doerMismatch() : undefined,
+      doerJhaank: req.query.doer ? await doerJhaank(String(req.query.doer)) : undefined,
       reminderWho: req.query.who ? await reminderWho() : undefined,
       delegationAudit: req.query.deleg ? await delegationAudit() : undefined,
       tableCols: req.query.cols ? await tableCols() : undefined,
