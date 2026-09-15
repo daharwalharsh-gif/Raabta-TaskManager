@@ -6568,11 +6568,54 @@ async function doerMismatch() {
       return { jodi: k, kitne: jodi[k], faisla: kya };
     }).sort((a, b) => b.kitne - a.kitne);
 
+    // ── RENAME hai ya SACH ME GALAT AADMI -- pakka faisla ──
+    // Tarika: jis id par mismatch hai, USI id ke saare task ke label dekho.
+    // Agar ek hi id par do naam mile aur purana naam sirf PURANE task par ho
+    // (nayi tareekh wale task par naya naam), to us account ka naam badla
+    // tha -- task wahin ke wahin hain, sahi bande ke paas. Agar purana naam
+    // nayi tareekh par bhi chal raha hai, to baat rename ki nahi hai.
+    const idsMe = [...new Set(chl.filter(t => {
+      const l = String(t.doer_name || '').trim();
+      if (!l) return false;
+      const dk = byId[String(t.assigned_to)];
+      return dk !== undefined && norm(l) !== norm(dk);
+    }).map(t => String(t.assigned_to)))];
+
+    const jaanch = idsMe.map(id => {
+      const rows = chl.filter(t => String(t.assigned_to) === id);
+      const label = {};
+      rows.forEach(t => {
+        const l = String(t.doer_name || '').trim() || '(khali)';
+        if (!label[l]) label[l] = { kitne: 0, pehla: '', aakhri: '' };
+        const e = label[l];
+        e.kitne++;
+        const c = String(t.created_at || '');
+        if (c) {
+          if (!e.pehla || c < e.pehla) e.pehla = c;
+          if (!e.aakhri || c > e.aakhri) e.aakhri = c;
+        }
+      });
+      return {
+        user: `${byId[id]} (id ${id})`,
+        is_id_par_kaunse_naam: Object.entries(label)
+          .sort((a, b) => b[1].kitne - a[1].kitne)
+          .map(([l, e]) => `"${l}" -- ${e.kitne} task (${e.pehla ? e.pehla.slice(0, 10) : '?'} se ${e.aakhri ? e.aakhri.slice(0, 10) : '?'} tak bane)`)
+      };
+    });
+
     return {
       kitne_galat: bad.length,
       kul_checklist: chl.length,
       FAISLA: faisla,
-      namune: bad.slice(0, 15)
+      JAANCH: jaanch,
+      namune: bad.slice(0, 15).map(b => {
+        const t = chl.find(x => String(x.id) === String(b.id)) || {};
+        return Object.assign({}, b, {
+          assigned_to: t.assigned_to,
+          bana: String(t.created_at || '').slice(0, 16),
+          kaam: String(t.description || '').slice(0, 45)
+        });
+      })
     };
   } catch (e) { return { error: e.message }; }
 }
