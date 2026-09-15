@@ -76,7 +76,11 @@ module.exports = {
   // Harsh, 11 Sep 2026 (shaam): "ab sirf 9:30 par hi jaye — 10:15 aur 5 baje
   // wala dono band." Pehle 10:15 AM aur 5:00 PM the; ab ek hi slot.
   // Din ka cap = slots ki ginti, isliye ab roz EK hi pass chalega.
-  reminderTimes: [ { h: 9, m: 30 } ],   // sirf 9:30 AM
+  //
+  // Harsh, 15 Sep 2026 (shaam): "subah ka reminder 9 AM par jana chahiye kal
+  // se." Isliye 9:30 -> 9:00. Office-hours guard bhi apne aap 9:00 se shuru
+  // ho jayega (guard isi list ke pehle slot se match karta hai).
+  reminderTimes: [ { h: 9, m: 0 } ],   // sirf 9:00 AM
   timeoutMs:    60000,   // naya API 0.4s me jawab deta hai; buffer ke liye same rakha
   // Self keep-alive ka pata. Ye .env me set nahi tha, isliye keep-alive
   // band pada tha aur Hostinger par app so jaati thi — 10:15 ka tick chalta
