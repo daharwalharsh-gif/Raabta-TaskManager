@@ -1120,6 +1120,13 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
         </div>
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <!-- Checklist me aage ki date wale task by default chhupe rehte hain
+             (wo roz-ka-kaam wali list hai). Upload ke baad "task dikh hi nahi
+             rahe" isi wajah se lagta tha, isliye ye toggle. (15 Sep 2026) -->
+        <label id="tasksFutureWrap" style="display:none;align-items:center;gap:6px;font-size:12px;color:#64748b;cursor:pointer;white-space:nowrap">
+          <input type="checkbox" id="tasksFuture" onchange="loadAllTasks()" style="cursor:pointer">
+          Aage ke task bhi
+        </label>
         <!-- PC-only: user filter + date range (desktop only) -->
         <div id="tasksUserDateFilters" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;">
           <select id="tasksUserFilter" onchange="filterTasks()"
@@ -3763,7 +3770,14 @@ async function loadAllTasks() {
     }
   }
 
-  const data = await api(`/api/tasks?type=${tasksType}`);
+  // "Aage ke task bhi" sirf Checklist par kaam ki cheez hai -- delegation me
+  // aage wale waise bhi dikhte hain.
+  const futWrap = document.getElementById('tasksFutureWrap');
+  const futBox  = document.getElementById('tasksFuture');
+  if (futWrap) futWrap.style.display = (tasksType === 'checklist') ? 'inline-flex' : 'none';
+  const aageBhi = !!(futBox && futBox.checked && tasksType === 'checklist');
+
+  const data = await api(`/api/tasks?type=${tasksType}${aageBhi ? '&includeFuture=1' : ''}`);
 
   // Flatten all tasks — admin, HOD and PC get grouped response
   let allTasks = [];
