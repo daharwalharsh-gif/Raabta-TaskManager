@@ -3133,6 +3133,58 @@ async function resyncChecklistDoerLabels() {
   }
 }
 
+// ── Ashok ke 17 task par "Ravi Kant" ka galat label ──
+// 15 Sep 2026. Ye aakhri bacha hua mismatch tha. Faisla ginti se nikala,
+// andaze se nahi:
+//   Ravi Kant (id 9, headdesigner@raabtajewels.com) -- checklist task: 0
+//   Ashok Sn  (id 5, ashok@raabtajewels.com)        -- checklist task: 553
+//   Vivadit kaam: "Align Karigars & beading staff for Production" x17,
+//     2026-07-21 ko bane, tab se assigned_to = 5 (Ashok) hi hai.
+//   Ashok ke baaki kaam: "stock of pearl chain used for kaleeras",
+//     "stocks of semi precious stones & beads" -- yaani beads/production ka
+//     kaam Ashok hi dekhta hai. Ravi Kant Head Designer hai aur uske paas
+//     ek bhi checklist task nahi hai.
+// Nateeja: task SAHI bande ke paas hai, sirf doer_name galat likha reh gaya.
+// Isliye task HILATE NAHI -- sirf label theek karte hain.
+//
+// Ye jaan-boojh kar tang rakha hai (sirf yahi naam + yahi id), taaki koi
+// aur row galti se na chhoo jaye. Galat nikle to Edit Task me Doer badal
+// kar kabhi bhi palta ja sakta hai.
+async function fixRaviKantLabelOnAshok() {
+  const MARKER = 'checklist_ravikant_label_fix_v1';
+  try {
+    const d = await getDB();
+    await ensureAppStateTab(d);
+    const done = await d.findWhere('App_State', { key_name: MARKER });
+    if (done && done.length) return;
+
+    const users = await d.findAll('Users');
+    const ashok = users.find(u => String(u.email || '').trim().toLowerCase() === 'ashok@raabtajewels.com');
+    // Banda hi na mile to kuch mat karo -- marker bhi mat likho, agli baar
+    // dobara koshish ho jayegi.
+    if (!ashok) { console.log('  RaviKant label fix: ashok@raabtajewels.com nahi mila -- skip'); return; }
+
+    const chl = await d.findAll('Checklist_Tasks');
+    const target = chl.filter(t =>
+      String(t.assigned_to) === String(ashok.id) &&
+      String(t.doer_name || '').trim().toLowerCase() === 'ravi kant');
+
+    let n = 0;
+    for (const t of target) {
+      await d.update('Checklist_Tasks', t.id, { doer_name: ashok.name }).catch(() => {});
+      n++;
+    }
+    const msg = `${n} row ka label "Ravi Kant" -> "${ashok.name}" (task kisi ka nahi hila)`;
+    await d.insert('App_State', {
+      key_name: MARKER, value: msg,
+      updated_at: new Date().toISOString().replace('T', ' ').split('.')[0]
+    });
+    console.log(`  ✅ RaviKant label fix: ${msg}`);
+  } catch (e) {
+    console.error('  fixRaviKantLabelOnAshok error (agli baar retry hogi):', e.message);
+  }
+}
+
 async function runOneTimeMigrations() {
   // Checklist tasks ka "Assigned By: Harsh" -> "Rahul Sir"
   const MARKER = 'migration_checklist_harsh_to_rahul_v1';
@@ -7544,6 +7596,7 @@ async function seedAdminIfNeeded() {
       // taaki backfill pehle nipat jaye). Sirf doer_name -- task kisi ka
       // nahi hilta.
       .then(() => setTimeout(() => resyncChecklistDoerLabels().catch(() => {}), 30 * 1000))
+      .then(() => setTimeout(() => fixRaviKantLabelOnAshok().catch(() => {}), 33 * 1000))
       .then(() => setTimeout(() => repairNaNChecklistDates().catch(() => {}), 35 * 1000))
       .then(() => setTimeout(() => fixChecklistDateFormat().catch(() => {}), 45 * 1000))
       .then(() => setTimeout(() => removeOrphanOpenTasks().catch(() => {}), 55 * 1000))
