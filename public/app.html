@@ -1125,7 +1125,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
              rahe" isi wajah se lagta tha, isliye ye toggle. (15 Sep 2026) -->
         <label id="tasksFutureWrap" style="display:none;align-items:center;gap:6px;font-size:12px;color:#64748b;cursor:pointer;white-space:nowrap">
           <input type="checkbox" id="tasksFuture" onchange="loadAllTasks()" style="cursor:pointer">
-          Aage ke task bhi
+          Show upcoming tasks
         </label>
         <!-- PC-only: user filter + date range (desktop only) -->
         <div id="tasksUserDateFilters" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;">
@@ -2197,7 +2197,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
          chahiye to yahan tick karo. (16 Sep 2026) -->
     <label id="hClearWrap" style="display:flex;align-items:center;gap:8px;font-size:12px;color:#64748b;margin-bottom:12px;cursor:pointer">
       <input type="checkbox" id="hClear" style="cursor:pointer">
-      Is din ke checklist task bhi hata do (delete ho jayenge, wapas nahi aayenge)
+      Also delete checklist tasks on this date (cannot be undone)
     </label>
     <button class="btn btn-primary" style="width:100%;margin-bottom:16px" onclick="addHoliday()">Add Holiday</button>
     <div style="font-size:12px;font-weight:600;color:#64748b;margin-bottom:8px;text-transform:uppercase;letter-spacing:.4px">Holiday List</div>
@@ -2385,7 +2385,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     <div class="form-group">
       <label>Doer</label>
       <select id="editTDoer"></select>
-      <div style="font-size:11px;color:#94a3b8;margin-top:4px">Doer badla to task usi ke naam par chala jayega.</div>
+      <div style="font-size:11px;color:#94a3b8;margin-top:4px">Changing the doer moves this task to that person.</div>
     </div>
     <div class="form-group">
       <label>Description</label>
@@ -4376,7 +4376,7 @@ async function openEditTask(id, type) {
     users.map(u => `<option value="${u.id}">${u.name}</option>`).join('');
   doerSel.value = String(t.assigned_to || '');
   if (!doerSel.value) {
-    showToast('Is task ka doer Users me nahi mila — naya doer chuno','warning');
+    showToast("This task's doer is not in the Users list — please pick a doer",'warning');
   }
 
   // Show/hide priority for delegation only
@@ -4738,15 +4738,15 @@ async function addHoliday() {
   await renderHolidayList();
 
   showToast(deleted > 0
-    ? `Holiday added! ${deleted} checklist task(s) hataye gaye — ${formatDate(date)}`
+    ? `Holiday added! ${deleted} checklist task(s) deleted for ${formatDate(date)}`
     : `Holiday added — ${formatDate(date)}`);
 }
 
 async function deleteHoliday(id) {
-  if (!confirm('Ye chhutti list se hata dein?')) return;
+  if (!confirm('Remove this holiday from the list?')) return;
   const r = await api('/api/holidays/'+id,'DELETE');
   if (r.error) { showToast(r.error,'error'); return; }
-  showToast('Holiday hata di');
+  showToast('Holiday removed');
   await renderHolidayList();
 }
 
@@ -4762,7 +4762,7 @@ async function renderHolidayList() {
   const todayStr = new Date().toISOString().split('T')[0];
   container.innerHTML = list.map(h=>`
     <div class="holiday-item"${h.date < todayStr ? ' style="opacity:.55"' : ''}>
-      <span><strong>${formatDate(h.date)}</strong> — ${h.name}${h.date < todayStr ? ' <span style="font-size:11px;color:#94a3b8">(guzar chuki)</span>' : ''}</span>
+      <span><strong>${formatDate(h.date)}</strong> — ${h.name}${h.date < todayStr ? ' <span style="font-size:11px;color:#94a3b8">(past)</span>' : ''}</span>
       ${isAdmin ? `<button class="action-btn delete" onclick="deleteHoliday('${h.id}')">Remove</button>` : ''}
     </div>`).join('');
 }

@@ -2646,7 +2646,7 @@ app.put('/api/tasks/:id/edit', requireAuth, requireAdmin, async (req, res) => {
     // task kisi aur ko dikhta.
     if (assignedTo != null && String(assignedTo).trim()) {
       const newDoer = await db.findOne('Users', { id: String(assignedTo).trim() });
-      if (!newDoer) return res.status(400).json({ error: 'Doer nahi mila' });
+      if (!newDoer) return res.status(400).json({ error: 'Doer not found' });
       upd.assigned_to = String(newDoer.id);
       if (tabName === 'Checklist_Tasks') upd.doer_name = newDoer.name || '';
     }
@@ -4670,11 +4670,11 @@ app.post('/api/holidays', requireAuth, requireAdmin, async (req, res) => {
   try {
     const date = toIsoDateSrv(req.body?.date);
     const name = String(req.body?.name || '').trim();
-    if (!date) return res.status(400).json({ error: `Date theek nahi hai: "${req.body?.date}"` });
-    if (!name) return res.status(400).json({ error: 'Holiday ka naam chahiye' });
+    if (!date) return res.status(400).json({ error: `Invalid date: "${req.body?.date}" — use YYYY-MM-DD or DD-MM-YYYY` });
+    if (!name) return res.status(400).json({ error: 'Holiday name is required' });
     // Ek hi din do baar na jude
     const pehle = (await db.findAll('Holidays')).find(h => String(h.date) === date);
-    if (pehle) return res.status(409).json({ error: `${date} par pehle se chhutti hai: ${pehle.name}` });
+    if (pehle) return res.status(409).json({ error: `${date} is already a holiday: ${pehle.name}` });
     const row = await db.insert('Holidays', {
       date, name,
       created_at: new Date(Date.now() + 330 * 60000).toISOString().replace('T', ' ').split('.')[0]
