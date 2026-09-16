@@ -2192,6 +2192,13 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
         <input type="text" id="hName" placeholder="e.g. Diwali"/>
       </div>
     </div>
+    <!-- Pehle chhutti add karte hi us din ke SAARE checklist task chupchaap
+         delete ho jaate the (completed bhi). Ab ye apne aap nahi hota --
+         chahiye to yahan tick karo. (16 Sep 2026) -->
+    <label id="hClearWrap" style="display:flex;align-items:center;gap:8px;font-size:12px;color:#64748b;margin-bottom:12px;cursor:pointer">
+      <input type="checkbox" id="hClear" style="cursor:pointer">
+      Is din ke checklist task bhi hata do (delete ho jayenge, wapas nahi aayenge)
+    </label>
     <button class="btn btn-primary" style="width:100%;margin-bottom:16px" onclick="addHoliday()">Add Holiday</button>
     <div style="font-size:12px;font-weight:600;color:#64748b;margin-bottom:8px;text-transform:uppercase;letter-spacing:.4px">Holiday List</div>
     <div id="holidayList" style="max-height:280px;overflow-y:auto"></div>
@@ -2865,7 +2872,9 @@ let dashType = 'all';
 let dashSearchQuery = '';
 let tasksType = 'delegation';
 let dashChartInst = null;
-let holidays = JSON.parse(localStorage.getItem('tm_holidays') || '[]');
+// Chhuttiyan ab DB se aati hain (/api/holidays), browser me nahi rakhi
+// jaatin. Pehle ye localStorage me thin, isliye ek bande ki daali hui
+// chhutti kisi doosre ko dikhti hi nahi thi. (16 Sep 2026)
 let transferMode = false;
 let pendingTransferTaskIds = []; // task IDs that already have pending transfer
 // Dashboard date sort: 0=default(API order), 1=asc(oldest first), 2=desc(newest first)
@@ -3018,13 +3027,10 @@ async function removeProfileImage() {
 }
 
 function setMinDates() {
-  const today = new Date().toISOString().split('T')[0];
-  // cDate (checklist) aur dDate (delegation) NOT restricted — backdated tasks allowed.
-  // Sirf hDate (holiday) future-only rehta hai.
-  ['hDate'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.min = today;
-  });
+  // Kisi date par ab koi rok nahi hai.
+  // cDate (checklist) aur dDate (delegation): backdated tasks allowed.
+  // hDate (holiday): pehle future-only tha, par purani chhuttiyan (26 Jan,
+  // 4 Mar...) list me daalni hi nahi ja sakti thin -- isliye ab khula hai.
 }
 
 // ══════════════════════════════════════════════════════
@@ -4691,13 +4697,23 @@ async function saveChecklist() {
 // ══════════════════════════════════════════════════════
 // HOLIDAYS
 // ══════════════════════════════════════════════════════
-function openHoliday() {
-  const today = new Date().toISOString().split('T')[0];
+async function openHoliday() {
   document.getElementById('hDate').value='';
-  document.getElementById('hDate').min=today;
+  // min HATA diya: purani tareekh ki chhutti bhi list me daali ja sake
+  // (26 Jan, 4 Mar jaisi guzri hui tareekhen pehle add hi nahi hoti thin).
+  document.getElementById('hDate').removeAttribute('min');
   document.getElementById('hName').value='';
-  renderHolidayList();
+  const cb = document.getElementById('hClear');
+  if (cb) cb.checked = false;              // har baar OFF se shuru
+  // Add/Remove sirf admin ke liye — baaki sab list dekh sakte hain
+  const sirfDekhna = !(ME && ME.role === 'admin');
+  ['hDate','hName'].forEach(id => { const e=document.getElementById(id); if(e) e.disabled = sirfDekhna; });
+  const cw = document.getElementById('hClearWrap');
+  if (cw) cw.style.display = sirfDekhna ? 'none' : 'flex';
+  const addBtn = document.querySelector('#holidayModal .btn-primary');
+  if (addBtn) addBtn.style.display = sirfDekhna ? 'none' : '';
   document.getElementById('holidayModal').classList.add('open');
+  await renderHolidayList();
 }
 
 async function addHoliday() {
@@ -4705,39 +4721,49 @@ async function addHoliday() {
   const name = document.getElementById('hName').value.trim();
   if (!date||!name) { showToast('Date and name required!'); return; }
 
-  // Save holiday
-  holidays.push({date,name});
-  holidays.sort((a,b)=>a.date.localeCompare(b.date));
-  localStorage.setItem('tm_holidays', JSON.stringify(holidays));
+  const r = await api('/api/holidays','POST',{date,name});
+  if (r.error) { showToast(r.error,'error'); return; }
 
-  // Auto-delete checklist tasks on this holiday date
-  const result = await api('/api/tasks/delete-by-date','DELETE',{date});
-  const deleted = result.deleted || 0;
+  // Task hatana ab apne aap NAHI hota -- sirf tab jab tick kiya ho
+  let deleted = 0;
+  const cb = document.getElementById('hClear');
+  if (cb && cb.checked) {
+    const res = await api('/api/tasks/delete-by-date','DELETE',{date});
+    deleted = res.deleted || 0;
+  }
 
   document.getElementById('hDate').value='';
   document.getElementById('hName').value='';
-  renderHolidayList();
+  if (cb) cb.checked = false;
+  await renderHolidayList();
 
-  if (deleted > 0) {
-    showToast(`Holiday added! ${deleted} checklist task(s) auto-deleted for ${formatDate(date)}`);
-  } else {
-    showToast(`Holiday added! No checklist tasks were on ${formatDate(date)}`);
-  }
+  showToast(deleted > 0
+    ? `Holiday added! ${deleted} checklist task(s) hataye gaye — ${formatDate(date)}`
+    : `Holiday added — ${formatDate(date)}`);
 }
 
-function deleteHoliday(idx) {
-  holidays.splice(idx,1);
-  localStorage.setItem('tm_holidays', JSON.stringify(holidays));
-  renderHolidayList();
+async function deleteHoliday(id) {
+  if (!confirm('Ye chhutti list se hata dein?')) return;
+  const r = await api('/api/holidays/'+id,'DELETE');
+  if (r.error) { showToast(r.error,'error'); return; }
+  showToast('Holiday hata di');
+  await renderHolidayList();
 }
 
-function renderHolidayList() {
+async function renderHolidayList() {
   const container = document.getElementById('holidayList');
-  if (!holidays.length) { container.innerHTML='<div class="empty" style="padding:16px">No holidays added yet</div>'; return; }
-  container.innerHTML = holidays.map((h,i)=>`
-    <div class="holiday-item">
-      <span><strong>${formatDate(h.date)}</strong> — ${h.name}</span>
-      <button class="action-btn delete" onclick="deleteHoliday(${i})">Remove</button>
+  container.innerHTML = '<div class="empty" style="padding:16px">Loading…</div>';
+  const list = await api('/api/holidays');
+  if (!Array.isArray(list) || !list.length) {
+    container.innerHTML='<div class="empty" style="padding:16px">No holidays added yet</div>';
+    return;
+  }
+  const isAdmin = !!(ME && ME.role === 'admin');
+  const todayStr = new Date().toISOString().split('T')[0];
+  container.innerHTML = list.map(h=>`
+    <div class="holiday-item"${h.date < todayStr ? ' style="opacity:.55"' : ''}>
+      <span><strong>${formatDate(h.date)}</strong> — ${h.name}${h.date < todayStr ? ' <span style="font-size:11px;color:#94a3b8">(guzar chuki)</span>' : ''}</span>
+      ${isAdmin ? `<button class="action-btn delete" onclick="deleteHoliday('${h.id}')">Remove</button>` : ''}
     </div>`).join('');
 }
 

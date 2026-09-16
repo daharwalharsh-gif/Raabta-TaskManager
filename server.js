@@ -502,6 +502,15 @@ const MYSQL_SCHEMA = {
     action_type: "VARCHAR(20) DEFAULT ''", status: "VARCHAR(20) DEFAULT 'pending'",
     note: "TEXT", created_at: "VARCHAR(40) DEFAULT ''"
   },
+  // Chhuttiyan. 16 Sep 2026 tak ye browser ke localStorage me padi thin,
+  // isliye jo bhi add karta wo SIRF USI ke browser me dikhti thi -- kisi
+  // doosre bande ko, ya usi bande ko doosre phone par, kuch nahi dikhta tha.
+  // Harsh: "sabhi ko show honi chahiye." Isliye ab DB me.
+  Holidays: {
+    date: "VARCHAR(20) DEFAULT ''",        // YYYY-MM-DD
+    name: "VARCHAR(160) DEFAULT ''",
+    created_at: "VARCHAR(40) DEFAULT ''"
+  },
   Task_Comments: {
     task_id: "VARCHAR(20) DEFAULT ''", task_type: "VARCHAR(20) DEFAULT ''",
     user_id: "VARCHAR(20) DEFAULT ''", comment: "TEXT", created_at: "VARCHAR(40) DEFAULT ''"
@@ -3185,6 +3194,53 @@ async function fixRaviKantLabelOnAshok() {
   }
 }
 
+// ── Harsh ki 2026 holiday list ek baar daal do ──
+// 16 Sep 2026: pehle chhuttiyan localStorage me thin, isliye "Holiday List"
+// sabko khali dikhti thi. Ab DB me hain, aur ye list ek baar seed ho jaati
+// hai taaki haath se 8 baar type na karni pade.
+//
+// DHYAN: yahan JAAN-BOOJH KAR koi task delete NAHI hota. Modal se chhutti
+// add karne par us din ke checklist task hat jaate hain, par usme purani
+// tareekh daali hi nahi ja sakti thi. Is list me 4 tareekhen guzar chuki
+// hain (26 Jan, 4 Mar, 15 Aug, 28 Aug) -- un din ka jo kaam ho chuka hai
+// uska record mita dena bilkul galat hota. Isliye seed sirf chhutti likhta
+// hai, task ko haath nahi lagata.
+const HOLIDAYS_2026 = [
+  { date: '2026-01-26', name: 'Republic Day' },
+  { date: '2026-03-04', name: 'Holi' },
+  { date: '2026-08-15', name: 'Independence Day' },
+  { date: '2026-08-28', name: 'Raksha Bandhan' },
+  { date: '2026-10-02', name: 'Mahatma Gandhi Jayanti' },
+  { date: '2026-11-08', name: 'Diwali (Deepavali)' },
+  { date: '2026-11-09', name: 'Govardhan Puja' },
+  { date: '2026-11-11', name: 'Bhai Dooj' }
+];
+
+async function seedHolidays2026() {
+  const MARKER = 'holidays_2026_seed_v1';
+  try {
+    const d = await getDB();
+    await ensureAppStateTab(d);
+    const done = await d.findWhere('App_State', { key_name: MARKER });
+    if (done && done.length) return;
+
+    const pehle = await d.findAll('Holidays').catch(() => []);
+    const hai = new Set(pehle.map(h => String(h.date || '').trim()));
+    const nowStr = new Date(Date.now() + 330 * 60000).toISOString().replace('T', ' ').split('.')[0];
+
+    let daale = 0;
+    for (const h of HOLIDAYS_2026) {
+      if (hai.has(h.date)) continue;          // pehle se hai to dobara mat daalo
+      await d.insert('Holidays', { date: h.date, name: h.name, created_at: nowStr }).catch(() => {});
+      daale++;
+    }
+    await d.insert('App_State', { key_name: MARKER, value: `${daale} chhutti daali`, updated_at: nowStr });
+    console.log(`  ✅ Holidays 2026 seed: ${daale} chhutti daali (koi task delete nahi hua)`);
+  } catch (e) {
+    console.error('  seedHolidays2026 error (agli baar retry hogi):', e.message);
+  }
+}
+
 async function runOneTimeMigrations() {
   // Checklist tasks ka "Assigned By: Harsh" -> "Rahul Sir"
   const MARKER = 'migration_checklist_harsh_to_rahul_v1';
@@ -4591,6 +4647,46 @@ app.put('/api/users/:id', requireAuth, requireAdmin, async (req, res) => {
       }
     }
     res.json({ success: true, doerLabelUpdated: labelBadle });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ══════════════════════════════════════════════════════
+// HOLIDAYS — sabko dikhti hain, badalta sirf admin hai
+// ══════════════════════════════════════════════════════
+// Pehle ye localStorage me thin, isliye ek bande ki daali hui chhutti kisi
+// doosre ko dikhti hi nahi thi (na usi bande ko doosre phone par). Harsh
+// (16 Sep 2026): "sabhi ko show honi chahiye." Ab DB se aati hain.
+
+// Padhna sab kar sakte hain — chhutti sabke kaam ki cheez hai
+app.get('/api/holidays', requireAuth, async (req, res) => {
+  try {
+    const rows = await db.findAll('Holidays');
+    rows.sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+    res.json(rows.map(h => ({ id: h.id, date: h.date, name: h.name })));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/holidays', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const date = toIsoDateSrv(req.body?.date);
+    const name = String(req.body?.name || '').trim();
+    if (!date) return res.status(400).json({ error: `Date theek nahi hai: "${req.body?.date}"` });
+    if (!name) return res.status(400).json({ error: 'Holiday ka naam chahiye' });
+    // Ek hi din do baar na jude
+    const pehle = (await db.findAll('Holidays')).find(h => String(h.date) === date);
+    if (pehle) return res.status(409).json({ error: `${date} par pehle se chhutti hai: ${pehle.name}` });
+    const row = await db.insert('Holidays', {
+      date, name,
+      created_at: new Date(Date.now() + 330 * 60000).toISOString().replace('T', ' ').split('.')[0]
+    });
+    res.json({ success: true, id: row.id, date, name });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/holidays/:id', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    await db.delete('Holidays', req.params.id);
+    res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -7597,6 +7693,7 @@ async function seedAdminIfNeeded() {
       // nahi hilta.
       .then(() => setTimeout(() => resyncChecklistDoerLabels().catch(() => {}), 30 * 1000))
       .then(() => setTimeout(() => fixRaviKantLabelOnAshok().catch(() => {}), 33 * 1000))
+      .then(() => setTimeout(() => seedHolidays2026().catch(() => {}), 36 * 1000))
       .then(() => setTimeout(() => repairNaNChecklistDates().catch(() => {}), 35 * 1000))
       .then(() => setTimeout(() => fixChecklistDateFormat().catch(() => {}), 45 * 1000))
       .then(() => setTimeout(() => removeOrphanOpenTasks().catch(() => {}), 55 * 1000))
