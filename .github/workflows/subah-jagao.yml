@@ -1,0 +1,57 @@
+# ══════════════════════════════════════════════════════
+# SUBAH APP KO JAGAO — taaki 9:00 ka reminder apne aap jaye
+# ══════════════════════════════════════════════════════
+# Dikkat: Hostinger raat me app ka process maar deta hai. Soyi hui app khud
+# ko ping nahi kar sakti (keep-alive tabhi chalta hai jab app zinda ho),
+# isliye 9:00 ka tick aata hi nahi tha aur reminder tabhi jaata tha jab koi
+# pehli baar app kholta -- 15 Sep ko 9:45, 16 Sep ko 9:09.
+#
+# Ye workflow GitHub ke server se chalta hai (app se bilkul alag), isliye
+# app soyi ho ya mari ho, ye use jaga deta hai. Jaagte hi app ka catch-up
+# us din ka reminder chala deta hai. Kisi hPanel/cron ki zaroorat nahi.
+#
+# GitHub UTC par chalta hai. IST = UTC + 5:30.
+#   03:00 UTC = 08:30 IST   |   04:50 UTC = 10:20 IST
+# Har 10 min chalta hai 8:30-10:20 IST ke beech. Itni baar isliye ki GitHub
+# ka schedule thoda late bhi ho jaye to bhi 9:00 se pehle ek ping zaroor
+# lage, aur agar ek koshish fail ho to agli 10 min me sudhar jaye.
+#
+# Reminder DO baar nahi jayega: slot marker aur per-banda dedup dono DB me
+# hain, isliye din me pass ek hi baar chalta hai chahe ye 12 baar ping kare.
+
+name: Subah app jagao (9 AM reminder)
+
+on:
+  schedule:
+    - cron: '*/10 3-4 * * *'
+  workflow_dispatch:        # zaroorat pade to haath se bhi chala sakte ho
+
+# Ek waqt me ek hi run — pichhla chal raha ho to naya uske baad
+concurrency:
+  group: subah-jagao
+  cancel-in-progress: false
+
+jobs:
+  jagao:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: App jagao aur reminder slot check karao
+        run: |
+          URL="https://red-gazelle-125683.hostingersite.com/api/cron/wa-reminders"
+          # Thandi app ko uthne me waqt lagta hai (cold start + DB), isliye
+          # timeout khula rakha hai aur 3 koshish.
+          for i in 1 2 3; do
+            code=$(curl -s -o out.json -w '%{http_code}' --max-time 150 \
+                   -H 'X-Wake: github-actions' "$URL" || echo 000)
+            echo "koshish $i -> HTTP $code"
+            if [ "$code" = "200" ]; then
+              echo "--- app ka jawab ---"
+              head -c 500 out.json; echo
+              exit 0
+            fi
+            echo "phir koshish 20 sec baad..."
+            sleep 20
+          done
+          echo "::error::Teeno koshish fail -- app nahi jaagi. Reminder aaj late ja sakta hai."
+          exit 1
