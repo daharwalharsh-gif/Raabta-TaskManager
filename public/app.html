@@ -3704,7 +3704,7 @@ function renderDashTable(tasks, type) {
         ${t.waiting_approval==1 ? `
           <span style="font-size:11px;color:#f59e0b;font-weight:600" title="Approver ke decision ka intezaar hai">⏳ Waiting Approval</span>
         ` : `
-          ${(!isPC || t.type==='checklist') ? `<button class="action-btn done" onclick="dashDone(${t.id},'${t.type}')">Done</button>` : ''}
+          ${(!isPC || t.type==='checklist') && String(t.assigned_to) === String(ME && ME.id) ? `<button class="action-btn done" onclick="dashDone(${t.id},'${t.type}')">Done</button>` : ''}
           ${(!isPC && t.type!=='checklist') ? `<button class="action-btn revise" style="margin-left:3px" onclick="openReviseModal(${t.id},'${t.type}')">Revise</button>` : ''}
         `}
       </td>
@@ -3859,6 +3859,11 @@ function renderTaskRow(t, isAdmin) {
   const isReport = t.status === 'report';
   const isWaiting = t.waiting_approval == 1;
   const isChecklist = tasksType === 'checklist';
+  // Done SIRF doer ka haq hai (Harsh, 17 Sep 2026). Admin/PC ko ab doosre ke
+  // task par "Done" ka button dikhta hi nahi -- server bhi rokta hai, par
+  // button pehle hi hata dena behtar hai taaki dabaane par error na mile.
+  // Admin ka baaki kaam waisa hi: Close, Reopen, Revise, Edit sab chalega.
+  const meraHai = String(t.assigned_to) === String(ME && ME.id);
   const attBtn = t.hasAttachments
     ? `<button class="action-btn" style="background:#fff7ed;color:#c2410c;margin-left:3px" onclick="viewReportAttachments(${t.id})" title="Attachments dekho">📎 View</button>` : '';
 
@@ -3869,7 +3874,7 @@ function renderTaskRow(t, isAdmin) {
       ${isReport ? `${attBtn}
         <button class="action-btn done" style="margin-left:3px" onclick="reportClose(${t.id})" title="Close — Closed Tasks me daal do">✅ Close</button>
         <button class="action-btn" style="background:#fef3c7;color:#92400e;margin-left:3px" onclick="reportReopen(${t.id})" title="Reopen — wapas Pending, doer dobara kare">🔓 Reopen</button>` : ''}
-      ${!isCompleted && !isClosed && !isReport && !isWaiting ? (isChecklist
+      ${!isCompleted && !isClosed && !isReport && !isWaiting && meraHai ? (isChecklist
         ? `<button class="action-btn done" style="margin-left:3px" onclick="updateStatus(${t.id},'completed','alltasks','${tasksType}')">Done</button>`
         : `<button class="action-btn done" style="margin-left:3px" onclick="openReportModal(${t.id})" title="Complete — image/PDF proof ke saath">Done</button>`) : ''}
       ${!isChecklist && !isCompleted && !isClosed && !isReport && !isWaiting ? `<button class="action-btn revise" style="margin-left:3px" onclick="openReviseModal(${t.id},'${tasksType}')">Revise</button>` : ''}
@@ -3879,7 +3884,7 @@ function renderTaskRow(t, isAdmin) {
       ${isWaiting ? `<span style="font-size:11px;color:#f59e0b;font-weight:600;margin-left:4px">⏳ Waiting</span>` : ''}
     ` : (ME.role==='pc') ? `
       <button class="action-btn" style="background:#ecfdf5;color:#1d4ed8;padding:4px 7px" onclick="openComments(${t.id},'${tasksType}')" title="Comments">💬</button>
-      ${isChecklist && !isCompleted && !isClosed && !isWaiting ? `<button class="action-btn done" style="margin-left:3px" onclick="updateStatus(${t.id},'completed','alltasks','${tasksType}')">Done</button>` : ''}
+      ${isChecklist && !isCompleted && !isClosed && !isWaiting && meraHai ? `<button class="action-btn done" style="margin-left:3px" onclick="updateStatus(${t.id},'completed','alltasks','${tasksType}')">Done</button>` : ''}
       ${isClosed && !isChecklist ? attBtn : ''}
       ${isWaiting ? `<span style="font-size:11px;color:#f59e0b;font-weight:600;margin-left:4px">⏳ Waiting</span>` : ''}
     ` : `

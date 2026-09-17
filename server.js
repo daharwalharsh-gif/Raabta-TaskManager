@@ -2563,6 +2563,23 @@ app.put('/api/tasks/:id/status', requireAuth, async (req, res) => {
     if (!isAdmin && !isPC && String(task.assigned_to) !== String(uid))
       return res.status(403).json({ error: 'Not allowed' });
 
+    // ── DONE SIRF DOER KAR SAKTA HAI ──
+    // Harsh (17 Sep 2026): "ab se auto task nahi honge, only doer hi kar
+    // sakta hai."
+    // Pehle admin/PC kisi ka bhi task Done kar sakte the. Isse baar-baar ye
+    // sawaal uthta tha ki "task bina kiye Done kaise ho gaya" -- kaam kisi ne
+    // kiya nahi hota tha, par status Done ho jaata tha.
+    // Ab Done (delegation me 'report', checklist me 'completed') SIRF wahi
+    // banda laga sakta hai jise task mila hai. Admin ka baaki kaam waisa hi
+    // rehta hai -- Close, Reopen, Revise sab kar sakta hai; bas doosre ki
+    // taraf se "ho gaya" nahi keh sakta.
+    const doneWaliStatus = (status === 'report' || status === 'completed');
+    if (doneWaliStatus && String(task.assigned_to) !== String(uid)) {
+      return res.status(403).json({
+        error: 'Task sirf uska doer hi Done kar sakta hai. Aap ise Close ya Revise kar sakte hain.'
+      });
+    }
+
     const waitingApproval = parseInt(task.waiting_approval) || 0;
 
     // Proof/attachments (image/PDF base64 + note) — kisi bhi complete/report ke
