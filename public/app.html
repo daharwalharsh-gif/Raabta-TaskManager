@@ -3909,11 +3909,23 @@ function renderTaskRow(t, isAdmin) {
   // tha kyunki screen par kahin nahi likha hota tha ki status kisne badla.
   // Record 12 Sep se DB me ja raha tha, bas dikhta nahi tha. Ab status ke
   // neeche chhote akshar me: kisne aur kab. (17 Sep 2026)
-  const byLine = (t.statusChangedByName || t.statusChangedAt)
-    ? `<div style="font-size:10px;color:#94a3b8;margin-top:3px;line-height:1.3;white-space:nowrap">${
-        t.statusChangedByName ? `by <b style="color:#64748b">${t.statusChangedByName}</b>` : 'by —'
-      }${t.statusChangedAt ? `<br>${fmtDate(String(t.statusChangedAt).split(' ')[0]) || ''} ${String(t.statusChangedAt).split(' ')[1]?.slice(0,5) || ''}` : ''}</div>`
+  // Safar ke do padav ALAG dikhte hain, kyunki ek hi "by" line kaafi nahi
+  // thi: doer ne Done kiya, phir kisi aur ne Close kiya -- to Done wala naam
+  // dab jaata tha. Ab dono apni jagah.
+  const shortWhen = s => s
+    ? `${fmtDate(String(s).split(' ')[0]) || ''} ${String(s).split(' ')[1]?.slice(0,5) || ''}`.trim()
     : '';
+  const stepLine = (label, who, when, color) => (who || when)
+    ? `<div style="font-size:10px;color:#94a3b8;margin-top:3px;line-height:1.3;white-space:nowrap">${label} <b style="color:${color}">${who || '—'}</b>${when ? `<br><span style="color:#cbd5e1">${when}</span>` : ''}</div>`
+    : '';
+  let byLine =
+      stepLine('Done by', t.doneByName, shortWhen(t.doneAt), '#059669')
+    + stepLine('Closed by', t.closedByName, shortWhen(t.closedAt), '#4f46e5');
+  // Log 17 Sep 2026 se shuru hua. Usse purane task ka safar nahi hai --
+  // unke liye wahi ek aakhri record dikha do jo pehle se rakha ja raha tha.
+  if (!byLine && (t.statusChangedByName || t.statusChangedAt)) {
+    byLine = stepLine('by', t.statusChangedByName, shortWhen(t.statusChangedAt), '#64748b');
+  }
   return `<tr${wasReported ? ' class="row-reported" title="Doer ne report bheji thi — Reopen ke baad wapas Pending"' : ''}>
       <td class="t-action" style="white-space:nowrap">${actionBtns}</td>
       <td class="t-desc">${t.description||''}${t.report_note ? ` <span style="font-size:10px;color:#c2410c">📝 ${t.report_note}</span>` : ''}</td>

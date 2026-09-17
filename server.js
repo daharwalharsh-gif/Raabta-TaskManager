@@ -502,6 +502,17 @@ const MYSQL_SCHEMA = {
     action_type: "VARCHAR(20) DEFAULT ''", status: "VARCHAR(20) DEFAULT 'pending'",
     note: "TEXT", created_at: "VARCHAR(40) DEFAULT ''"
   },
+  // Status ka poora safar. status_changed_* columns me sirf AAKHRI badlav
+  // rehta hai -- agla badlav pichhle ko mita deta hai. Isliye "pending se
+  // done kisne kiya" ka jawab nahi milta tha, kyunki uske baad kisi ne close
+  // kiya to wahi naam upar chadh jaata tha. Ab har badlav alag row banta hai.
+  // (Harsh, 17 Sep 2026)
+  Task_Status_Log: {
+    task_id: "VARCHAR(20) DEFAULT ''", task_type: "VARCHAR(20) DEFAULT ''",
+    from_status: "VARCHAR(20) DEFAULT ''", to_status: "VARCHAR(20) DEFAULT ''",
+    by_user: "VARCHAR(20) DEFAULT ''", by_name: "VARCHAR(120) DEFAULT ''",
+    changed_at: "VARCHAR(40) DEFAULT ''"
+  },
   // Chhuttiyan. 16 Sep 2026 tak ye browser ke localStorage me padi thin,
   // isliye jo bhi add karta wo SIRF USI ke browser me dikhti thi -- kisi
   // doosre bande ko, ya usi bande ko doosre phone par, kuch nahi dikhta tha.
@@ -2206,6 +2217,24 @@ app.get('/api/tasks', requireAuth, async (req, res) => {
       allowedUserIds = [String(uid)];
     }
 
+    // Har task ke do khaas mode: DONE kisne kiya (report/completed me le gaya)
+    // aur CLOSE kisne kiya. Ek hi baar poora log padh kar map bana lete hain,
+    // har task par alag query nahi.
+    const doneMap = {}, closeMap = {};
+    try {
+      const log = await db.findAll('Task_Status_Log');
+      log.sort((a, b) => String(a.changed_at || '').localeCompare(String(b.changed_at || '')));
+      log.forEach(l => {
+        if (String(l.task_type || '') !== (type || 'delegation')) return;
+        const k = String(l.task_id);
+        const ko = String(l.to_status || '');
+        const kisne = { by: l.by_name || '', at: l.changed_at || '' };
+        // baad wali entry pehle wali ko badal degi -- yaani sabse naya wala
+        if (ko === 'report' || ko === 'completed') doneMap[k] = kisne;
+        else if (ko === 'closed') closeMap[k] = kisne;
+      });
+    } catch { /* log table abhi bani nahi -- koi baat nahi */ }
+
     const allTasks = await db.findAll(tabName);
 
     const tasks = allTasks.filter(t => {
@@ -2242,6 +2271,12 @@ app.get('/api/tasks', requireAuth, async (req, res) => {
       statusChangedAt: t.status_changed_at || '',
       statusChangedByName: t.status_changed_by_name
         || (t.status_changed_by ? (userMap[String(t.status_changed_by)]?.name || '') : ''),
+      // Safar ke do padav alag-alag -- taaki "Done kisne kiya" baad me koi
+      // close kar de to bhi gum na ho
+      doneByName: (doneMap[String(t.id)] || {}).by || '',
+      doneAt: (doneMap[String(t.id)] || {}).at || '',
+      closedByName: (closeMap[String(t.id)] || {}).by || '',
+      closedAt: (closeMap[String(t.id)] || {}).at || '',
       assignedToName: userMap[String(t.assigned_to)]?.name || '',
       assignedByName: userMap[String(t.assigned_by)]?.name || ''
     })).sort((a, b) => (a.due_date || '').localeCompare(b.due_date || ''));
@@ -2559,6 +2594,7 @@ app.put('/api/tasks/:id/status', requireAuth, async (req, res) => {
       }
       // was_reported: Reopen ke baad Pending me row highlight karne ke liye
       await db.update(tabName, req.params.id, stamp(req, { status: 'report', waiting_approval: '0', was_reported: '1', ...attUpd }));
+      await logStatusChange(req, type, req.params.id, task.status, 'report');
       return res.json({ success: true });
     }
 
@@ -2569,6 +2605,7 @@ app.put('/api/tasks/:id/status', requireAuth, async (req, res) => {
       const upd = stamp(req, { status: 'completed', ...attUpd });
       if (type === 'delegation') upd.waiting_approval = '0';
       await db.update(tabName, req.params.id, upd);
+      await logStatusChange(req, type, req.params.id, task.status, 'completed');
       return res.json({ success: true, needsApproval: false });
     }
 
@@ -2592,6 +2629,7 @@ app.put('/api/tasks/:id/status', requireAuth, async (req, res) => {
     if (type === 'delegation') upd.waiting_approval = '0';
     if (newDate && status === 'revised') upd.due_date = newDate;
     await db.update(tabName, req.params.id, upd);
+    await logStatusChange(req, type, req.params.id, task.status, status);
     res.json({ success: true, needsApproval: false });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -2631,6 +2669,27 @@ function stamp(req, extra) {
     status_changed_by: String((req && req.session && req.session.userId) || ''),
     status_changed_by_name: String((req && req.session && req.session.name) || '')
   }, extra || {});
+}
+
+// Har status badlav ki alag row. stamp() sirf AAKHRI badlav rakhta hai (agla
+// badlav pichhle ko mita deta hai), isliye "pending se done kisne kiya" ka
+// jawab gum ho jaata tha jab baad me kisi ne close kar diya. Ye log kabhi
+// kuch mitata nahi -- poora safar rehta hai.
+// Log likhna FAIL ho jaye to bhi task ka kaam rukna nahi chahiye, isliye
+// poora try/catch me hai. (Harsh, 17 Sep 2026)
+async function logStatusChange(req, taskType, taskId, fromStatus, toStatus) {
+  try {
+    if (!toStatus || String(fromStatus) === String(toStatus)) return;
+    await db.insert('Task_Status_Log', {
+      task_id: String(taskId), task_type: String(taskType || 'delegation'),
+      from_status: String(fromStatus || ''), to_status: String(toStatus),
+      by_user: String((req && req.session && req.session.userId) || ''),
+      by_name: String((req && req.session && req.session.name) || ''),
+      changed_at: new Date(Date.now() + 330 * 60000).toISOString().replace('T', ' ').split('.')[0]
+    });
+  } catch (e) {
+    console.error('  status log likhna fail (task chalta rahega):', e.message);
+  }
 }
 
 app.put('/api/tasks/:id/edit', requireAuth, requireAdmin, async (req, res) => {
@@ -3779,7 +3838,10 @@ app.put('/api/approvals/:id', requireAuth, async (req, res) => {
       // Pending me highlight isi se hota hai).
       const upd = stamp(req, { status: appr.action_type, waiting_approval: '0' });
       if (appr.action_type === 'report') upd.was_reported = '1';
+      // Purana status pehle padh lo, warna update ke baad pata nahi chalega
+      const pehleKa = (await db.findOne(tabName, { id: appr.task_id }) || {}).status || '';
       await db.update(tabName, appr.task_id, upd);
+      await logStatusChange(req, appr.task_type, appr.task_id, pehleKa, appr.action_type);
       // New-task approval (action_type 'pending'): ab jaake doer ko task dikha hai,
       // isliye WhatsApp bhi ab hi jaata hai (create ke waqt nahi gaya tha).
       if (WA.notifyOnAssign && appr.action_type === 'pending' && appr.task_type === 'delegation') {
@@ -6843,6 +6905,14 @@ async function taskKaHisaab(q) {
     const k = String(q || '').trim().toLowerCase();
     if (!k) return { error: 'task ka naam ya uska tukda do' };
 
+    // Poora safar: pending -> report -> closed, har padav kisne kiya
+    let log = [];
+    try { log = await d.findAll('Task_Status_Log'); } catch { /* table abhi nahi bani */ }
+    const safarKa = (kism, id) => log
+      .filter(l => String(l.task_id) === String(id) && String(l.task_type || '') === kism)
+      .sort((a, b) => String(a.changed_at || '').localeCompare(String(b.changed_at || '')))
+      .map(l => `${l.from_status || '?'} -> ${l.to_status}  |  ${l.by_name || '(naam nahi)'}  |  ${l.changed_at}`);
+
     const pick = (rows, kism) => rows
       .filter(t => String(t.description || '').toLowerCase().includes(k))
       .map(t => ({
@@ -6856,7 +6926,11 @@ async function taskKaHisaab(q) {
         STATUS_KISNE_BADLA: t.status_changed_by_name
           || (t.status_changed_by ? (naam[String(t.status_changed_by)] || `(id ${t.status_changed_by})`) : '(record nahi)'),
         kab_badla: t.status_changed_at || '(record nahi)',
-        doer_ne_report_bheji_thi: String(t.was_reported || '') === '1' ? 'HAAN' : 'nahi'
+        doer_ne_report_bheji_thi: String(t.was_reported || '') === '1' ? 'HAAN' : 'nahi',
+        POORA_SAFAR: (() => {
+          const s = safarKa(kism, t.id);
+          return s.length ? s : ['(is task ka safar record nahi hua -- log 17 Sep 2026 se shuru hua hai)'];
+        })()
       }));
 
     const mile = pick(del, 'delegation').concat(pick(chl, 'checklist'));
