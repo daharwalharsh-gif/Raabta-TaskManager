@@ -586,17 +586,38 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     border:none !important;padding:2px 0 !important;
     font-size:12px;color:#475569;line-height:1.5;
   }
-  /* Har value ke aage uska chhota label */
+  /* DETAILS poora dikhe. Upar .task-table-card ka generic rule doosre column
+     par max-width:110px + ellipsis lagata hai, aur Maintenance table par wo
+     class bhi lagi hai -- isliye phone par "Bisl...", "Pen..." kat kar dikh
+     rahe the. Yahan wo kaat khol di. (Harsh, 17 Sep 2026) */
+  .maint-table tbody td:nth-child(2){
+    max-width:none !important;overflow:visible !important;
+    text-overflow:clip !important;white-space:normal !important;
+  }
+  /* Lamba bina-space wala shabd bhi card se bahar na nikle */
+  .maint-table tbody td{overflow-wrap:anywhere;}
+
+  /* Har value ke aage uska chhota label.
+     Label ABSOLUTE hai (inline-block nahi) -- isse lambi baat label ke neeche
+     nahi ghusti, apne column me seedhi wrap hoti hai. Aur Details ke andar jo
+     "— Ashok Sn" wali line hai wo apni jagah NEECHE hi rehti hai (flex hota
+     to bagal me chali jaati). */
+  .maint-table tbody td[data-lbl]{
+    position:relative;padding-left:72px !important;min-height:16px;
+  }
   .maint-table tbody td[data-lbl]::before{
-    content:attr(data-lbl);display:inline-block;min-width:76px;
+    content:attr(data-lbl);position:absolute;left:0;top:3px;width:66px;
     font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;
+    line-height:1.4;
   }
   /* Amount bada aur alag — card ka main number */
   .maint-table tbody td.m-amt{
     font-size:17px !important;font-weight:800 !important;
     text-align:left !important;padding-top:4px !important;
   }
-  .maint-table tbody td.m-amt::before{min-width:76px;}
+  /* Label ab absolute hai, isliye alag min-width ki zaroorat nahi --
+     sirf bade number ke saath thoda neeche se shuru ho */
+  .maint-table tbody td.m-amt::before{top:8px;}
   /* Khali row (No expenses / Loading) card na bane */
   .maint-table tbody td.empty{
     text-align:center !important;padding:22px 8px !important;
