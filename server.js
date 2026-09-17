@@ -2236,6 +2236,12 @@ app.get('/api/tasks', requireAuth, async (req, res) => {
       hasAttachments: isDeleg ? !!(t.attachments && String(t.attachments).length > 5) : false,
       report_note: isDeleg ? (t.report_note || '') : '',
       was_reported: isDeleg ? (parseInt(t.was_reported) || 0) : 0,
+      // Status kisne aur kab badla. DB me ye 12 Sep se likha ja raha tha par
+      // screen par kahin dikhta nahi tha -- isliye har band task dekh kar
+      // lagta tha "apne aap ho gaya". Ab list me saath dikhega.
+      statusChangedAt: t.status_changed_at || '',
+      statusChangedByName: t.status_changed_by_name
+        || (t.status_changed_by ? (userMap[String(t.status_changed_by)]?.name || '') : ''),
       assignedToName: userMap[String(t.assigned_to)]?.name || '',
       assignedByName: userMap[String(t.assigned_by)]?.name || ''
     })).sort((a, b) => (a.due_date || '').localeCompare(b.due_date || ''));
@@ -2682,6 +2688,9 @@ app.get('/api/tasks/user/:userId', requireAuth, async (req, res) => {
         due_date: t.due_date || '',
         assigned_on: t.created_at ? t.created_at.split('T')[0].split(' ')[0] : '',
         frequency: t.frequency || '',
+        statusChangedAt: t.status_changed_at || '',
+        statusChangedByName: t.status_changed_by_name
+          || (t.status_changed_by ? (userMap[String(t.status_changed_by)]?.name || '') : ''),
         assignedToName: userMap[String(t.assigned_to)]?.name || '',
         assignedByName: userMap[String(t.assigned_by)]?.name || ''
       }))
