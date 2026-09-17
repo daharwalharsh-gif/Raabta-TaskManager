@@ -427,12 +427,20 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
   .topbar-right select{max-width:130px;font-size:11px;}
 
   /* ── BOTTOM NAV — frosted glass ── */
+  /* iPhone par patti scroll nahi ho rahi thi (Cash/Profile/Logout tak pahunch
+     hi nahi paate the). Wajah: iOS Safari me jab fixed element par khud
+     backdrop-filter lagta hai, to uske ANDAR ka horizontal scroll touch se
+     chalna band ho jaata hai. Isliye blur ab patti par nahi, uske peeche ek
+     ::before parat par hai — dikhne me bilkul wahi frosted look, par scroll
+     ke raste me koi filter nahi aata. (17 Sep 2026) */
   .mobile-bottom-nav{
     background:rgba(255,255,255,0.96) !important;
-    backdrop-filter:blur(14px) !important;
-    -webkit-backdrop-filter:blur(14px) !important;
     border-top:1px solid rgba(226,232,240,0.9) !important;
     box-shadow:0 -4px 24px rgba(0,0,0,0.09) !important;
+  }
+  .mobile-bottom-nav::before{
+    content:'';position:absolute;inset:0;z-index:0;pointer-events:none;
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
   }
   .mob-nav-item.active{color:#10b981;}
   .mob-nav-item.active svg{filter:drop-shadow(0 0 4px rgba(16,185,129,0.4));}
@@ -442,6 +450,12 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
   .mobile-nav-inner{
     overflow-x:auto;-webkit-overflow-scrolling:touch;
     scrollbar-width:none;-ms-overflow-style:none;
+    /* iOS ko saaf batao ki yahan ungli SIDE me chalti hai -- warna wo swipe
+       ko page ka scroll ya system gesture samajh kar nigal jaata hai */
+    touch-action:pan-x;
+    overscroll-behavior-x:contain;
+    /* blur wali parat ke UPAR raho, warna touch usi par lag jaate hain */
+    position:relative;z-index:1;
   }
   .mobile-nav-inner::-webkit-scrollbar{display:none;}
   .mob-nav-item{flex:0 0 auto;min-width:62px;padding-left:6px;padding-right:6px;}
