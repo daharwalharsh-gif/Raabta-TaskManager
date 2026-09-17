@@ -6827,6 +6827,46 @@ async function doerJhaank(q) {
   } catch (e) { return { error: e.message }; }
 }
 
+// ── "Ye task kisne diya aur kisne band kiya?" ──
+// Naam ka tukda do, task dhoondh kar poora hisaab de deta hai. Delegation
+// aur Checklist dono me dekhta hai. Ye sawaal baar-baar aata hai, isliye
+// har baar DB kholne ki jagah ek jagah se jawab. (17 Sep 2026)
+//   /api/cron/wa-reminders?task=test run
+async function taskKaHisaab(q) {
+  try {
+    const d = await getDB();
+    const [del, chl, users] = await Promise.all([
+      d.findAll('Delegation_Tasks'), d.findAll('Checklist_Tasks'), d.findAll('Users')
+    ]);
+    const naam = {};
+    users.forEach(u => { naam[String(u.id)] = String(u.name || ''); });
+    const k = String(q || '').trim().toLowerCase();
+    if (!k) return { error: 'task ka naam ya uska tukda do' };
+
+    const pick = (rows, kism) => rows
+      .filter(t => String(t.description || '').toLowerCase().includes(k))
+      .map(t => ({
+        kism, id: t.id,
+        kaam: String(t.description || '').slice(0, 80),
+        KISNE_DIYA: naam[String(t.assigned_by)] || `(id ${t.assigned_by || '-'})`,
+        KISE_DIYA: naam[String(t.assigned_to)] || `(id ${t.assigned_to || '-'})`,
+        kab_diya: t.created_at || '',
+        due_date: t.due_date || '',
+        ab_status: t.status || '',
+        STATUS_KISNE_BADLA: t.status_changed_by_name
+          || (t.status_changed_by ? (naam[String(t.status_changed_by)] || `(id ${t.status_changed_by})`) : '(record nahi)'),
+        kab_badla: t.status_changed_at || '(record nahi)',
+        doer_ne_report_bheji_thi: String(t.was_reported || '') === '1' ? 'HAAN' : 'nahi'
+      }));
+
+    const mile = pick(del, 'delegation').concat(pick(chl, 'checklist'));
+    if (!mile.length) return { MILA: 'NAHI — is naam ka koi task nahi mila', dhoonda: q };
+    // Naya pehle
+    mile.sort((a, b) => String(b.kab_diya || '').localeCompare(String(a.kab_diya || '')));
+    return { dhoonda: q, kitne_mile: mile.length, mile: mile.slice(0, 10) };
+  } catch (e) { return { error: e.message }; }
+}
+
 // Kisi ek doer ki checklist rows jhaank kar dekho — sirf id/date/status.
 // Description NAHI bhejte (endpoint public hai). Diagnose ke liye:
 //   /api/cron/wa-reminders?peek=ravi
@@ -6891,6 +6931,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
         orphanDoers: req.query.orphans ? await orphanDoers() : undefined,
         doerMismatch: req.query.mismatch ? await doerMismatch() : undefined,
         doerJhaank: req.query.doer ? await doerJhaank(String(req.query.doer)) : undefined,
+        taskKaHisaab: req.query.task ? await taskKaHisaab(String(req.query.task)) : undefined,
         reminderWho: req.query.who ? await reminderWho() : undefined,
         delegationAudit: req.query.deleg ? await delegationAudit() : undefined,
         tableCols: req.query.cols ? await tableCols() : undefined,
@@ -6972,6 +7013,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
       orphanDoers: req.query.orphans ? await orphanDoers() : undefined,
       doerMismatch: req.query.mismatch ? await doerMismatch() : undefined,
       doerJhaank: req.query.doer ? await doerJhaank(String(req.query.doer)) : undefined,
+      taskKaHisaab: req.query.task ? await taskKaHisaab(String(req.query.task)) : undefined,
       reminderWho: req.query.who ? await reminderWho() : undefined,
       delegationAudit: req.query.deleg ? await delegationAudit() : undefined,
       tableCols: req.query.cols ? await tableCols() : undefined,
