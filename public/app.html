@@ -1342,10 +1342,19 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
   <div id="page-approvals" class="page">
     <div class="page-header"><h2>Approvals</h2></div>
 
-    <!-- Tabs -->
-    <div style="display:flex;gap:4px;background:#f1f5f9;padding:3px;border-radius:8px;width:fit-content;margin-bottom:18px">
-      <div class="tab active" id="apprTabTask" onclick="switchApprovalTab('task',this)">📋 Task Approvals</div>
-      <div class="tab" id="apprTabTransfer" onclick="switchApprovalTab('transfer',this)" style="display:none">🔀 Transfer Requests</div>
+    <!-- Tabs + search. Approvals ki list lambi ho jaati hai (50+), isliye
+         naam/kaam se dhoondhne ka rasta. (Harsh, 18 Sep 2026) -->
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:18px">
+      <div style="display:flex;gap:4px;background:#f1f5f9;padding:3px;border-radius:8px;width:fit-content">
+        <div class="tab active" id="apprTabTask" onclick="switchApprovalTab('task',this)">📋 Task Approvals</div>
+        <div class="tab" id="apprTabTransfer" onclick="switchApprovalTab('transfer',this)" style="display:none">🔀 Transfer Requests</div>
+      </div>
+      <div id="apprSearchWrap" style="position:relative;flex:1;min-width:220px;max-width:420px">
+        <input type="text" id="apprSearch" oninput="renderApprovals()" placeholder="🔍 Search by employee, approver, task…"
+          style="width:100%;padding:8px 30px 8px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;outline:none;color:#1e293b;background:#fff">
+        <span id="apprSearchClear" onclick="clearApprSearch()" title="Clear"
+          style="display:none;position:absolute;right:9px;top:50%;transform:translateY(-50%);cursor:pointer;color:#94a3b8;font-size:14px;line-height:1">✕</span>
+      </div>
     </div>
 
     <!-- Task approvals panel -->
@@ -5233,6 +5242,10 @@ function switchApprovalTab(tab, el) {
   if (el) el.classList.add('active');
   document.getElementById('approvalsPanel').style.display = tab==='task' ? 'block' : 'none';
   document.getElementById('transferApprovalsPanel').style.display = tab==='transfer' ? 'block' : 'none';
+  // Search sirf Task Approvals ko filter karta hai, isliye Transfer tab par
+  // use chhupa dete hain -- warna box dikhta aur kaam kuch na karta.
+  const sw = document.getElementById('apprSearchWrap');
+  if (sw) sw.style.display = tab==='task' ? 'block' : 'none';
   if (tab==='transfer') loadTransferApprovals();
 }
 
@@ -5242,12 +5255,43 @@ async function loadApprovals() {
     document.getElementById('apprTabTransfer').style.display = 'block';
   }
 
-  const approvals = await api('/api/approvals');
+  _apprAll = await api('/api/approvals');
+  renderApprovals();
+}
+
+// List server se EK baar aati hai aur _apprAll me rakhi rehti hai; search
+// sirf usi par chalti hai -- har akshar par server ko dobara nahi poochhte.
+let _apprAll = [];
+function clearApprSearch() {
+  const b = document.getElementById('apprSearch');
+  if (b) { b.value = ''; b.focus(); }
+  renderApprovals();
+}
+function renderApprovals() {
   const container = document.getElementById('approvalsContent');
+  if (!container) return;
   const isAdminOrPC = ME.role === 'admin' || ME.role === 'pc';
 
-  if (!approvals.length) {
+  const q = (document.getElementById('apprSearch')?.value || '').trim().toLowerCase();
+  const clr = document.getElementById('apprSearchClear');
+  if (clr) clr.style.display = q ? 'block' : 'none';
+
+  // Naam, approver, kaam ka text aur "kis cheez ki approval hai" -- sab me
+  // dhoondho. Space se alag kiye gaye kai shabd likhe to SAARE milne
+  // chahiye (jaise "ravi tikka"), kram koi bhi ho.
+  const kism = a => a.action_type === 'completed' ? 'mark complete'
+    : a.action_type === 'pending' ? 'new task'
+    : a.action_type === 'report' ? 'done report approval' : 'revision';
+  const approvals = !q ? _apprAll : _apprAll.filter(a => {
+    const hay = [a.requestedByName, a.requestedToName, a.description, kism(a)]
+      .map(v => String(v == null ? '' : v).toLowerCase()).join(' ');
+    return q.split(/\s+/).every(w => hay.includes(w));
+  });
+
+  if (!_apprAll.length) {
     container.innerHTML = `<div class="empty" style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;">✅ No pending task approvals!</div>`;
+  } else if (!approvals.length) {
+    container.innerHTML = `<div class="empty" style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;">🔍 "${maintEsc(q)}" se kuch nahi mila — ${_apprAll.length} approvals me se koi match nahi</div>`;
   } else {
     container.innerHTML = `
       <div class="flat-tasks-table">
