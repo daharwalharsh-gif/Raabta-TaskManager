@@ -8240,7 +8240,7 @@ async function saveEditFMS() {
   const r = await api(`/api/fms/${fmsActiveId}`,'PUT',{
     fmsName: fmsName || sheetName,
     sheetName, sheetId, headerRow,
-    steps: fmsSteps.map(s=>({...s, showCols:s.showCols||[], delayReasonCol:s.delayReasonCol||'', doerNameCol:s.doerNameCol||s.doer_name_col||'', extraRows:(s.extraRows||[]).map(r=>({...r,dropdown_options:r.dropdown_options||'',sub_options:r.sub_options||'',sub_col_letter:r.sub_col_letter||'',uid_prefix:r.uid_prefix||'UQ',uid_pad:r.uid_pad||3,sub_multi:r.sub_multi||0,allow_other:r.allow_other||0,required:r.required===0?0:1}))}))
+    steps: fmsSteps.map(s=>({...s, showCols:s.showCols||[], delayReasonCol:s.delayReasonCol||'', doerNameCol:s.doerNameCol||s.doer_name_col||'', extraRows:(s.extraRows||[]).map(r=>({...r,dropdown_options:r.dropdown_options||'',sub_options:r.sub_options||'',sub_col_letter:r.sub_col_letter||'',uid_prefix:r.uid_prefix||'UQ',uid_pad:r.uid_pad||3,sub_multi:r.sub_multi||0,allow_other:r.allow_other||0,sub_remarks:r.sub_remarks||0,required:r.required===0?0:1}))}))
   });
   if (r.error) { err.textContent=r.error; err.style.display='block'; return; }
 
@@ -8669,7 +8669,7 @@ function toggleFMSExtra(idx, val) {
 function addFMSExtraRow(idx) {
   if (!fmsSteps[idx].extraRows) fmsSteps[idx].extraRows=[];
   fmsFlushExtraRows(idx);   // re-render se pehle DOM ka data bacha lo
-  fmsSteps[idx].extraRows.push({col_letter:'', field_type:'text', label:'', dropdown_options:'', sub_options:'', sub_col_letter:'', uid_prefix:'UQ', uid_pad:3, sub_multi:0, allow_other:0, required:1});
+  fmsSteps[idx].extraRows.push({col_letter:'', field_type:'text', label:'', dropdown_options:'', sub_options:'', sub_col_letter:'', uid_prefix:'UQ', uid_pad:3, sub_multi:0, allow_other:0, sub_remarks:0, required:1});
   refreshStepBox(idx);
   setupMultiSelect(idx);
   updateFMSDoerTags(idx);
@@ -8795,6 +8795,16 @@ function buildDropdownOptionsHTML(idx, ri, r) {
         <label style="font-size:10px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.3px">Save sub-answer in</label>
         ${subColSel}
       </div>
+      <!-- Harsh (19 Sep 2026): "doer select karne par uske neeche ek remarks
+           ka option hona chahiye, aur sheet me naam ke saath remark jaye --
+           aur FMS Admin me option dena ki ye chahiye ya nahi." -->
+      <label style="display:flex;align-items:flex-start;gap:7px;margin-top:8px;font-size:11px;color:#475569;cursor:pointer;line-height:1.5">
+        <input type="checkbox" ${parseInt(r.sub_remarks) ? 'checked' : ''}
+          onchange="fmsSteps[${idx}].extraRows[${ri}].sub_remarks=this.checked?1:0"
+          style="width:14px;height:14px;accent-color:#10b981;cursor:pointer;margin-top:2px;flex-shrink:0">
+        <span>Har tick kiye naam ke neeche <b>remarks</b> ka box bhi do
+          <span style="color:#94a3b8">— sheet me <b>Naam: remark</b> aise jayega. Remarks bharna zaroori nahi.</span></span>
+      </label>
     </div>
 
     <div style="margin-top:8px;font-size:11px;color:#16a34a;background:#f0fdf4;border-radius:7px;padding:7px 10px;line-height:1.5">
@@ -9076,7 +9086,7 @@ async function saveFMS() {
     sheetId: fmsData.sheetId,
     headerRow: fmsData.headerRow,
     totalSteps: fmsSteps.length,
-    steps: fmsSteps.map(s=>({...s, showCols: s.showCols||[], delayReasonCol: s.delayReasonCol||'', doerNameCol: s.doerNameCol||s.doer_name_col||'', extraRows: (s.extraRows||[]).map(r=>({...r, dropdown_options: r.dropdown_options||'', sub_options: r.sub_options||'', sub_col_letter: r.sub_col_letter||'', uid_prefix: r.uid_prefix||'UQ', uid_pad: r.uid_pad||3, sub_multi: r.sub_multi||0, allow_other: r.allow_other||0, required: r.required===0?0:1}))}))
+    steps: fmsSteps.map(s=>({...s, showCols: s.showCols||[], delayReasonCol: s.delayReasonCol||'', doerNameCol: s.doerNameCol||s.doer_name_col||'', extraRows: (s.extraRows||[]).map(r=>({...r, dropdown_options: r.dropdown_options||'', sub_options: r.sub_options||'', sub_col_letter: r.sub_col_letter||'', uid_prefix: r.uid_prefix||'UQ', uid_pad: r.uid_pad||3, sub_multi: r.sub_multi||0, allow_other: r.allow_other||0, sub_remarks: r.sub_remarks||0, required: r.required===0?0:1}))}))
   };
 
   const r = await api('/api/fms', 'POST', body);
@@ -9599,13 +9609,31 @@ function onFMSDropChange(i) {
   const style = 'width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:\'Inter\',sans-serif;outline:none;box-sizing:border-box';
   // Sub-dropdown hamesha tick box (ek chahiye to ek hi tick karo) + Other
   document.getElementById(`fmsSubLabel_${i}`).textContent = `${picked} — tick one or more`;
+  // Remarks ka box tabhi jab FMS Admin me is field par on kiya ho
+  const remOn = !!parseInt(r.sub_remarks || 0);
+  const remStyle = 'width:100%;padding:6px 10px;margin:4px 0 2px 23px;border:1.5px solid #e2e8f0;'
+    + 'border-radius:7px;font-size:12px;font-family:\'Inter\',sans-serif;outline:none;box-sizing:border-box;'
+    + 'max-width:calc(100% - 23px)';
   box.innerHTML = `<div id="fmsSubList_${i}" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:6px 10px;background:#fff;max-height:170px;overflow-y:auto">
-      ${subs.map(o => `<label style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px;cursor:pointer">
-        <input type="checkbox" value="${o}" data-sub="${i}" style="width:15px;height:15px;accent-color:#10b981;cursor:pointer"/> ${o}
-      </label>`).join('')}
+      ${subs.map((o, oi) => `<div style="padding:2px 0">
+        <label style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px;cursor:pointer">
+          <input type="checkbox" value="${o}" data-sub="${i}"${remOn ? ` onchange="fmsToggleSubRemark(${i},${oi},this.checked)"` : ''} style="width:15px;height:15px;accent-color:#10b981;cursor:pointer"/> ${o}
+        </label>
+        ${remOn ? `<input type="text" id="fmsSubRem_${i}_${oi}" data-remfor="1" placeholder="↳ ${o} ke liye remarks (optional)" style="${remStyle};display:none"/>` : ''}
+      </div>`).join('')}
     </div>
     <input type="text" id="fmsSubOther_${i}" placeholder="➕ Other — yahan khud likho (optional)" style="${style};margin-top:6px"/>`;
   wrap.style.display = 'block';
+}
+
+// Naam tick hote hi uske neeche remarks ka box khulta hai, hataate hi band
+// (aur jo likha tha wo bhi hat jaata hai -- warna un-tick karne ke baad bhi
+// chhupa hua text sheet me chala jaata).
+function fmsToggleSubRemark(i, oi, on) {
+  const el = document.getElementById(`fmsSubRem_${i}_${oi}`);
+  if (!el) return;
+  el.style.display = on ? 'block' : 'none';
+  if (on) el.focus(); else el.value = '';
 }
 
 // Is field ka asli jawab — dropdown/Other/multi-select sab sambhal kar
@@ -9621,7 +9649,14 @@ function fmsReadExtra(i, r) {
   const wrap = document.getElementById(`fmsSubWrap_${i}`);
   if (wrap && wrap.style.display !== 'none') {
     const list = document.getElementById(`fmsSubList_${i}`);
-    const picked = list ? [...list.querySelectorAll('input[type=checkbox]:checked')].map(c => c.value) : [];
+    // Jis naam ke saath remarks likha hai wo "Naam: remark" ban kar jaata
+    // hai; khali chhoda to sirf naam. (19 Sep 2026)
+    const picked = list ? [...list.querySelectorAll('input[type=checkbox]:checked')].map(c => {
+      const row = c.closest('div');
+      const rem = row ? row.querySelector('input[type=text][data-remfor]') : null;
+      const txt = rem ? rem.value.trim() : '';
+      return txt ? `${c.value}: ${txt}` : c.value;
+    }) : [];
     const extra = document.getElementById(`fmsSubOther_${i}`);
     const typed = extra ? extra.value.trim() : '';
     if (typed) picked.push(typed);
