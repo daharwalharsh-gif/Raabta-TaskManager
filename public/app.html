@@ -3888,10 +3888,17 @@ function renderTaskRow(t, isAdmin) {
   const attBtn = t.hasAttachments
     ? `<button class="action-btn" style="background:#fff7ed;color:#c2410c;margin-left:3px" onclick="viewReportAttachments(${t.id})" title="Attachments dekho">📎 View</button>` : '';
 
+  // 💬 par comment ki ginti. Pehle button khole bina pata hi nahi chalta tha
+  // ki is task par koi baat hui hai ya nahi -- har task khol kar dekhna
+  // padta tha. Ab number saamne dikhta hai. (Harsh, 18 Sep 2026)
+  // 0 comment par koi number nahi dikhta -- button pehle jaisa saaf.
+  const _cc = parseInt(t.commentCount) || 0;
+  const cmtBtn = (extraStyle) => `<button class="action-btn" style="background:#ecfdf5;color:#1d4ed8;padding:4px 7px;${extraStyle || ''};position:relative" onclick="openComments(${t.id},'${tasksType}')" title="${_cc ? _cc + ' comment' + (_cc > 1 ? 's' : '') : 'Comments'}">💬${_cc ? `<span style="position:absolute;top:-6px;right:-6px;min-width:15px;height:15px;padding:0 3px;border-radius:8px;background:#ef4444;color:#fff;font-size:9px;font-weight:700;line-height:15px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.25)">${_cc > 9 ? '9+' : _cc}</span>` : ''}</button>`;
+
   const actionBtns = isAdmin ? `
       <button class="action-btn edit" style="padding:4px 7px" onclick="openEditTask(${t.id},'${tasksType}')" title="Edit">✏️</button>
       <button class="action-btn delete" style="padding:4px 7px;margin-left:3px" onclick="deleteTask(${t.id},'${tasksType}')" title="Delete">🗑</button>
-      <button class="action-btn" style="background:#ecfdf5;color:#1d4ed8;padding:4px 7px;margin-left:3px" onclick="openComments(${t.id},'${tasksType}')" title="Comments">💬</button>
+      ${cmtBtn('margin-left:3px')}
       ${isReport ? `${attBtn}
         <button class="action-btn done" style="margin-left:3px" onclick="reportClose(${t.id})" title="Close — Closed Tasks me daal do">✅ Close</button>
         <button class="action-btn" style="background:#fef3c7;color:#92400e;margin-left:3px" onclick="reportReopen(${t.id})" title="Reopen — wapas Pending, doer dobara kare">🔓 Reopen</button>` : ''}
@@ -3904,12 +3911,12 @@ function renderTaskRow(t, isAdmin) {
       ${isClosed && !isChecklist ? attBtn : ''}
       ${isWaiting ? `<span style="font-size:11px;color:#f59e0b;font-weight:600;margin-left:4px">⏳ Waiting</span>` : ''}
     ` : (ME.role==='pc') ? `
-      <button class="action-btn" style="background:#ecfdf5;color:#1d4ed8;padding:4px 7px" onclick="openComments(${t.id},'${tasksType}')" title="Comments">💬</button>
+      ${cmtBtn()}
       ${isChecklist && !isCompleted && !isClosed && !isWaiting && meraHai ? `<button class="action-btn done" style="margin-left:3px" onclick="updateStatus(${t.id},'completed','alltasks','${tasksType}')">Done</button>` : ''}
       ${isClosed && !isChecklist ? attBtn : ''}
       ${isWaiting ? `<span style="font-size:11px;color:#f59e0b;font-weight:600;margin-left:4px">⏳ Waiting</span>` : ''}
     ` : `
-      <button class="action-btn" style="background:#ecfdf5;color:#1d4ed8;padding:4px 7px" onclick="openComments(${t.id},'${tasksType}')" title="Comments">💬</button>
+      ${cmtBtn()}
       ${isReport ? `${attBtn}<span style="font-size:11px;color:#c2410c;font-weight:600;margin-left:4px">📤 Report bheja</span>` : ''}
       ${isClosed && !isChecklist ? attBtn : ''}
       ${!isCompleted && !isClosed && !isReport && !isWaiting ? `
@@ -4518,6 +4525,17 @@ async function addComment() {
   await api('/api/comments','POST',{taskId, taskType, comment});
   document.getElementById('commentInput').value = '';
   await loadComments(taskId, taskType);
+  refreshCommentBadges();
+}
+
+// 💬 par ginti purani na reh jaye. Comment add/delete karne ke baad list
+// dobara maangte hain -- modal upar khula rehta hai, isliye dikhne me kuch
+// hilta nahi, bas peeche ginti sahi ho jaati hai. (18 Sep 2026)
+function refreshCommentBadges() {
+  const pg = document.getElementById('page-alltasks');
+  if (pg && pg.classList.contains('active') && typeof loadAllTasks === 'function') {
+    loadAllTasks();
+  }
 }
 
 async function deleteComment(id) {
@@ -4526,6 +4544,7 @@ async function deleteComment(id) {
   const taskId = document.getElementById('commentTaskId').value;
   const taskType = document.getElementById('commentTaskType').value;
   await loadComments(taskId, taskType);
+  refreshCommentBadges();
 }
 
 async function bulkDelete(userId) {

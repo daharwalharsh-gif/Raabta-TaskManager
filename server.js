@@ -2235,6 +2235,22 @@ app.get('/api/tasks', requireAuth, async (req, res) => {
       });
     } catch { /* log table abhi bani nahi -- koi baat nahi */ }
 
+    // Har task par kitne comment hain. 💬 button par chhoti si ginti
+    // dikhani hai, taaki ek nazar me pata chale ki kisi task par baat hui
+    // hai -- pehle button khole bina pata hi nahi chalta tha ki andar kuch
+    // likha hai ya nahi. (Harsh, 18 Sep 2026)
+    // Poori table EK baar padh kar map bana lete hain -- har task par alag
+    // query nahi.
+    const cmtMap = {};
+    try {
+      const cmts = await db.findAll('Task_Comments');
+      cmts.forEach(c => {
+        if (String(c.task_type || '') !== (type || 'delegation')) return;
+        const k = String(c.task_id);
+        cmtMap[k] = (cmtMap[k] || 0) + 1;
+      });
+    } catch { /* table na ho to ginti 0 rahegi -- list phir bhi chalegi */ }
+
     const allTasks = await db.findAll(tabName);
 
     const tasks = allTasks.filter(t => {
@@ -2277,6 +2293,7 @@ app.get('/api/tasks', requireAuth, async (req, res) => {
       doneAt: (doneMap[String(t.id)] || {}).at || '',
       closedByName: (closeMap[String(t.id)] || {}).by || '',
       closedAt: (closeMap[String(t.id)] || {}).at || '',
+      commentCount: cmtMap[String(t.id)] || 0,
       assignedToName: userMap[String(t.assigned_to)]?.name || '',
       assignedByName: userMap[String(t.assigned_by)]?.name || ''
     })).sort((a, b) => (a.due_date || '').localeCompare(b.due_date || ''));
