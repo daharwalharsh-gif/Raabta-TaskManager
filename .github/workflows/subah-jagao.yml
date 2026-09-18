@@ -25,7 +25,7 @@ on:
   schedule:
     # :00 par GitHub sabse zyada busy rehta hai aur schedule tal jaata hai --
     # isliye ginti-ke minute chune hain, aur window bhi lambi ki hai.
-    - cron: '7,17,27,37,47,57 3-5 * * *'
+    - cron: '7,17,27,37,47,57 2-5 * * *'
   workflow_dispatch:        # zaroorat pade to haath se bhi chala sakte ho
 
 # Ek waqt me ek hi run — pichhla chal raha ho to naya uske baad
