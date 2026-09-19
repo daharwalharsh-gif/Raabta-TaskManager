@@ -5510,16 +5510,46 @@ function ftDeliveryKey(row) {
   const keys = Object.keys(row && row.data || {});
   return keys.find(k => /deliver/i.test(k)) || '';
 }
+// AAKHRI step (yahan Step 21) ka actual done date. 'na' wale step ginti me
+// nahi aate. Yahi wo tareekh hai jis par kaam sach me poora hua.
+function ftLastActual(row) {
+  const steps = (row && row.steps || []).filter(s => s.state !== 'na');
+  if (!steps.length) return '';
+  const last = steps.reduce((a, b) => (b.order > a.order ? b : a), steps[0]);
+  return hrNormDate(last.actual) || '';
+}
+
+// Harsh (19 Sep 2026): "21 step ka actual done ho jaye to Date of Delivery
+// aur 21 ke actual done date ke hisaab se delay dikhe -- us time par ho gaya
+// to delay nahi, usse late hua to delay."
+//
+// Isliye do soortein hain:
+//   1) Aakhri step ka actual bhara hua hai (kaam poora ho chuka)
+//        actual <= delivery  -> time par hua, DELAY NAHI (chahe aaj purana ho)
+//        actual >  delivery  -> DELAY, aur kitne din late wo bhi actual se
+//   2) Aakhri step abhi baaki hai
+//        delivery nikal gayi -> DELAY (aaj tak kitne din ho gaye)
+//        delivery aage ki    -> abhi delay nahi
+//
+// Pehle sirf "delivery nikal gayi + poora nahi hua" dekhte the -- usme jo
+// order time par nipat gaye the par tareekh purani thi, unka hisaab hi nahi
+// hota tha, aur jo late nipte unhe delay me ginte hi nahi the.
 function ftDelayInfo(row) {
-  if (!row || row.complete) return null;          // poora ho gaya -> delay nahi
+  if (!row) return null;
   const k = ftDeliveryKey(row);
   if (!k) return null;
-  const d = hrNormDate(row.data[k]);
-  if (!d) return null;
+  const due = hrNormDate(row.data[k]);
+  if (!due) return null;
+  const din = (a, b) => Math.round((new Date(b) - new Date(a)) / 86400000);
+
+  const done = ftLastActual(row);
+  if (done) {
+    if (done <= due) return null;                 // us din ya usse pehle -> theek
+    return { date: due, days: din(due, done), doneOn: done, finished: true };
+  }
   const today = new Date().toISOString().split('T')[0];
-  if (d >= today) return null;                    // abhi tareekh aayi hi nahi
-  const din = Math.round((new Date(today) - new Date(d)) / 86400000);
-  return { date: d, days: din };
+  if (due >= today) return null;                  // abhi tareekh aayi hi nahi
+  return { date: due, days: din(due, today), finished: false };
 }
 
 function ftRowDates(row) {
@@ -5612,13 +5642,15 @@ function ftRender() {
       const dots = (r.steps || []).map(s =>
         `<span title="Step ${s.order}: ${s.name} — ${s.state}" style="display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:3px;background:${s.state === 'done' ? '#10b981' : s.state === 'pending' ? '#e2e8f0' : '#f1f5f9'};border:${s.state === 'na' ? '1px dashed #cbd5e1' : 'none'}"></span>`
       ).join('');
-      // Delay wali row laal patti + halka laal background se alag dikhti hai
-      const dly = ftDelayInfo(r);
+      // Laal highlight SIRF "Delayed" card par click karne ke baad. Harsh
+      // (19 Sep): "pehle hi show mat karwao, jab Delayed card par click kare
+      // tab hi dikhe." Warna poori list laal-laal dikhti thi.
+      const dly = (_ftView === 'delayed') ? ftDelayInfo(r) : null;
       const rowStyle = dly ? 'background:#fef2f2;box-shadow:inset 3px 0 0 #ef4444'
         : (r.complete ? 'background:#f0fdf4' : '');
       const delKey = dly ? ftDeliveryKey(r) : '';
       return `<tr onclick="ftOpenDetail(${r.sheetRow})" style="cursor:pointer;${rowStyle}" title="${dly ? `Delivery ${dly.days} din pehle honi thi — abhi tak poora nahi hua` : 'Click for full details'}">
-        ${cols.map(c => `<td style="white-space:nowrap">${fmsLinkify(r.data[c])}${dly && c === delKey ? `<div style="font-size:10px;font-weight:700;color:#dc2626;margin-top:2px">⏰ ${dly.days} din late</div>` : ''}</td>`).join('')}
+        ${cols.map(c => `<td style="white-space:nowrap">${fmsLinkify(r.data[c])}${dly && c === delKey ? `<div style="font-size:10px;font-weight:700;color:#dc2626;margin-top:2px">⏰ ${dly.days} din late${dly.finished ? ` (${dly.doneOn} ko hua)` : ''}</div>` : ''}</td>`).join('')}
         <td style="white-space:nowrap">${dots}<div style="font-size:10px;color:#64748b;margin-top:2px">${r.doneCount}/${r.applicable} · ${pct}%</div></td>
         <td>${r.currentStep
           ? `<span style="font-weight:600">Step ${r.currentStep.order}</span> — ${r.currentStep.name}`
