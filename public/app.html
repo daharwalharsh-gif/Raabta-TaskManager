@@ -9452,15 +9452,29 @@ function renderFMSStepTable(stepId) {
     cont.innerHTML = `<div style="padding:16px;text-align:center;color:#22c55e;font-size:13px;font-weight:600">✅ No pending rows — all complete!</div>`;
     return;
   }
+  // Har heading ke neeche ek filter box. 700+ pending rows me se kisi ek
+  // client ya bill number ko dhoondhna warna namumkin tha. (Harsh, 19 Sep 2026)
+  const fStyle = 'width:100%;min-width:80px;padding:3px 6px;border:1px solid #e2e8f0;border-radius:5px;'
+    + 'font-size:11px;font-family:\'Inter\',sans-serif;outline:none;box-sizing:border-box;font-weight:400';
   cont.innerHTML = `
     <div class="fms-step-rows-table">
+      <div style="padding:0 0 8px;font-size:11px;color:#94a3b8" id="fmsFiltCount_${stepId}"></div>
       <div class="fms-step-rows-scroll">
         <table>
-          <thead><tr>
-            <th>Action</th>
-            ${st.colKeys.map(k => `<th>${k}</th>`).join('')}
-            <th>Status</th>
-          </tr></thead>
+          <thead>
+            <tr>
+              <th>Action</th>
+              ${st.colKeys.map(k => `<th>${k}</th>`).join('')}
+              <th>Status</th>
+            </tr>
+            <tr class="fms-filt-row">
+              <th><span onclick="fmsClearFilters(${stepId})" title="Saare filter hatao"
+                style="cursor:pointer;font-size:10px;color:#94a3b8;font-weight:600">✕ Clear</span></th>
+              ${st.colKeys.map((k, ci) => `<th><input type="text" data-fms-filt="${ci}"
+                oninput="fmsFilterRows(${stepId})" placeholder="🔍" style="${fStyle}"/></th>`).join('')}
+              <th></th>
+            </tr>
+          </thead>
           <tbody>
             ${st.rows.map((row, i) => `<tr>
               <td><button class="fms-done-btn" onclick="openFMSDoneModal(${stepId},${i})">✅ Done</button></td>
@@ -9471,6 +9485,73 @@ function renderFMSStepTable(stepId) {
         </table>
       </div>
     </div>`;
+
+  // Heading sticky hai (top:0). Filter row bhi sticky honi chahiye, warna
+  // 700 rows scroll karte hi gayab ho jaati. Uski jagah JS se NAAPTE hain --
+  // pehli row ki asli oonchai jo bhi ho, filter row theek uske neeche baithe.
+  // Hardcode karte to font/padding badalne par row aapas me chipak jaatin.
+  const head1 = cont.querySelector('thead tr:first-child th');
+  const filtRow = cont.querySelector('tr.fms-filt-row');
+  if (head1 && filtRow) {
+    const h = Math.round(head1.getBoundingClientRect().height);
+    [...filtRow.children].forEach(th => {
+      th.style.top = h + 'px';
+      th.style.padding = '0 14px 8px';
+      th.style.zIndex = '2';              // pehli heading row ke peeche
+      th.style.boxShadow = 'none';
+      th.style.textTransform = 'none';
+    });
+  }
+}
+
+// Filter lagao — row ko chhupate/dikhate hain, list dobara nahi banate.
+// Ye JAAN-BOOJH KAR aise hai: "✅ Done" button me row ka number bandha hota
+// hai (openFMSDoneModal(stepId, i)). Agar filter par list dobara banate to
+// number badal jaate aur Done galat row par lag jaata.
+function fmsFilterRows(stepId) {
+  const cont = document.getElementById(`fmsStepRows_${stepId}`);
+  if (!cont) return;
+  const boxes = [...cont.querySelectorAll('input[data-fms-filt]')];
+  const filt = boxes.map(b => String(b.value || '').trim().toLowerCase());
+  const koiFilter = filt.some(v => v);
+  const body = cont.querySelector('tbody');
+  if (!body) return;
+  let dikhe = 0;
+  const rows = [...body.rows].filter(tr => !tr.dataset.fmsNoMatch);
+  rows.forEach(tr => {
+    // cell 0 = Action, isliye filter i ka cell i+1
+    const theek = filt.every((v, ci) => {
+      if (!v) return true;
+      const cell = tr.cells[ci + 1];
+      return cell && cell.textContent.toLowerCase().includes(v);
+    });
+    tr.style.display = theek ? '' : 'none';
+    if (theek) dikhe++;
+  });
+  // Kuch na mile to khali table ki jagah saaf message
+  let nm = body.querySelector('tr[data-fms-no-match]');
+  if (!dikhe && koiFilter) {
+    if (!nm) {
+      nm = body.insertRow();
+      nm.setAttribute('data-fms-no-match', '1');
+      nm.dataset.fmsNoMatch = '1';
+      const td = nm.insertCell();
+      td.colSpan = (rows[0] ? rows[0].cells.length : 3);
+      td.style.cssText = 'text-align:center;padding:18px;color:#94a3b8;font-size:12px';
+      td.textContent = '🔍 Is filter se koi row nahi mili';
+    }
+    nm.style.display = '';
+  } else if (nm) nm.style.display = 'none';
+
+  const c = document.getElementById(`fmsFiltCount_${stepId}`);
+  if (c) c.textContent = koiFilter ? `🔍 ${dikhe} / ${rows.length} rows dikh rahi hain` : '';
+}
+
+function fmsClearFilters(stepId) {
+  const cont = document.getElementById(`fmsStepRows_${stepId}`);
+  if (!cont) return;
+  cont.querySelectorAll('input[data-fms-filt]').forEach(b => { b.value = ''; });
+  fmsFilterRows(stepId);
 }
 
 function openFMSDoneModal(stepId, rowIdx) {
