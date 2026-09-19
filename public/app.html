@@ -1520,6 +1520,10 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       <div class="ov-card pending" style="cursor:pointer" onclick="ftSetView('pending')"><div class="label">⏳ In Progress</div><div class="number" id="ftCardPending">—</div></div>
       <div class="ov-card completed" style="cursor:pointer" onclick="ftSetView('done')"><div class="label">✅ Completed</div><div class="number" id="ftCardDone">—</div></div>
       <div class="ov-card revised" style="cursor:pointer" onclick="ftSetView('all')"><div class="label">📦 Total Entries</div><div class="number" id="ftCardTotal">—</div></div>
+      <!-- Delivery date nikal gayi par order abhi poora nahi hua (19 Sep 2026) -->
+      <div class="ov-card pending" style="cursor:pointer;background:linear-gradient(145deg,#fff1f2,#fff)" onclick="ftSetView('delayed')"
+        title="Jinki Date of Delivery nikal chuki hai aur kaam abhi poora nahi hua">
+        <div class="label" style="color:#dc2626">⏰ Delayed</div><div class="number" id="ftCardDelayed" style="color:#dc2626">—</div></div>
     </div>
 
     <!-- Step cards — barabar width ki grid, screen ke hisaab se columns adjust -->
@@ -5489,6 +5493,35 @@ function ftClearFilters() {
 }
 
 // Row me jo bhi date jaisi value ho usse compare karo (sheet me DD/MM/YYYY hota hai)
+// ── DELAY ──
+// Harsh (19 Sep 2026): "Date of Delivery column sheet me hai. Is date par
+// delivery nahi hui to matlab done nahi hua -- 21 step hain, jo is date tak
+// poore nahi hue, wo delay show karwana."
+//
+// Yaani: delivery ki tareekh nikal gayi AUR order abhi tak poora nahi hua.
+// Jo poora ho chuka wo delay me nahi ginta, chahe late hua ho -- ab wo
+// atka hua nahi hai.
+//
+// Column ka naam har FMS ki sheet me alag ho sakta hai, isliye heading me
+// "delivery" dhoondhte hain (DATE OF DELIVERY, Delivery Date, wagairah).
+// Na mile to delay ka hisaab hi nahi lagta -- galat rows laal karne se
+// behtar hai kuch na dikhana.
+function ftDeliveryKey(row) {
+  const keys = Object.keys(row && row.data || {});
+  return keys.find(k => /deliver/i.test(k)) || '';
+}
+function ftDelayInfo(row) {
+  if (!row || row.complete) return null;          // poora ho gaya -> delay nahi
+  const k = ftDeliveryKey(row);
+  if (!k) return null;
+  const d = hrNormDate(row.data[k]);
+  if (!d) return null;
+  const today = new Date().toISOString().split('T')[0];
+  if (d >= today) return null;                    // abhi tareekh aayi hi nahi
+  const din = Math.round((new Date(today) - new Date(d)) / 86400000);
+  return { date: d, days: din };
+}
+
 function ftRowDates(row) {
   const out = [];
   Object.values(row.data || {}).forEach(v => { const d = hrNormDate(v); if (d) out.push(d); });
@@ -5507,6 +5540,7 @@ function ftRender() {
   let rows = (_ftData.rows || []).filter(r => {
     if (_ftView === 'pending' && r.complete) return false;
     if (_ftView === 'done' && !r.complete) return false;
+    if (_ftView === 'delayed' && !ftDelayInfo(r)) return false;
     if (doer !== 'all' && !(r.currentStep && r.currentStep.doers.includes(doer))) return false;
     if (stepF !== 'all' && !(r.currentStep && String(r.currentStep.order) === String(stepF))) return false;
     if (from || to) {
@@ -5531,6 +5565,9 @@ function ftRender() {
   document.getElementById('ftCardTotal').textContent = all.length;
   document.getElementById('ftCardDone').textContent = all.filter(r => r.complete).length;
   document.getElementById('ftCardPending').textContent = all.filter(r => !r.complete).length;
+  const delayedAll = all.filter(r => ftDelayInfo(r));
+  const dc = document.getElementById('ftCardDelayed');
+  if (dc) dc.textContent = delayedAll.length;
 
   // Har step par kitne atke hain — ek nazar me. Sab cards barabar size ke
   // grid me, taaki line se lagein (pehle flex-wrap se lambai alag-alag thi
@@ -5575,8 +5612,13 @@ function ftRender() {
       const dots = (r.steps || []).map(s =>
         `<span title="Step ${s.order}: ${s.name} — ${s.state}" style="display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:3px;background:${s.state === 'done' ? '#10b981' : s.state === 'pending' ? '#e2e8f0' : '#f1f5f9'};border:${s.state === 'na' ? '1px dashed #cbd5e1' : 'none'}"></span>`
       ).join('');
-      return `<tr onclick="ftOpenDetail(${r.sheetRow})" style="cursor:pointer;${r.complete ? 'background:#f0fdf4' : ''}" title="Click for full details">
-        ${cols.map(c => `<td style="white-space:nowrap">${fmsLinkify(r.data[c])}</td>`).join('')}
+      // Delay wali row laal patti + halka laal background se alag dikhti hai
+      const dly = ftDelayInfo(r);
+      const rowStyle = dly ? 'background:#fef2f2;box-shadow:inset 3px 0 0 #ef4444'
+        : (r.complete ? 'background:#f0fdf4' : '');
+      const delKey = dly ? ftDeliveryKey(r) : '';
+      return `<tr onclick="ftOpenDetail(${r.sheetRow})" style="cursor:pointer;${rowStyle}" title="${dly ? `Delivery ${dly.days} din pehle honi thi — abhi tak poora nahi hua` : 'Click for full details'}">
+        ${cols.map(c => `<td style="white-space:nowrap">${fmsLinkify(r.data[c])}${dly && c === delKey ? `<div style="font-size:10px;font-weight:700;color:#dc2626;margin-top:2px">⏰ ${dly.days} din late</div>` : ''}</td>`).join('')}
         <td style="white-space:nowrap">${dots}<div style="font-size:10px;color:#64748b;margin-top:2px">${r.doneCount}/${r.applicable} · ${pct}%</div></td>
         <td>${r.currentStep
           ? `<span style="font-weight:600">Step ${r.currentStep.order}</span> — ${r.currentStep.name}`
@@ -5584,11 +5626,12 @@ function ftRender() {
         <td style="color:#64748b">${r.currentStep ? (r.currentStep.doers.join(', ') || '—') : '—'}</td>
         <td>${r.complete
           ? '<span class="status-badge completed">Completed</span>'
+          : dly ? `<span class="status-badge" style="background:#fee2e2;color:#b91c1c">⏰ Delayed</span>`
           : '<span class="status-badge pending">In Progress</span>'}</td>
       </tr>`;
     }).join('')}</tbody></table>`;
   foot.textContent = `${rows.length} of ${all.length} entries` +
-    (_ftView !== 'all' ? ` · showing ${_ftView === 'done' ? 'completed' : 'in progress'}` : '') +
+    (_ftView !== 'all' ? ` · showing ${_ftView === 'done' ? 'completed' : _ftView === 'delayed' ? 'delayed' : 'in progress'}` : '') +
     (q ? ` · search "${q}"` : '');
 }
 
