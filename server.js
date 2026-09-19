@@ -5242,6 +5242,50 @@ app.get('/api/fms-tasks/:id', requireAuth, async (req, res) => {
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
 
+// ══════════════════════════════════════════════════════
+// SHEET KA CHHOTA CACHE — Google ka quota bachane ke liye
+// ══════════════════════════════════════════════════════
+// FMS Tasks ka page khulte hi HAR step ke liye alag request jaati hai, aur
+// har request POORI sheet padhti thi (A1:ZZ). PMS me 21 step hain -- yaani
+// ek banda page khole to 21 baar poori sheet. Do-teen log ek saath khol dein
+// to Google ka "read requests per minute" quota khatam.
+//
+// 19 Sep 2026 ko log me yahi mila:
+//   "Quota exceeded for quota metric 'Read requests' and limit
+//    'Read requests per minute per user' ... sheets.googleapis.com"
+// Quota khatam hone par request fail hoti hai aur doer ko rows aati hi
+// nahi -- screen par "All done!" dikh jaata hai jabki kaam pending hota hai.
+//
+// Ab sheet 30 second ke liye yaad rakhi jaati hai. 21 step ab 21 nahi, EK
+// read me nipat jaate hain. 30 sec isliye ki sheet me kiya hua badlav
+// bahut der tak purana na dikhe.
+const _sheetCache = new Map();
+const SHEET_CACHE_MS = 30 * 1000;
+async function readSheetCached(d, spreadsheetId, range) {
+  const key = `${spreadsheetId}|${range}`;
+  const hit = _sheetCache.get(key);
+  if (hit && (Date.now() - hit.at) < SHEET_CACHE_MS) return hit.rows;
+  // Ek hi waqt par kai request aayein to sirf PEHLI Google ko jaaye, baaki
+  // usi ka intezaar karein -- warna 21 request ek saath nikal jaatin.
+  if (hit && hit.wait) return hit.wait;
+  const p = withRetry(() => d.sheets.spreadsheets.values.get({ spreadsheetId, range }))
+    .then(r => {
+      const rows = r.data.values || [];
+      _sheetCache.set(key, { rows, at: Date.now() });
+      return rows;
+    })
+    .catch(e => { _sheetCache.delete(key); throw e; });
+  _sheetCache.set(key, { wait: p, at: Date.now(), rows: (hit && hit.rows) || [] });
+  return p;
+}
+// Sheet me kuch likhne ke baad cache purana ho jaata hai -- turant hata do,
+// warna doer ko apna hi kiya hua Done 30 sec tak pending dikhta rehta.
+function clearSheetCache(spreadsheetId) {
+  for (const k of _sheetCache.keys()) {
+    if (!spreadsheetId || k.startsWith(spreadsheetId + '|')) _sheetCache.delete(k);
+  }
+}
+
 // GET /api/fms-tasks/:fmsId/steps/:stepId/rows — fetch pending rows from external sheet
 app.get('/api/fms-tasks/:fmsId/steps/:stepId/rows', requireAuth, async (req, res) => {
   try {
@@ -5252,17 +5296,18 @@ app.get('/api/fms-tasks/:fmsId/steps/:stepId/rows', requireAuth, async (req, res
     const fms = parseFMSRow(fmsRow);
     // Find current step index (0-based)
     const stepIdx = fms.steps.findIndex((s,i) => String(s.id || i+1) === String(req.params.stepId));
-    if (stepIdx < 0) return res.json({ rows: [], headers: [], total: 0, allHeaders: [] });
+    // Pehle yahan khali list jaati thi, jo screen par "✅ All done!" dikhti
+    // thi -- yaani config ki gadbad bilkul "kaam ho gaya" jaisi lagti thi.
+    // Ab saaf error, taaki asli baat pata chale. (19 Sep 2026)
+    if (stepIdx < 0) return res.status(404).json({ error: `Step ${req.params.stepId} is FMS me mila hi nahi — FMS Admin me step dobara save karo` });
     const step = fms.steps[stepIdx];
 
     const spreadsheetId = extractSheetId(fms.sheet_id);
     const headerRow = parseInt(fms.header_row) || 1;
 
-    // Fetch full sheet — use wide range to cover columns beyond Z
-    const response = await withRetry(() => d.sheets.spreadsheets.values.get({
-      spreadsheetId, range: `${fms.sheet_name}!A1:ZZ`
-    }));
-    const allRows = response.data.values || [];
+    // Poori sheet — 30 sec ka cache, taaki 21 step ke liye 21 baar Google
+    // ko na jaana pade (quota isi se khatam ho raha tha)
+    const allRows = await readSheetCached(d, spreadsheetId, `${fms.sheet_name}!A1:ZZ`);
     if (allRows.length < headerRow) return res.json({ rows: [], headers: [], total: 0, allHeaders: [] });
 
     const headers = allRows[headerRow - 1] || [];
@@ -5510,10 +5555,9 @@ async function runFMSNotifications(force) {
       const fms = parseFMSRow(fmsRow);
       let allRows;
       try {
-        const resp = await withRetry(() => d.sheets.spreadsheets.values.get({
-          spreadsheetId: extractSheetId(fms.sheet_id), range: `${fms.sheet_name}!A1:ZZ`
-        }));
-        allRows = resp.data.values || [];
+        // Wahi cache — notify har 3 min chalta hai aur poori sheet padhta
+        // hai; isse doer ke request ke saath quota nahi tootta
+        allRows = await readSheetCached(d, extractSheetId(fms.sheet_id), `${fms.sheet_name}!A1:ZZ`);
       } catch (e) { console.error('  FMS notify — sheet read failed:', fms.sheet_name, e.message); continue; }
 
       const headerRow = parseInt(fms.header_row) || 1;
@@ -5927,6 +5971,10 @@ app.post('/api/fms-tasks/:fmsId/steps/:stepId/done', requireAuth, async (req, re
         requestBody: { valueInputOption: 'USER_ENTERED', data: updates }
       }));
     }
+
+    // Sheet badal gayi -- cache turant hatao, warna doer ko apna hi kiya hua
+    // Done 30 second tak pending dikhta rehta
+    clearSheetCache(spreadsheetId);
 
     res.json({ success: true, generatedIds });
   } catch(err) {
