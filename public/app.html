@@ -3915,6 +3915,12 @@ function renderTaskRow(t, isAdmin) {
         ? `<button class="action-btn done" style="margin-left:3px" onclick="updateStatus(${t.id},'completed','alltasks','${tasksType}')">Done</button>`
         : `<button class="action-btn done" style="margin-left:3px" onclick="openReportModal(${t.id})" title="Complete — image/PDF proof ke saath">Done</button>`) : ''}
       ${!isChecklist && !isCompleted && !isClosed && !isReport && !isWaiting ? `<button class="action-btn revise" style="margin-left:3px" onclick="openReviseModal(${t.id},'${tasksType}')">Revise</button>` : ''}
+      <!-- Harsh (19 Sep 2026): "admin ko ek Close ka button do, kisi ka bhi
+           task wo close kar sakta hai." Pehle Close sirf Report aur Completed
+           par dikhta tha -- Pending/Revised task band karne ka koi rasta hi
+           nahi tha, pehle Done karwana padta tha. Ab admin seedha band kar
+           sakta hai. Doer ka "Done" wala haq isse nahi badla. -->
+      ${!isChecklist && !isClosed && !isReport && !isCompleted ? `<button class="action-btn" style="background:#e0e7ff;color:#3730a3;margin-left:3px" onclick="closeTask(${t.id},'${tasksType}')" title="Close — task seedha Closed Tasks me chala jayega">🔒 Close</button>` : ''}
       ${(isCompleted || isClosed) && !isChecklist ? `<button class="action-btn" style="background:#fef3c7;color:#92400e;margin-left:3px" onclick="reopenTask(${t.id},'${tasksType}')" title="Reopen — mark as pending again">↺ Reopen</button>` : ''}
       ${isCompleted && !isChecklist ? `<button class="action-btn" style="background:#e0e7ff;color:#3730a3;margin-left:3px" onclick="closeTask(${t.id},'${tasksType}')" title="Close — task will move to the Closed Tasks tab">🔒 Close</button>${attBtn}` : ''}
       ${isClosed && !isChecklist ? attBtn : ''}
