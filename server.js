@@ -2593,7 +2593,7 @@ app.put('/api/tasks/:id/status', requireAuth, async (req, res) => {
     const doneWaliStatus = (status === 'report' || status === 'completed');
     if (doneWaliStatus && String(task.assigned_to) !== String(uid)) {
       return res.status(403).json({
-        error: 'Task sirf uska doer hi Done kar sakta hai. Aap ise Close ya Revise kar sakte hain.'
+        error: 'Only the doer can mark this task Done. You can Close or Revise it instead.'
       });
     }
 
@@ -5453,16 +5453,16 @@ app.get('/api/fms-tasks/:fmsId/steps/:stepId/rows', requireAuth, async (req, res
       const noActual = colLetterToIdx(step.actualCol || '') < 0;
       const noPlan   = colLetterToIdx(step.planCol   || '') < 0;
       if (noActual)
-        emptyWhy = `Is step ka ACTUAL column set hi nahi hai — Done kahin likha hi nahi ja sakta. FMS Admin me Step ${stepIdx + 1} kholo aur Actual column chuno`;
+        emptyWhy = `This step has no ACTUAL column set — "Done" cannot be saved anywhere. Open Step ${stepIdx + 1} in FMS Admin and pick an Actual column.`;
       else if (noPlan)
-        emptyWhy = `Is step ka PLAN column set hi nahi hai — FMS Admin me Step ${stepIdx + 1} kholo aur Plan column chuno`;
+        emptyWhy = `This step has no PLAN column set — open Step ${stepIdx + 1} in FMS Admin and pick a Plan column.`;
       else if (!planHasAny[stepIdx]) {
         if (stepIdx === 0) {
           // PEHLA step -- iska Planned khali hai to kaam kabhi shuru hi nahi
           // hoga. Yahi wo haal tha jisme 766 kaam chhup gaye the.
-          emptyWhy = `Is step ka Planned column (${step.planCol}) poori sheet me khali hai — isliye koi kaam shuru hi nahi ho sakta. Sheet me us column ka formula check karo`;
+          emptyWhy = `The Planned column (${step.planCol}) is empty for every row in the sheet, so no work can start here. Please check that column's formula in the sheet.`;
         } else {
-          emptyNote = `Abhi tak yahan tak kaam nahi pahuncha. Pichhle step par Done hote hi rows yahan apne aap aa jayengi.`;
+          emptyNote = `Work hasn't reached this step yet. Rows will appear here automatically once the previous step is marked Done.`;
         }
       }
     }
