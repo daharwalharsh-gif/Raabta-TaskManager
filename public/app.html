@@ -1431,7 +1431,10 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     <div id="fmsTasksViewTabs" style="display:none;margin-bottom:16px">
       <div class="tab-group">
         <div class="tab active" id="fmsViewTabTasks" onclick="switchFMSView('tasks',this)">Tasks</div>
-        <div class="tab" id="fmsViewTabForm" onclick="switchFMSView('form',this)">📝 Form</div>
+        <!-- "📝 Form" tab Harsh ke kehne par hataya (20 Sep 2026). Button hata
+             hai, uske peeche ka form aur switchFMSView('form') waise hi hain --
+             wapas chahiye to sirf ye ek line lauta dena. -->
+        <div class="tab" id="fmsViewTabForm" onclick="switchFMSView('form',this)" style="display:none">📝 Form</div>
       </div>
     </div>
 
@@ -9496,13 +9499,14 @@ async function loadFMSStepRows(stepId) {
   const step = (window._fmsAllSteps || []).find(s => s.id === stepId) || null;
   const rows = r.rows || [];
   const colKeys = rows.length ? Object.keys(rows[0].data) : [];
-  window._fmsStepStates[stepId] = { rows, colKeys, step, emptyWhy: r.emptyWhy || '' };
-  // "All done!" tabhi jab kaam SACH ME ho chuka ho. Agar rows isliye khali
-  // hain ki sheet/config me kuch gadbad hai to wo saaf likha jaayega --
-  // warna 766 pending kaam bhi "All done!" dikhte hain. (20 Sep 2026)
+  window._fmsStepStates[stepId] = { rows, colKeys, step, emptyWhy: r.emptyWhy || '', emptyNote: r.emptyNote || '' };
+  // "All done!" tabhi jab kaam SACH ME ho chuka ho. Gadbad par warning, aur
+  // jo step abhi apni baari ka intezaar kar raha hai uspar halki si line --
+  // teeno alag. (20 Sep 2026)
   if (countEl) {
     if (r.total) { countEl.textContent = `${r.total} pending row(s)`; countEl.style.color = '#ef4444'; }
     else if (r.emptyWhy) { countEl.textContent = '⚠️ Setup dekho'; countEl.style.color = '#d97706'; }
+    else if (r.emptyNote) { countEl.textContent = '⏳ Baari nahi aayi'; countEl.style.color = '#94a3b8'; }
     else { countEl.textContent = '✅ All done!'; countEl.style.color = '#16a34a'; }
   }
   renderFMSStepTable(stepId);
@@ -9535,6 +9539,8 @@ function renderFMSStepTable(stepId) {
       ? `<div style="padding:14px 16px;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;color:#92400e;font-size:12.5px;line-height:1.6">
            <b>⚠️ Yahan koi row nahi dikh rahi — par kaam poora hua ho, ye pakka nahi.</b><br>${st.emptyWhy}
          </div>`
+      : st.emptyNote
+      ? `<div style="padding:14px;text-align:center;color:#94a3b8;font-size:12.5px">⏳ ${st.emptyNote}</div>`
       : `<div style="padding:16px;text-align:center;color:#22c55e;font-size:13px;font-weight:600">✅ No pending rows — all complete!</div>`;
     return;
   }

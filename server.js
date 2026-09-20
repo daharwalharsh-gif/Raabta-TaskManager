@@ -5439,18 +5439,34 @@ app.get('/api/fms-tasks/:fmsId/steps/:stepId/rows', requireAuth, async (req, res
     // sach me ho gaya ho, ya sheet ka Planned column khali reh gaya ho, ya
     // step ke column set hi na kiye hon. Teeno ek jaise dikhte the, isliye
     // 766 kaam chhupe rehne par bhi kisi ko pata nahi chala. (20 Sep 2026)
-    let emptyWhy = '';
+    // Row na mile to do alag-alag baatein hoti hain -- inhe ek jaisa dikhana
+    // galat hai:
+    //   emptyWhy  = ASLI GADBAD (column set nahi, ya PEHLE step ka Planned
+    //               hi khali). Yahan peeli warning banti hai.
+    //   emptyNote = NORMAL BAAT (aage ka step abhi apni baari ka intezaar kar
+    //               raha hai). Yahan sirf halki si line, warning nahi.
+    // 20 Sep: pehle "Planned khali" par HAR step (2..21) peeli warning dikha
+    // raha tha -- 20 step par dar wali warning, jabki wo bilkul normal haal
+    // hai (har step ka Planned pichhle step ke Actual se banta hai).
+    let emptyWhy = '', emptyNote = '';
     if (!rows.length) {
-      if (colLetterToIdx(step.actualCol || '') < 0)
+      const noActual = colLetterToIdx(step.actualCol || '') < 0;
+      const noPlan   = colLetterToIdx(step.planCol   || '') < 0;
+      if (noActual)
         emptyWhy = `Is step ka ACTUAL column set hi nahi hai — Done kahin likha hi nahi ja sakta. FMS Admin me Step ${stepIdx + 1} kholo aur Actual column chuno`;
-      else if (colLetterToIdx(step.planCol || '') < 0)
+      else if (noPlan)
         emptyWhy = `Is step ka PLAN column set hi nahi hai — FMS Admin me Step ${stepIdx + 1} kholo aur Plan column chuno`;
-      else if (!planHasAny[stepIdx])
-        emptyWhy = `Is step ka Planned column (${step.planCol}) poori sheet me khali hai — isliye koi row is step par lagu nahi maani ja rahi. Sheet me us column ka formula check karo`;
-      else if (colLetterToIdx(step.actualCol || '') < 0)
-        emptyWhy = `Is step ka ACTUAL column set hi nahi hai — FMS Admin me Step ${stepIdx + 1} kholo aur Actual column chuno`;
+      else if (!planHasAny[stepIdx]) {
+        if (stepIdx === 0) {
+          // PEHLA step -- iska Planned khali hai to kaam kabhi shuru hi nahi
+          // hoga. Yahi wo haal tha jisme 766 kaam chhup gaye the.
+          emptyWhy = `Is step ka Planned column (${step.planCol}) poori sheet me khali hai — isliye koi kaam shuru hi nahi ho sakta. Sheet me us column ka formula check karo`;
+        } else {
+          emptyNote = `Abhi tak yahan tak kaam nahi pahuncha. Pichhle step par Done hote hi rows yahan apne aap aa jayengi.`;
+        }
+      }
     }
-    res.json({ rows, headers: cols.map(c => c.key), total: rows.length, allHeaders: headers, emptyWhy });
+    res.json({ rows, headers: cols.map(c => c.key), total: rows.length, allHeaders: headers, emptyWhy, emptyNote });
   } catch(err) {
     let msg = err.message || 'Unknown error';
     if (msg.includes('403')) msg = 'Access denied — FMS sheet ko service account ke saath share karo';
