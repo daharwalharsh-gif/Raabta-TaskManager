@@ -9496,8 +9496,15 @@ async function loadFMSStepRows(stepId) {
   const step = (window._fmsAllSteps || []).find(s => s.id === stepId) || null;
   const rows = r.rows || [];
   const colKeys = rows.length ? Object.keys(rows[0].data) : [];
-  window._fmsStepStates[stepId] = { rows, colKeys, step };
-  if (countEl) countEl.textContent = r.total ? `${r.total} pending row(s)` : '✅ All done!';
+  window._fmsStepStates[stepId] = { rows, colKeys, step, emptyWhy: r.emptyWhy || '' };
+  // "All done!" tabhi jab kaam SACH ME ho chuka ho. Agar rows isliye khali
+  // hain ki sheet/config me kuch gadbad hai to wo saaf likha jaayega --
+  // warna 766 pending kaam bhi "All done!" dikhte hain. (20 Sep 2026)
+  if (countEl) {
+    if (r.total) { countEl.textContent = `${r.total} pending row(s)`; countEl.style.color = '#ef4444'; }
+    else if (r.emptyWhy) { countEl.textContent = '⚠️ Setup dekho'; countEl.style.color = '#d97706'; }
+    else { countEl.textContent = '✅ All done!'; countEl.style.color = '#16a34a'; }
+  }
   renderFMSStepTable(stepId);
 }
 
@@ -9524,7 +9531,11 @@ function renderFMSStepTable(stepId) {
   const st = (window._fmsStepStates || {})[stepId];
   if (!cont || !st) return;
   if (!st.rows.length) {
-    cont.innerHTML = `<div style="padding:16px;text-align:center;color:#22c55e;font-size:13px;font-weight:600">✅ No pending rows — all complete!</div>`;
+    cont.innerHTML = st.emptyWhy
+      ? `<div style="padding:14px 16px;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;color:#92400e;font-size:12.5px;line-height:1.6">
+           <b>⚠️ Yahan koi row nahi dikh rahi — par kaam poora hua ho, ye pakka nahi.</b><br>${st.emptyWhy}
+         </div>`
+      : `<div style="padding:16px;text-align:center;color:#22c55e;font-size:13px;font-weight:600">✅ No pending rows — all complete!</div>`;
     return;
   }
   // Har heading ke neeche ek filter box. 700+ pending rows me se kisi ek

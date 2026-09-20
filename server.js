@@ -5355,28 +5355,41 @@ app.get('/api/fms-tasks/:fmsId/steps/:stepId/rows', requireAuth, async (req, res
     // Jin sheets me Planned sach me per-step bharta hai (Store Visit /
     // Customised wali), wahan kuch nahi badla -- wahan column khali nahi
     // hota, to niyam pehle jaisa hi chalta hai.
+    // 20 Sep 2026 -- pehle yahan ek "fallback" daala tha: Planned column poori
+    // sheet me khali ho to us step ko har row par lagu maan lo. Wo GALAT nikla:
+    // is sheet me step 2..20 ka Planned isliye khali hai ki wahan tak kaam
+    // pahuncha hi nahi (har step ka Planned pichhle step ke Actual se banta
+    // hai). Fallback ne un steps par 97 rows dikha di jinka kaam tha hi nahi.
+    // Isliye niyam wapas sakht: Planned khali = ye step is row par lagu nahi.
+    //
+    // Par ASLI dikkat (kaam chhup jaana) chhupni nahi chahiye -- uska ilaaj
+    // filter badalna nahi, BATANA hai. Niche planEmpty bhej rahe hain, jisse
+    // screen par "All done!" ki jagah saaf wajah likhi aati hai.
     const planHasAny = {};
     fms.steps.forEach((s, i) => {
       const pi = colLetterToIdx(s.planCol || '');
       planHasAny[i] = pi >= 0 && rawDataRows.some(r => String(r[pi] || '').trim() !== '');
     });
-    const isRelevant = (row, s, si) => {
+    const isRelevant = (row, s) => {
       const pIdx = colLetterToIdx(s.planCol || '');
-      if (pIdx < 0) return true;
-      if (!planHasAny[si]) return true;          // poore sheet me khali -> rok mat lagao
-      return (row[pIdx] || '').trim() !== '';
+      return pIdx < 0 || (row[pIdx] || '').trim() !== '';
     };
-    const pending = rawDataRows
+    // Jis step ka ACTUAL column set hi nahi hai, uska "Done" kahin likha hi
+    // nahi ja sakta -- wo step chal hi nahi sakta. Pehle aisa step HAR row ko
+    // pending dikha deta tha (PMS ka Step-21 aise hi 97 phantom rows dikha
+    // raha tha). Ab wahan koi row nahi, aur niche saaf likha jaata hai ki
+    // column set karo. (20 Sep 2026)
+    const pending = (colLetterToIdx(step.actualCol || '') < 0 ? [] : rawDataRows)
       .map((row, idx) => ({ row, sheetRow: headerRow + idx + 1 }))
       .filter(({ row }) => {
         if (!hasRealData(row)) return false;
         // Ye row is step par apply hi nahi hoti to yahan pending nahi dikhegi
-        if (!isRelevant(row, step, stepIdx)) return false;
+        if (!isRelevant(row, step)) return false;
         // Sirf un previous steps ko "done hona chahiye" treat karo jo IS ROW par
         // relevant hain — jo step row par lagu hi nahi, wo block nahi karega
         for (let i = 0; i < stepIdx; i++) {
           const prevStep = fms.steps[i];
-          if (!isRelevant(row, prevStep, i)) continue;
+          if (!isRelevant(row, prevStep)) continue;
           const prevIdx = colLetterToIdx(prevStep.actualCol || '');
           if (prevIdx >= 0 && !isDone(row[prevIdx])) return false;
         }
@@ -5421,7 +5434,23 @@ app.get('/api/fms-tasks/:fmsId/steps/:stepId/rows', requireAuth, async (req, res
       };
     });
 
-    res.json({ rows, headers: cols.map(c => c.key), total: rows.length, allHeaders: headers });
+    // Agar ek bhi row nahi mili to WAJAH bhi bhejo. Pehle sirf khali list
+    // jaati thi aur screen par "✅ All done!" likh aata tha -- chahe kaam
+    // sach me ho gaya ho, ya sheet ka Planned column khali reh gaya ho, ya
+    // step ke column set hi na kiye hon. Teeno ek jaise dikhte the, isliye
+    // 766 kaam chhupe rehne par bhi kisi ko pata nahi chala. (20 Sep 2026)
+    let emptyWhy = '';
+    if (!rows.length) {
+      if (colLetterToIdx(step.actualCol || '') < 0)
+        emptyWhy = `Is step ka ACTUAL column set hi nahi hai — Done kahin likha hi nahi ja sakta. FMS Admin me Step ${stepIdx + 1} kholo aur Actual column chuno`;
+      else if (colLetterToIdx(step.planCol || '') < 0)
+        emptyWhy = `Is step ka PLAN column set hi nahi hai — FMS Admin me Step ${stepIdx + 1} kholo aur Plan column chuno`;
+      else if (!planHasAny[stepIdx])
+        emptyWhy = `Is step ka Planned column (${step.planCol}) poori sheet me khali hai — isliye koi row is step par lagu nahi maani ja rahi. Sheet me us column ka formula check karo`;
+      else if (colLetterToIdx(step.actualCol || '') < 0)
+        emptyWhy = `Is step ka ACTUAL column set hi nahi hai — FMS Admin me Step ${stepIdx + 1} kholo aur Actual column chuno`;
+    }
+    res.json({ rows, headers: cols.map(c => c.key), total: rows.length, allHeaders: headers, emptyWhy });
   } catch(err) {
     let msg = err.message || 'Unknown error';
     if (msg.includes('403')) msg = 'Access denied — FMS sheet ko service account ke saath share karo';
@@ -5869,19 +5898,9 @@ app.get('/api/fms-tracking/:fmsId', requireAuth, async (req, res) => {
     const isDone = v => { const s = String(v || '').trim(); return s !== '' && s.toUpperCase() !== 'FALSE'; };
     // Wahi rule jo pending-rows endpoint me hai: jis step ka Planned column
     // is row me khali hai, wo step is row par lagu hi nahi hota.
-    // Aur wahi bachav bhi: agar kisi step ka Planned column POORI SHEET me
-    // khali hai (jaise PMS me formula bigadne par hua tha), to ye rok lagti
-    // hi nahi -- warna Tracking me bhi sab "complete" dikhne lagta tha.
-    const planHasAnyT = {};
-    fms.steps.forEach((s, i) => {
+    const isRelevant = (row, s) => {
       const p = colLetterToIdx(s.planCol || '');
-      planHasAnyT[i] = p >= 0 && dataRows.some(r => String(r[p] || '').trim() !== '');
-    });
-    const isRelevant = (row, s, si) => {
-      const p = colLetterToIdx(s.planCol || '');
-      if (p < 0) return true;
-      if (si !== undefined && !planHasAnyT[si]) return true;
-      return String(row[p] || '').trim() !== '';
+      return p < 0 || String(row[p] || '').trim() !== '';
     };
     const hasRealData = row => {
       for (let i = 0; i < Math.min(10, headers.length); i++) {
@@ -5913,7 +5932,7 @@ app.get('/api/fms-tracking/:fmsId', requireAuth, async (req, res) => {
       const per = [];
       let current = null, doneCount = 0, applicable = 0;
       fms.steps.forEach((s, si) => {
-        const rel = isRelevant(row, s, si);
+        const rel = isRelevant(row, s);
         const aIdx = colLetterToIdx(s.actualCol || '');
         const done = rel && aIdx >= 0 && isDone(row[aIdx]);
         if (rel) { applicable++; if (done) doneCount++; }
