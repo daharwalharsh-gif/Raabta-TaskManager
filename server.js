@@ -5339,21 +5339,44 @@ app.get('/api/fms-tasks/:fmsId/steps/:stepId/rows', requireAuth, async (req, res
     // Planned column sirf usi step ke liye bharta hai. Isliye jis step ka Planned
     // column is row mein khali hai, wo step us row par apply hi nahi hota (skip),
     // aur wo "previous step must be done" wali check ko bhi block nahi karega.
-    const isRelevant = (row, s) => {
+    //
+    // 20 Sep 2026 -- EK BADI GADBAD YAHIN CHHUPI THI:
+    // PMS sheet me Planned column (U) ka formula kaam karna band ho gaya tha
+    // aur POORI sheet me wo khali ho gaya -- 766 me se EK bhi row me value
+    // nahi. Upar wale niyam ke hisaab se har row "is step par lagu nahi"
+    // ban gayi, saari rows chhup gayin, aur doer ko "✅ All done!" dikhne
+    // laga jabki 766 kaam pade the. Kisi ko pata hi nahi chalta -- na error,
+    // na warning.
+    //
+    // Isliye ab: agar kisi step ka Planned column POORI SHEET me khali hai,
+    // to us step ke liye ye niyam lagta hi nahi -- wo har row par lagu maana
+    // jaata hai. Matlab sheet ka formula bigad bhi jaye to kaam dikhta
+    // rahega, chhupega nahi.
+    // Jin sheets me Planned sach me per-step bharta hai (Store Visit /
+    // Customised wali), wahan kuch nahi badla -- wahan column khali nahi
+    // hota, to niyam pehle jaisa hi chalta hai.
+    const planHasAny = {};
+    fms.steps.forEach((s, i) => {
+      const pi = colLetterToIdx(s.planCol || '');
+      planHasAny[i] = pi >= 0 && rawDataRows.some(r => String(r[pi] || '').trim() !== '');
+    });
+    const isRelevant = (row, s, si) => {
       const pIdx = colLetterToIdx(s.planCol || '');
-      return pIdx < 0 || (row[pIdx] || '').trim() !== '';
+      if (pIdx < 0) return true;
+      if (!planHasAny[si]) return true;          // poore sheet me khali -> rok mat lagao
+      return (row[pIdx] || '').trim() !== '';
     };
     const pending = rawDataRows
       .map((row, idx) => ({ row, sheetRow: headerRow + idx + 1 }))
       .filter(({ row }) => {
         if (!hasRealData(row)) return false;
         // Ye row is step par apply hi nahi hoti to yahan pending nahi dikhegi
-        if (!isRelevant(row, step)) return false;
+        if (!isRelevant(row, step, stepIdx)) return false;
         // Sirf un previous steps ko "done hona chahiye" treat karo jo IS ROW par
         // relevant hain — jo step row par lagu hi nahi, wo block nahi karega
         for (let i = 0; i < stepIdx; i++) {
           const prevStep = fms.steps[i];
-          if (!isRelevant(row, prevStep)) continue;
+          if (!isRelevant(row, prevStep, i)) continue;
           const prevIdx = colLetterToIdx(prevStep.actualCol || '');
           if (prevIdx >= 0 && !isDone(row[prevIdx])) return false;
         }
@@ -5846,9 +5869,19 @@ app.get('/api/fms-tracking/:fmsId', requireAuth, async (req, res) => {
     const isDone = v => { const s = String(v || '').trim(); return s !== '' && s.toUpperCase() !== 'FALSE'; };
     // Wahi rule jo pending-rows endpoint me hai: jis step ka Planned column
     // is row me khali hai, wo step is row par lagu hi nahi hota.
-    const isRelevant = (row, s) => {
+    // Aur wahi bachav bhi: agar kisi step ka Planned column POORI SHEET me
+    // khali hai (jaise PMS me formula bigadne par hua tha), to ye rok lagti
+    // hi nahi -- warna Tracking me bhi sab "complete" dikhne lagta tha.
+    const planHasAnyT = {};
+    fms.steps.forEach((s, i) => {
       const p = colLetterToIdx(s.planCol || '');
-      return p < 0 || String(row[p] || '').trim() !== '';
+      planHasAnyT[i] = p >= 0 && dataRows.some(r => String(r[p] || '').trim() !== '');
+    });
+    const isRelevant = (row, s, si) => {
+      const p = colLetterToIdx(s.planCol || '');
+      if (p < 0) return true;
+      if (si !== undefined && !planHasAnyT[si]) return true;
+      return String(row[p] || '').trim() !== '';
     };
     const hasRealData = row => {
       for (let i = 0; i < Math.min(10, headers.length); i++) {
@@ -5880,7 +5913,7 @@ app.get('/api/fms-tracking/:fmsId', requireAuth, async (req, res) => {
       const per = [];
       let current = null, doneCount = 0, applicable = 0;
       fms.steps.forEach((s, si) => {
-        const rel = isRelevant(row, s);
+        const rel = isRelevant(row, s, si);
         const aIdx = colLetterToIdx(s.actualCol || '');
         const done = rel && aIdx >= 0 && isDone(row[aIdx]);
         if (rel) { applicable++; if (done) doneCount++; }
