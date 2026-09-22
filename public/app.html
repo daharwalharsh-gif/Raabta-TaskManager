@@ -8241,6 +8241,14 @@ async function openEditFMS() {
         uid_pad:          r.uid_pad || 3,
         sub_multi:        r.sub_multi || 0,
         allow_other:      r.allow_other || 0,
+        // 22 Sep 2026 -- YE CHHOOT GAYA THA aur setting apne aap hat jaati thi.
+        // Ye LOAD ka raasta hai: FMS Admin khulte hi har row yahan DOBARA
+        // banti hai. Jo field is list me nahi, wo yahin gir jaata hai --
+        // isliye tick lagane ke baad bhi, page refresh hote hi sub_remarks
+        // gayab ho jaata tha aur agli save me 0 chala jaata tha.
+        // Naya field yahan jodna HAMESHA zaroori hai, sirf save wali jagah
+        // par nahi.
+        sub_remarks:      r.sub_remarks || 0,
         required:         r.required === 0 ? 0 : 1
       })),
       showCols:       Array.isArray(s.showCols) ? s.showCols : [],
@@ -8886,8 +8894,8 @@ function buildDropdownOptionsHTML(idx, ri, r) {
         <input type="checkbox" ${parseInt(r.sub_remarks) ? 'checked' : ''}
           onchange="fmsSteps[${idx}].extraRows[${ri}].sub_remarks=this.checked?1:0"
           style="width:14px;height:14px;accent-color:#10b981;cursor:pointer;margin-top:2px;flex-shrink:0">
-        <span>Har tick kiye naam ke neeche <b>remarks</b> ka box bhi do
-          <span style="color:#94a3b8">— sheet me <b>Naam: remark</b> aise jayega. Remarks bharna zaroori nahi.</span></span>
+        <span>Also show a <b>remarks</b> box under each ticked name
+          <span style="color:#94a3b8">— saved to the sheet as <b>Name: remark</b>. Remarks are optional.</span></span>
       </label>
     </div>
 
@@ -9798,7 +9806,7 @@ function onFMSDropChange(i) {
         <label style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px;cursor:pointer">
           <input type="checkbox" value="${o}" data-sub="${i}"${remOn ? ` onchange="fmsToggleSubRemark(${i},${oi},this.checked)"` : ''} style="width:15px;height:15px;accent-color:#10b981;cursor:pointer"/> ${o}
         </label>
-        ${remOn ? `<input type="text" id="fmsSubRem_${i}_${oi}" data-remfor="1" placeholder="↳ ${o} ke liye remarks (optional)" style="${remStyle};display:none"/>` : ''}
+        ${remOn ? `<input type="text" id="fmsSubRem_${i}_${oi}" data-remfor="1" placeholder="↳ Remarks for ${o} (optional)" style="${remStyle};display:none"/>` : ''}
       </div>`).join('')}
     </div>
     <input type="text" id="fmsSubOther_${i}" placeholder="➕ Other — yahan khud likho (optional)" style="${style};margin-top:6px"/>`;
