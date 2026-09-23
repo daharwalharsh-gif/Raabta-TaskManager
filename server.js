@@ -5997,13 +5997,29 @@ app.post('/api/fms-tasks/:fmsId/steps/:stepId/done', requireAuth, async (req, re
     const spreadsheetId = extractSheetId(fms.sheet_id);
     const updates = [];
 
-    if (step.actualCol && actualValue !== undefined) {
+    // ══════════════════════════════════════════════════════
+    // KHALI VALUE KABHI MAT LIKHO -- ye data mita deti thi
+    // ══════════════════════════════════════════════════════
+    // Harsh (23 Sep 2026): "PMS sheet me data auto delete ho raha hai, kal
+    // ki entries gayab ho gayin."
+    //
+    // Wajah: Done form me jo OPTIONAL field khali chhod diya jaata tha, wo
+    // bhi "" ban kar sheet me likh diya jaata tha. Sheet me us cell me pehle
+    // se kuch likha ho (kisi ne haath se bhara ho, ya pichhle step me bhara
+    // ho) to wo "" usko MITA deta tha. Row nahi udti thi -- cell khali ho
+    // jaata tha, isliye "data apne aap delete ho gaya" lagta tha.
+    //
+    // Ab khali value ka matlab hai "is khaane ko haath mat lagao". Cell
+    // saaf karna ho to sheet me khud karo -- app kabhi apne aap nahi mitayegi.
+    const bhara = v => v !== undefined && v !== null && String(v).trim() !== '';
+
+    if (step.actualCol && bhara(actualValue)) {
       updates.push({ range: `${fms.sheet_name}!${step.actualCol.toUpperCase()}${rowIndex}`, values: [[actualValue]] });
     }
-    if (step.delayReasonCol && delayReason !== undefined) {
+    if (step.delayReasonCol && bhara(delayReason)) {
       updates.push({ range: `${fms.sheet_name}!${step.delayReasonCol.toUpperCase()}${rowIndex}`, values: [[delayReason]] });
     }
-    if (step.doerNameCol && doerName !== undefined) {
+    if (step.doerNameCol && bhara(doerName)) {
       updates.push({ range: `${fms.sheet_name}!${step.doerNameCol.toUpperCase()}${rowIndex}`, values: [[doerName]] });
     }
     const generatedIds = {};
@@ -6027,7 +6043,9 @@ app.post('/api/fms-tasks/:fmsId/steps/:stepId/done', requireAuth, async (req, re
           val = nextUniqId(existing, prefix, pad);
           generatedIds[ef.col.toUpperCase()] = val;
         }
-        if (val !== undefined) {
+        // Wahi niyam extra fields par bhi: khali chhoda hua khaana sheet ka
+        // purana data nahi mitayega. (auto-ID hamesha bhari hoti hai)
+        if (bhara(val)) {
           updates.push({ range: `${fms.sheet_name}!${ef.col.toUpperCase()}${rowIndex}`, values: [[val]] });
         }
       }
