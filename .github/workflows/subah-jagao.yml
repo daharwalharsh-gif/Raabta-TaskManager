@@ -25,7 +25,11 @@ on:
   schedule:
     # :00 par GitHub sabse zyada busy rehta hai aur schedule tal jaata hai --
     # isliye ginti-ke minute chune hain, aur window bhi lambi ki hai.
-    - cron: '7,17,27,37,47,57 2-5 * * *'
+    # GitHub schedule ko ROZ ~4 ghante taal deta hai (asli record:
+    # maanga 2-5 UTC, chala 07:39 UTC = 1:09 PM IST). Isliye window ab
+    # bahut pehle se shuru -- 22:00 UTC (3:30 AM IST) se 5 UTC tak. Late
+    # hoke bhi 9 baje ke aas-paas ek ping lag jaye.
+    - cron: '7,27,47 22,23,0,1,2,3,4,5 * * *'
   workflow_dispatch:        # zaroorat pade to haath se bhi chala sakte ho
 
 # Ek waqt me ek hi run — pichhla chal raha ho to naya uske baad
