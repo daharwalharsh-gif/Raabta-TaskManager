@@ -49,7 +49,22 @@ body{font-family:'Inter',sans-serif;background:#f1f5f9;color:#1e293b;min-height:
 /* overflow-y:auto — items screen se zyada hon to nav scroll hota hai;
    pehle overflow:hidden tha to neeche wale items (Profile/HR Reporting)
    chupchap kat jaate the aur kisi ko dikhte hi nahi the */
-.nav{padding:10px 8px;flex:1;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;}
+/* Sidebar ki list. Maintenance sabse neeche hai, aur chhoti screen par
+   (jaise iPhone landscape me, jahan width 768 se zyada ho jaati hai to
+   desktop wala sidebar dikhne lagta hai) list screen se lambi ho jaati
+   hai -- tab neeche ke item tak scroll karke hi pahuncha ja sakta hai.
+   overflow-y:auto pehle se tha, par iOS par itna kaafi nahi: sidebar
+   position:fixed hai, aur uske andar ke scroller ko ungli se chalane ke
+   liye touch-action batana padta hai.
+
+   ASLI JAD -- min-height:0. Flex column me overflow:auto wala item tab tak
+   SIKUDTA HI NAHI jab tak min-height:0 na ho (default 'auto' hota hai, jo
+   use content se chhota nahi hone deta). Isliye .nav poora faila rehta
+   tha, .sidebar (jiska overflow:hidden hai) use kaat deta tha, aur .nav ka
+   apna scroll kabhi chalta hi nahi tha -- neeche ke item (Maintenance)
+   hamesha ke liye gayab. (2 Oct 2026) */
+.nav{padding:10px 8px;flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior-y:contain;}
 .nav::-webkit-scrollbar{display:none;}
 .nav-item{
   display:flex;align-items:center;gap:10px;
