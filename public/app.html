@@ -915,6 +915,29 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
   background:rgba(255,255,255,.8);animation:festBar linear forwards;}
 @keyframes festBar{from{width:100%}to{width:0}}
 
+/* ── Topbar ki tyohaar patti — poore din ghoomti hai ──
+   Popup 4 second me chala jaata hai; ye din bhar yaad dilati rehti hai ki
+   aaj kya hai. Rang tyohaar ke hi hain par halke (alpha ke saath), taaki
+   kaali likhawat har theme par saaf padhi ja sake -- tirange wali safed
+   patti par bhi. (Harsh, 2 Oct 2026) */
+#festStrip{display:none;flex:1;min-width:0;margin:0 18px;height:30px;overflow:hidden;
+  border-radius:999px;align-items:center;border:1px solid rgba(15,23,42,.08);
+  box-shadow:inset 0 1px 2px rgba(255,255,255,.6);}
+#festStrip.on{display:flex;}
+.fs-track{display:flex;align-items:center;gap:44px;white-space:nowrap;padding-left:14px;
+  animation:fsMove 26s linear infinite;will-change:transform;}
+#festStrip:hover .fs-track{animation-play-state:paused;}   /* padhna ho to ruk jaye */
+@keyframes fsMove{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.fs-item{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;
+  letter-spacing:.2px;color:#0f172a;}
+.fs-item b{font-weight:800}
+@media(max-width:768px){
+  /* Phone par jagah kam hai -- patti chhoti, par rehti hai */
+  #festStrip{margin:0 8px;height:26px;}
+  .fs-track{gap:28px;animation-duration:20s;}
+  .fs-item{font-size:11px;}
+}
+
 /* ── udne wale kan (diye, rang, phool, confetti) ── */
 .fp{position:absolute;will-change:transform,opacity;}
 /* upar ko uthte hue — diya ki chingari, dhuan */
@@ -1090,6 +1113,9 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
 <div class="main" id="mainContent">
   <div class="topbar">
     <div class="topbar-title" id="topbarTitle">Dashboard</div>
+    <!-- Tyohaar ki patti — us din POORE din ghoomti rehti hai (popup to 4
+         second me chala jaata hai). Khali din chhupi rehti hai. -->
+    <div id="festStrip" title="Aaj ka tyohaar"><div class="fs-track" id="festStripTrack"></div></div>
     <div class="topbar-right" id="topbarActions">
       <div id="notifBellWrap" style="position:relative;display:inline-block;">
         <button id="notifBell" onclick="toggleNotifDropdown(event)" title="Checklist reminders"
@@ -3166,6 +3192,27 @@ function festShow(name, dateStr, autoMs) {
   if (autoMs) _festTimer = setTimeout(festClose, autoMs);
 }
 
+// Topbar ki ghoomti patti. Popup se ALAG hai: popup 4 second me chala jaata
+// hai, par ye us din POORE din dikhti rehti hai.
+function festStrip(name) {
+  const strip = document.getElementById('festStrip');
+  const track = document.getElementById('festStripTrack');
+  if (!strip || !track) return;
+  const th = festTheme(name);
+  // Tyohaar ke rang, par halke (33 = ~20% alpha) -- taaki kaali likhawat
+  // har theme par padhi ja sake. Poore rang par safed/peeli likhawat kahin
+  // dikhti kahin nahi; ye har jagah saaf rehta hai.
+  strip.style.background = 'linear-gradient(90deg,' + th.cols.map(c => c + '33').join(',') + ')';
+  const icon = th.chakra ? '🇮🇳' : th.icon;
+  const nm = (typeof maintEsc === 'function') ? maintEsc(name) : String(name || '');
+  const one =
+    '<span class="fs-item">' + icon + ' <b>' + th.wish + '</b></span>' +
+    '<span class="fs-item">✨ Aaj <b>' + nm + '</b> hai</span>' +
+    '<span class="fs-item">' + icon + ' ' + th.sub + '</span>';
+  track.innerHTML = one + one;        // do baar -> ghoomte waqt jod nahi dikhta
+  strip.classList.add('on');
+}
+
 function festClose() {
   const wrap = document.getElementById('festWrap');
   if (!wrap) return;
@@ -3178,15 +3225,22 @@ function festClose() {
   }, 500);
 }
 
-// Aaj koi tyohaar hai? Ho to din me EK baar dikhao.
+// Aaj koi tyohaar hai?
+//   PATTI  -> us din HAR BAAR dikhegi (poore din yaad dilati rahe)
+//   POPUP  -> din me SIRF EK BAAR (warna har refresh par aake chidhata)
+// Dono alag isliye hain ki Harsh ne kaha: "popup 4 second ka, par upar
+// wali patti us din poore din dikhti rahe."
 async function festCheckToday() {
   try {
     const today = new Date().toISOString().split('T')[0];
-    if (localStorage.getItem('fest_shown') === today) return;   // aaj dikha chuke
     const list = await api('/api/holidays');
     if (!Array.isArray(list)) return;
     const hit = list.find(h => String(h.date || '').slice(0, 10) === today);
-    if (!hit) return;
+    if (!hit) return;                       // aaj koi tyohaar nahi
+
+    festStrip(hit.name);                    // patti -- hamesha
+
+    if (localStorage.getItem('fest_shown') === today) return;   // popup aaj dikha chuke
     localStorage.setItem('fest_shown', today);
     setTimeout(function () { festShow(hit.name, hit.date, FEST_AUTO_MS); }, 700);   // page settle hone do
   } catch (e) { /* greeting na aaye to app ka kaam nahi rukna chahiye */ }
