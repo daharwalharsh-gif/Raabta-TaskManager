@@ -1115,7 +1115,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     <div class="topbar-title" id="topbarTitle">Dashboard</div>
     <!-- Tyohaar ki patti — us din POORE din ghoomti rehti hai (popup to 4
          second me chala jaata hai). Khali din chhupi rehti hai. -->
-    <div id="festStrip" title="Aaj ka tyohaar"><div class="fs-track" id="festStripTrack"></div></div>
+    <div id="festStrip" title="Today's festival"><div class="fs-track" id="festStripTrack"></div></div>
     <div class="topbar-right" id="topbarActions">
       <div id="notifBellWrap" style="position:relative;display:inline-block;">
         <button id="notifBell" onclick="toggleNotifDropdown(event)" title="Checklist reminders"
@@ -3207,7 +3207,7 @@ function festStrip(name) {
   const nm = (typeof maintEsc === 'function') ? maintEsc(name) : String(name || '');
   const one =
     '<span class="fs-item">' + icon + ' <b>' + th.wish + '</b></span>' +
-    '<span class="fs-item">✨ Aaj <b>' + nm + '</b> hai</span>' +
+    '<span class="fs-item">✨ Today is <b>' + nm + '</b></span>' +
     '<span class="fs-item">' + icon + ' ' + th.sub + '</span>';
   track.innerHTML = one + one;        // do baar -> ghoomte waqt jod nahi dikhta
   strip.classList.add('on');
