@@ -861,6 +861,73 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
   /* ── TOAST ── */
   #toast{bottom:78px !important;}
 }
+/* ══════════════════════════════════════════════════════
+   FESTIVAL GREETING — tyohaar wala animated popup
+   ══════════════════════════════════════════════════════
+   Jis din Holidays list me koi tyohaar hota hai, us din app kholte hi
+   ek animated greeting aata hai. Har tyohaar ka apna rang aur apne
+   animation. Din me EK baar (localStorage), warna har click par aata
+   rahega aur chidh jayega. (Harsh, 2 Oct 2026) */
+#festWrap{position:fixed;inset:0;z-index:4000;display:none;align-items:center;justify-content:center;
+  opacity:0;transition:opacity .45s ease;}
+#festWrap.on{display:flex;opacity:1;}
+#festBg{position:absolute;inset:0;}
+#festFx{position:absolute;inset:0;overflow:hidden;pointer-events:none;}
+.fest-card{position:relative;z-index:2;text-align:center;padding:38px 34px;max-width:440px;width:90%;
+  border-radius:26px;background:rgba(255,255,255,.1);backdrop-filter:blur(3px);
+  border:1px solid rgba(255,255,255,.22);box-shadow:0 24px 70px rgba(0,0,0,.38);
+  animation:festPop .7s cubic-bezier(.2,1.1,.3,1) both;}
+@keyframes festPop{from{opacity:0;transform:translateY(26px) scale(.9)}to{opacity:1;transform:none}}
+.fest-icon{font-size:62px;line-height:1;display:block;margin-bottom:10px;
+  animation:festBob 2.6s ease-in-out infinite;filter:drop-shadow(0 6px 16px rgba(0,0,0,.35));}
+@keyframes festBob{0%,100%{transform:translateY(0) rotate(-4deg)}50%{transform:translateY(-12px) rotate(4deg)}}
+.fest-wish{font-size:30px;font-weight:800;letter-spacing:.3px;margin-bottom:6px;line-height:1.25;
+  animation:festUp .8s .15s both;}
+.fest-name{font-size:14px;font-weight:700;opacity:.95;margin-bottom:12px;animation:festUp .8s .25s both;}
+.fest-sub{font-size:13.5px;line-height:1.65;opacity:.9;animation:festUp .8s .35s both;}
+.fest-from{margin-top:16px;font-size:11px;letter-spacing:2.4px;text-transform:uppercase;opacity:.75;
+  animation:festUp .8s .45s both;}
+@keyframes festUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.fest-close{margin-top:22px;border:none;cursor:pointer;padding:11px 30px;border-radius:30px;
+  font-family:'Inter',sans-serif;font-size:13px;font-weight:700;letter-spacing:.3px;
+  background:rgba(255,255,255,.94);color:#1e293b;box-shadow:0 8px 22px rgba(0,0,0,.25);
+  animation:festUp .8s .55s both;transition:transform .15s,box-shadow .15s;}
+.fest-close:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(0,0,0,.32);}
+/* Niche patli patti — kitna waqt bacha hai, ek nazar me. Popup 4 sec me
+   khud band ho jaata hai; ye patti bata deti hai ki wo apne aap jayega,
+   warna banda soch me pad jaata hai ki gaya kyun. */
+.fest-bar{position:absolute;left:0;bottom:0;height:3px;width:100%;border-radius:0 0 26px 26px;
+  background:rgba(255,255,255,.8);animation:festBar linear forwards;}
+@keyframes festBar{from{width:100%}to{width:0}}
+
+/* ── udne wale kan (diye, rang, phool, confetti) ── */
+.fp{position:absolute;will-change:transform,opacity;}
+/* upar ko uthte hue — diya ki chingari, dhuan */
+@keyframes fpRise{0%{transform:translateY(0) scale(.6);opacity:0}
+  12%{opacity:1}100%{transform:translateY(-104vh) scale(1.1);opacity:0}}
+/* niche girte hue — rang, phool, confetti */
+@keyframes fpFall{0%{transform:translateY(-12vh) rotate(0);opacity:0}
+  10%{opacity:1}100%{transform:translateY(106vh) rotate(680deg);opacity:0}}
+/* jhoolte hue — jhandi, rakhi */
+@keyframes fpSway{0%,100%{transform:translateY(0) rotate(-14deg)}50%{transform:translateY(-16px) rotate(14deg)}}
+/* phatakha */
+.fb{position:absolute;width:6px;height:6px;border-radius:50%;opacity:0;animation:fbBurst 2.4s ease-out infinite;}
+@keyframes fbBurst{0%{transform:translate(0,0) scale(.4);opacity:0}
+  8%{opacity:1}70%{opacity:.85}100%{transform:translate(var(--bx),var(--by)) scale(.2);opacity:0}}
+/* Ashoka chakra */
+.fest-chakra{width:58px;height:58px;margin:0 auto 10px;border-radius:50%;
+  border:3px solid #0b3d91;position:relative;animation:festSpin 9s linear infinite;}
+.fest-chakra::before,.fest-chakra::after{content:'';position:absolute;inset:-3px;border-radius:50%;
+  border:3px solid transparent;border-top-color:#0b3d91;border-bottom-color:#0b3d91;}
+.fest-chakra::after{transform:rotate(45deg);}
+@keyframes festSpin{to{transform:rotate(360deg)}}
+
+@media(max-width:768px){
+  .fest-card{padding:30px 22px;border-radius:22px;}
+  .fest-icon{font-size:50px;}
+  .fest-wish{font-size:24px;}
+}
+
 </style>
 </head>
 <body>
@@ -1993,6 +2060,13 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
 </div>
 
 <!-- Phone-style FMS popup notifications (fms-tasks tab) -->
+
+<!-- Tyohaar ka greeting: aaj ki date Holidays list me ho to khulta hai -->
+<div id="festWrap" onclick="if(event.target===this)festClose()">
+  <div id="festBg"></div>
+  <div id="festFx"></div>
+  <div class="fest-card" id="festCard"></div>
+</div>
 <div id="fmsNotifStack"></div>
 
 <!-- Delegation Done modal — image/PDF proof (doer report / admin complete) -->
@@ -2944,6 +3018,165 @@ let _dashDateSortState = 0;
 // ══════════════════════════════════════════════════════
 // INIT
 // ══════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════
+// FESTIVAL GREETING — tyohaar ka animated popup
+// ══════════════════════════════════════════════════════
+// Harsh (2 Oct 2026): "jab bhi koi tyohaar ho ya function ho to yahan
+// animated theme aa jaye, best popup ho."
+//
+// Holidays ki list pehle se DB me hai (/api/holidays). Aaj ki tareekh us
+// list me mili to app kholte hi greeting aata hai -- har tyohaar ka apna
+// rang, apna icon aur apna animation.
+//
+// Din me EK baar dikhta hai (localStorage), warna har click par aata
+// rahega aur chidh jayega.
+const FEST_THEMES = [
+  { re:/diwali|deepavali|deepawali/i, icon:'🪔', wish:'Happy Diwali',
+    sub:'May your home glow with light, joy and prosperity.',
+    bg:'radial-gradient(1200px 600px at 50% 110%,#4a1942 0%,#2d1b4e 45%,#140a24 100%)',
+    ink:'#fde68a', fx:'rise', chars:['🪔','✨','🎆'], cols:['#fbbf24','#f59e0b','#fb923c','#fcd34d'], burst:true },
+  { re:/holi/i, icon:'🎨', wish:'Happy Holi',
+    sub:'May every colour of life bring you happiness.',
+    bg:'linear-gradient(145deg,#ff5f6d 0%,#ffc371 35%,#47cf73 70%,#4facfe 100%)',
+    ink:'#ffffff', fx:'fall', chars:['🌸','💮','🎊'], cols:['#ff1b6b','#45caff','#ffd93d','#6bcB77','#c86bfa'] },
+  { re:/independence/i, icon:'🇮🇳', wish:'Happy Independence Day',
+    sub:'Jai Hind — may the colours of freedom always shine.',
+    bg:'linear-gradient(180deg,#ff9933 0%,#ffffff 50%,#138808 100%)',
+    ink:'#0b3d91', fx:'fall', chars:['🇮🇳','🎊'], cols:['#ff9933','#ffffff','#138808'], chakra:true },
+  { re:/republic/i, icon:'🇮🇳', wish:'Happy Republic Day',
+    sub:'Jai Hind — a salute to our Constitution and our nation.',
+    bg:'linear-gradient(180deg,#ff9933 0%,#ffffff 50%,#138808 100%)',
+    ink:'#0b3d91', fx:'fall', chars:['🇮🇳','🎊'], cols:['#ff9933','#ffffff','#138808'], chakra:true },
+  { re:/gandhi/i, icon:'🕊️', wish:'Gandhi Jayanti',
+    sub:'Truth and non-violence — our tribute to Bapu.',
+    bg:'linear-gradient(180deg,#ff9933 0%,#fdfdfb 52%,#138808 100%)',
+    ink:'#0b3d91', fx:'fall', chars:['🕊️','🌼'], cols:['#ff9933','#ffffff','#138808'], chakra:true },
+  { re:/raksha|rakhi/i, icon:'🎀', wish:'Happy Raksha Bandhan',
+    sub:'May this bond of love and protection grow stronger.',
+    bg:'linear-gradient(145deg,#ff9a9e 0%,#fecfef 50%,#fda085 100%)',
+    ink:'#7c2d12', fx:'fall', chars:['🎀','🌺','✨'], cols:['#f43f5e','#fbbf24','#e879f9'] },
+  { re:/govardhan/i, icon:'🌼', wish:'Happy Govardhan Puja',
+    sub:'A day of gratitude for food and nature.',
+    bg:'linear-gradient(145deg,#f6d365 0%,#fda085 55%,#c96f4a 100%)',
+    ink:'#4a2511', fx:'fall', chars:['🌼','🌾','🪔'], cols:['#f59e0b','#84cc16','#fb923c'] },
+  { re:/bhai\s*dooj|bhaiya\s*dooj/i, icon:'❤️', wish:'Happy Bhai Dooj',
+    sub:'May this day deepen the love between brother and sister.',
+    bg:'linear-gradient(145deg,#ee9ca7 0%,#ffdde1 50%,#f7971e 100%)',
+    ink:'#7f1d1d', fx:'fall', chars:['❤️','🌹','✨'], cols:['#ef4444','#fbbf24','#f472b6'] },
+  { re:/eid/i, icon:'🌙', wish:'Eid Mubarak',
+    sub:'May this day bring you peace and happiness.',
+    bg:'radial-gradient(1000px 600px at 50% 0%,#134e5e 0%,#0f2027 60%,#071318 100%)',
+    ink:'#fcd34d', fx:'rise', chars:['🌙','✨','🕌'], cols:['#fcd34d','#86efac','#e5e7eb'] },
+  { re:/christmas|x-?mas/i, icon:'🎄', wish:'Merry Christmas',
+    sub:'Wishing you warmth, joy and peace.',
+    bg:'linear-gradient(170deg,#0f3443 0%,#15616d 50%,#1b4332 100%)',
+    ink:'#fef3c7', fx:'fall', chars:['❄️','🎄','⭐'], cols:['#ffffff','#ef4444','#22c55e'] },
+  { re:/new\s*year/i, icon:'🎉', wish:'Happy New Year',
+    sub:'May the new year bring new opportunities.',
+    bg:'radial-gradient(1000px 600px at 50% 100%,#2b1055 0%,#141e30 60%,#0a0f1c 100%)',
+    ink:'#fde68a', fx:'rise', chars:['🎉','✨','🎆'], cols:['#fbbf24','#f472b6','#60a5fa'], burst:true }
+];
+const FEST_DEFAULT = { icon:'🎉', wish:'Happy Holiday',
+  sub:'Wishing you a wonderful day.',
+  bg:'linear-gradient(145deg,#667eea 0%,#764ba2 55%,#f093fb 100%)',
+  ink:'#ffffff', fx:'fall', chars:['🎉','🎊','✨'], cols:['#fbbf24','#f472b6','#60a5fa','#34d399'] };
+
+function festTheme(name) {
+  const n = String(name || '');
+  return FEST_THEMES.find(t => t.re.test(n)) || FEST_DEFAULT;
+}
+
+// Udne wale kan — har baar thodi alag jagah/raftaar, taaki banaya hua na lage
+function festParticles(box, th) {
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  let html = '';
+  const anim = th.fx === 'rise' ? 'fpRise' : 'fpFall';
+  const from = th.fx === 'rise' ? 'bottom:-8vh' : 'top:0';
+  for (let i = 0; i < 26; i++) {
+    const ch = th.chars[i % th.chars.length];
+    html += '<span class="fp" style="' + from + ';left:' + rnd(0,100).toFixed(1) + '%;font-size:'
+      + rnd(14,30).toFixed(0) + 'px;animation:' + anim + ' ' + rnd(7,15).toFixed(1) + 's linear '
+      + rnd(0,9).toFixed(1) + 's infinite">' + ch + '</span>';
+  }
+  for (let i = 0; i < 22; i++) {
+    const c = th.cols[i % th.cols.length];
+    html += '<span class="fp" style="' + from + ';left:' + rnd(0,100).toFixed(1) + '%;width:'
+      + rnd(5,11).toFixed(0) + 'px;height:' + rnd(8,18).toFixed(0) + 'px;background:' + c
+      + ';border-radius:' + (i % 3 ? '2px' : '50%') + ';opacity:.9;animation:' + anim + ' '
+      + rnd(6,13).toFixed(1) + 's linear ' + rnd(0,8).toFixed(1) + 's infinite"></span>';
+  }
+  // Phatakhe — sirf raat wale tyohaar me
+  if (th.burst) {
+    for (let b = 0; b < 4; b++) {
+      const cx = rnd(15,85).toFixed(0), cy = rnd(12,45).toFixed(0), delay = (b * 1.1).toFixed(1);
+      for (let k = 0; k < 14; k++) {
+        const ang = (k / 14) * Math.PI * 2, r = rnd(60,130);
+        html += '<span class="fb" style="left:' + cx + '%;top:' + cy + '%;background:'
+          + th.cols[k % th.cols.length] + ';--bx:' + (Math.cos(ang) * r).toFixed(0)
+          + 'px;--by:' + (Math.sin(ang) * r).toFixed(0) + 'px;animation-delay:' + delay + 's"></span>';
+      }
+    }
+  }
+  box.innerHTML = html;
+}
+
+// Popup khud band ho jaata hai. Harsh (2 Oct 2026): "4 second ka popup aaye."
+// Itna ki greeting padh li jaye, par kaam ke beech me khada na rahe.
+let _festTimer = null;
+const FEST_AUTO_MS = 4000;
+
+function festShow(name, dateStr, autoMs) {
+  const th = festTheme(name);
+  const wrap = document.getElementById('festWrap');
+  if (!wrap) return;
+  document.getElementById('festBg').style.background = th.bg;
+  festParticles(document.getElementById('festFx'), th);
+  const card = document.getElementById('festCard');
+  card.style.color = th.ink;
+  const nm = (typeof maintEsc === 'function') ? maintEsc(name) : String(name || '');
+  const dt = (dateStr && typeof fmtDate === 'function') ? ' · ' + fmtDate(dateStr) : '';
+  card.innerHTML =
+    (th.chakra ? '<div class="fest-chakra"></div>' : '<span class="fest-icon">' + th.icon + '</span>') +
+    '<div class="fest-wish">' + th.wish + '</div>' +
+    '<div class="fest-name">' + nm + dt + '</div>' +
+    '<div class="fest-sub">' + th.sub + '</div>' +
+    '<div class="fest-from">Team Raabta</div>' +
+    '<button class="fest-close" onclick="festClose()">Thank you</button>' +
+    (autoMs ? '<div class="fest-bar" style="animation-duration:' + autoMs + 'ms"></div>' : '');
+  wrap.classList.add('on');
+
+  // Apne aap band — par pehle wala timer saaf kar do, warna do timer chal
+  // kar popup adhbich me band kar dete hain
+  if (_festTimer) { clearTimeout(_festTimer); _festTimer = null; }
+  if (autoMs) _festTimer = setTimeout(festClose, autoMs);
+}
+
+function festClose() {
+  const wrap = document.getElementById('festWrap');
+  if (!wrap) return;
+  if (_festTimer) { clearTimeout(_festTimer); _festTimer = null; }   // haath se band kiya to timer bhi band
+  wrap.classList.remove('on');
+  // Animation band kar do, warna peeche chalti rehti hai aur phone garam hota hai
+  setTimeout(function () {
+    const fx = document.getElementById('festFx');
+    if (fx) fx.innerHTML = '';
+  }, 500);
+}
+
+// Aaj koi tyohaar hai? Ho to din me EK baar dikhao.
+async function festCheckToday() {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    if (localStorage.getItem('fest_shown') === today) return;   // aaj dikha chuke
+    const list = await api('/api/holidays');
+    if (!Array.isArray(list)) return;
+    const hit = list.find(h => String(h.date || '').slice(0, 10) === today);
+    if (!hit) return;
+    localStorage.setItem('fest_shown', today);
+    setTimeout(function () { festShow(hit.name, hit.date, FEST_AUTO_MS); }, 700);   // page settle hone do
+  } catch (e) { /* greeting na aaye to app ka kaam nahi rukna chahiye */ }
+}
+
 async function init() {
   try {
     const token = localStorage.getItem('authToken');
@@ -3023,6 +3256,7 @@ async function init() {
     }
     setMinDates();
     loadDashboard();
+    festCheckToday();            // aaj tyohaar ho to greeting (din me ek baar)
     loadApprovalBadge();
     loadTransferBadge();
     loadChecklistNotifications();
