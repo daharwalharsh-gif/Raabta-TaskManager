@@ -1854,6 +1854,25 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     </div>
 
     <div id="maintView1">
+    <!-- Month / date ka filter -- Harsh, 6 Oct: "month and date wise filter de do".
+         Kuch na chuno to sab kuch bilkul pehle jaisa: poora data, poore total. -->
+    <div id="maintFilterBar" style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+      <span style="font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase">Filter</span>
+      <select id="maintFMonth" onchange="maintMonthPick()"
+        style="padding:8px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;font-family:'Inter',sans-serif;outline:none;background:#fff;min-width:160px">
+        <option value="">All months</option>
+      </select>
+      <span style="font-size:12px;color:#94a3b8">or</span>
+      <input type="date" id="maintFFrom" onchange="maintDatePick()" title="From date"
+        style="padding:7px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;outline:none;background:#fff">
+      <span style="font-size:12px;color:#94a3b8">to</span>
+      <input type="date" id="maintFTo" onchange="maintDatePick()" title="To date"
+        style="padding:7px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;outline:none;background:#fff">
+      <button class="btn btn-outline" id="maintFClear" onclick="clearMaintFilter()"
+        style="font-size:12px;padding:6px 12px;display:none">&#10005; Clear</button>
+      <span id="maintFInfo" style="font-size:12px;color:#64748b"></span>
+    </div>
+
     <!-- Teen card: aaya / gaya / bacha -->
     <div class="overview-cards" style="margin-bottom:18px">
       <div class="ov-card completed">
@@ -1869,7 +1888,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       <div class="ov-card revised">
         <div class="label">Balance</div>
         <div class="number" id="maintBal">—</div>
-        <div style="font-size:11px;color:#64748b;margin-top:4px">received − spent</div>
+        <div style="font-size:11px;color:#64748b;margin-top:4px" id="maintBalSub">received − spent</div>
       </div>
     </div>
 
@@ -6925,26 +6944,141 @@ async function loadMaintenance(force) {
   }
 }
 
+// ── Maintenance ka month / date filter ────────────────────
+// Harsh, 6 Oct: "month and date wise filter de do".
+// Kuch na chuna ho to screen bilkul pehle jaisi rehti hai.
+
+// Kisi bhi date ko "YYYY-MM-DD" bana do, taaki aapas me tulna ho sake.
+// Sheet "01/04/2026 19:0" bhejti hai, app "2026-04-01". Na ban paye to khaali.
+function maintISO(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return m[1] + '-' + m[2] + '-' + m[3];
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) return m[3] + '-' + String(m[2]).padStart(2, '0') + '-' + String(m[1]).padStart(2, '0');
+  return '';
+}
+
+const MAINT_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'];
+
+// "2026-10" -> "October 2026"
+function maintMonthName(ym) {
+  const p = String(ym).split('-');
+  return (MAINT_MONTHS[Number(p[1]) - 1] || '') + ' ' + p[0];
+}
+
+// Abhi kya chuna hua hai: poora mahina, ya from-to, ya kuch bhi nahi
+function maintRange() {
+  const mEl = document.getElementById('maintFMonth');
+  const fEl = document.getElementById('maintFFrom');
+  const tEl = document.getElementById('maintFTo');
+  const ym = mEl ? mEl.value : '';
+  let from = fEl ? fEl.value : '';
+  let to = tEl ? tEl.value : '';
+  if (ym) {                                   // poora mahina -- 1 se aakhri din tak
+    const y = Number(ym.split('-')[0]), mo = Number(ym.split('-')[1]);
+    const last = new Date(y, mo, 0).getDate();
+    return { from: ym + '-01', to: ym + '-' + String(last).padStart(2, '0'),
+             on: true, label: maintMonthName(ym) };
+  }
+  if (from && to && from > to) { const x = from; from = to; to = x; }   // ulta bhar diya to seedha
+  if (!from && !to) return { from: '', to: '', on: false, label: '' };
+  const label = (from && to)
+    ? (from === to ? maintDate(from) : maintDate(from) + ' to ' + maintDate(to))
+    : (from ? 'from ' + maintDate(from) : 'up to ' + maintDate(to));
+  return { from: from, to: to, on: true, label: label };
+}
+
+// Ye row filter me aati hai ya nahi
+function maintInRange(raw, r) {
+  if (!r.on) return true;
+  const iso = maintISO(raw);
+  if (!iso) return false;                     // date hi nahi padh paye to filter me mat dikhao
+  if (r.from && iso < r.from) return false;
+  if (r.to && iso > r.to) return false;
+  return true;
+}
+
+// Mahina chuna to date khaali, date chuni to mahina khaali -- dono ek saath nahi
+function maintMonthPick() {
+  const f = document.getElementById('maintFFrom'), t = document.getElementById('maintFTo');
+  if (f) f.value = '';
+  if (t) t.value = '';
+  renderMaintenance();
+}
+function maintDatePick() {
+  const m = document.getElementById('maintFMonth');
+  if (m) m.value = '';
+  renderMaintenance();
+}
+function clearMaintFilter() {
+  ['maintFMonth', 'maintFFrom', 'maintFTo'].forEach(function (id) {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  renderMaintenance();
+}
+
+// Dropdown me wahi mahine jinme sach me entry hai -- nayi se purani
+function fillMaintMonths() {
+  const sel = document.getElementById('maintFMonth');
+  if (!sel) return;
+  const seen = {};
+  [].concat(_maintData.expenses || [], _maintData.credits || []).forEach(function (row) {
+    const iso = maintISO(row.spentOn || row.date);
+    if (iso) seen[iso.slice(0, 7)] = 1;
+  });
+  const months = Object.keys(seen).sort().reverse();
+  const keep = sel.value;
+  sel.innerHTML = '<option value="">All months</option>' +
+    months.map(function (ym) { return '<option value="' + ym + '">' + maintMonthName(ym) + '</option>'; }).join('');
+  if (keep && months.indexOf(keep) >= 0) sel.value = keep;   // render par chuna hua mahina gum na ho
+}
+
 function renderMaintenance() {
   const d = _maintData;
   const isAdmin = ME.role === 'admin';
 
-  document.getElementById('maintIn').textContent = maintMoney(d.totalIn);
-  document.getElementById('maintOut').textContent = maintMoney(d.totalOut);
-  document.getElementById('maintBal').textContent = maintMoney(d.balance);
-  document.getElementById('maintInSub').textContent = `${(d.credits || []).length} entries`;
-  document.getElementById('maintOutSub').textContent = `${(d.expenses || []).length} entries`;
+  // Filter laga ho to sirf us daur ki rows, aur usi daur ka total
+  fillMaintMonths();
+  const r = maintRange();
+  const credits = (d.credits || []).filter(function (c) { return maintInRange(c.date, r); });
+  const expenses = (d.expenses || []).filter(function (e) { return maintInRange(e.spentOn, r); });
+  const sum = function (list) { return list.reduce(function (a, x) { return a + (Number(x.amount) || 0); }, 0); };
+  const inSum = r.on ? sum(credits) : (Number(d.totalIn) || 0);
+  const outSum = r.on ? sum(expenses) : (Number(d.totalOut) || 0);
+  const balNow = r.on ? (inSum - outSum) : (Number(d.balance) || 0);
+
+  document.getElementById('maintIn').textContent = maintMoney(inSum);
+  document.getElementById('maintOut').textContent = maintMoney(outSum);
+  document.getElementById('maintBal').textContent = maintMoney(balNow);
+  document.getElementById('maintInSub').textContent = credits.length + ' entries' + (r.on ? ' · ' + r.label : '');
+  document.getElementById('maintOutSub').textContent = expenses.length + ' entries' + (r.on ? ' · ' + r.label : '');
+  const balSub = document.getElementById('maintBalSub');
+  if (balSub) balSub.textContent = r.on ? (r.label + ' · received − spent') : 'received − spent';
+
+  // Filter chalu ho to Clear button, aur saath me poore time ka asli balance --
+  // taaki jeb me sach me kitna hai wo kabhi gum na ho
+  const clrBtn = document.getElementById('maintFClear');
+  if (clrBtn) clrBtn.style.display = r.on ? '' : 'none';
+  const fInfo = document.getElementById('maintFInfo');
+  if (fInfo) fInfo.innerHTML = r.on
+    ? 'Overall balance <strong>' + maintEsc(maintMoney(d.balance)) + '</strong> (all time)'
+    : '';
 
   // Balance minus ho jaye to laal — turant dikhe ki zyada nikal liya
   const balEl = document.getElementById('maintBal');
-  balEl.style.color = (Number(d.balance) || 0) < 0 ? '#dc2626' : '';
+  balEl.style.color = balNow < 0 ? '#dc2626' : '';
 
   // ── Kharch ki list ──
   const expBody = document.getElementById('maintExpBody');
-  if (!(d.expenses || []).length) {
-    expBody.innerHTML = '<tr><td colspan="6" class="empty">No expenses yet 🎉</td></tr>';
+  if (!expenses.length) {
+    expBody.innerHTML = '<tr><td colspan="6" class="empty">' +
+      (r.on ? 'No entries in this filter' : 'No expenses yet 🎉') + '</td></tr>';
   } else {
-    expBody.innerHTML = d.expenses.map(e => `
+    expBody.innerHTML = expenses.map(e => `
       <tr>
         <td data-lbl="Date" style="white-space:nowrap">${maintDate(e.spentOn)}</td>
         <td data-lbl="Details">${maintEsc(e.description)}${e.by ? `<div style="font-size:10px;color:#94a3b8;margin-top:2px">— ${maintEsc(e.by)}</div>` : ''}</td>
@@ -6963,10 +7097,11 @@ function renderMaintenance() {
 
   // ── Sheet se aaya hua ──
   const crBody = document.getElementById('maintCreditBody');
-  if (!(d.credits || []).length) {
-    crBody.innerHTML = '<tr><td colspan="4" class="empty">No Ashok + Office Cash rows found in the sheet</td></tr>';
+  if (!credits.length) {
+    crBody.innerHTML = '<tr><td colspan="4" class="empty">' +
+      (r.on ? 'No entries in this filter' : 'No Ashok + Office Cash rows found in the sheet') + '</td></tr>';
   } else {
-    crBody.innerHTML = d.credits.map(c => `
+    crBody.innerHTML = credits.map(c => `
       <tr>
         <td data-lbl="Date" style="white-space:nowrap">${maintDate(c.date)}</td>
         <td data-lbl="Name">${maintEsc(c.name)}</td>
@@ -7157,19 +7292,27 @@ async function viewMaintImage(id, name) {
 
 function exportMaintCSV() {
   const d = _maintData;
+  // Jo filter screen par laga hai, CSV me bhi wahi rows jayengi
+  const r = maintRange();
+  const credits = (d.credits || []).filter(function (c) { return maintInRange(c.date, r); });
+  const expenses = (d.expenses || []).filter(function (e) { return maintInRange(e.spentOn, r); });
+  const sum = function (list) { return list.reduce(function (a, x) { return a + (Number(x.amount) || 0); }, 0); };
+  const inSum = r.on ? sum(credits) : (Number(d.totalIn) || 0);
+  const outSum = r.on ? sum(expenses) : (Number(d.totalOut) || 0);
   const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
   const lines = [];
+  if (r.on) { lines.push([q('FILTER'), q(r.label)].join(',')); lines.push(''); }
   lines.push(['Type', 'Date', 'Name / Description', 'Payment Mode', 'Amount', 'By'].map(q).join(','));
-  (d.credits || []).forEach(c => {
+  credits.forEach(c => {
     lines.push(['Received', maintDate(c.date), c.name, c.mode || '', c.amount, ''].map(q).join(','));
   });
-  (d.expenses || []).forEach(e => {
+  expenses.forEach(e => {
     lines.push(['Spent', maintDate(e.spentOn), e.description + (e.person ? ' [' + e.person + ']' : ''), '', e.amount, e.by || ''].map(q).join(','));
   });
   lines.push('');
-  lines.push([q('TOTAL RECEIVED'), '', '', '', q(d.totalIn), ''].join(','));
-  lines.push([q('TOTAL SPENT'), '', '', '', q(d.totalOut), ''].join(','));
-  lines.push([q('BALANCE'), '', '', '', q(d.balance), ''].join(','));
+  lines.push([q('TOTAL RECEIVED'), '', '', '', q(inSum), ''].join(','));
+  lines.push([q('TOTAL SPENT'), '', '', '', q(outSum), ''].join(','));
+  lines.push([q('BALANCE'), '', '', '', q(r.on ? (inSum - outSum) : d.balance), ''].join(','));
 
   const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
