@@ -7001,6 +7001,25 @@ function maintInRange(raw, r) {
   return true;
 }
 
+// Us tareekh tak jeb me kitna bacha tha -- yahi asli "Balance" hai.
+// Poore balance me se sirf wo hata do jo 'to' ke BAAD ka hai:
+//     closing = (sab aaya tak) - (sab gaya tak)
+//             = poora balance - (baad me aaya - baad me gaya)
+// Is tarah likhne ka fayda: jis row ki date nahi padhi gayi wo kabhi "baad" me
+// nahi girti, isliye apni jagah bani rehti hai; aur 'to' aaj se aage ho to
+// bilkul wahi poora balance milta hai jo bina filter ke dikhta hai.
+function maintClosing(d, r) {
+  const poora = Number(d.balance) || 0;
+  if (!r.on || !r.to) return poora;
+  const baad = function (list, key) {
+    return list.reduce(function (a, x) {
+      const iso = maintISO(x[key]);
+      return (iso && iso > r.to) ? a + (Number(x.amount) || 0) : a;
+    }, 0);
+  };
+  return poora - (baad(d.credits || [], 'date') - baad(d.expenses || [], 'spentOn'));
+}
+
 // Mahina chuna to date khaali, date chuni to mahina khaali -- dono ek saath nahi
 function maintMonthPick() {
   const f = document.getElementById('maintFFrom'), t = document.getElementById('maintFTo');
@@ -7049,7 +7068,7 @@ function renderMaintenance() {
   const sum = function (list) { return list.reduce(function (a, x) { return a + (Number(x.amount) || 0); }, 0); };
   const inSum = r.on ? sum(credits) : (Number(d.totalIn) || 0);
   const outSum = r.on ? sum(expenses) : (Number(d.totalOut) || 0);
-  const balNow = r.on ? (inSum - outSum) : (Number(d.balance) || 0);
+  const balNow = maintClosing(d, r);   // us tareekh tak bacha hua paisa
 
   document.getElementById('maintIn').textContent = maintMoney(inSum);
   document.getElementById('maintOut').textContent = maintMoney(outSum);
@@ -7057,7 +7076,9 @@ function renderMaintenance() {
   document.getElementById('maintInSub').textContent = credits.length + ' entries' + (r.on ? ' · ' + r.label : '');
   document.getElementById('maintOutSub').textContent = expenses.length + ' entries' + (r.on ? ' · ' + r.label : '');
   const balSub = document.getElementById('maintBalSub');
-  if (balSub) balSub.textContent = r.on ? (r.label + ' · received − spent') : 'received − spent';
+  if (balSub) balSub.textContent = r.on
+    ? (r.to ? ('as on ' + maintDate(r.to) + ' · cash in hand') : 'cash in hand (all time)')
+    : 'received − spent';
 
   // Filter chalu ho to Clear button, aur saath me poore time ka asli balance --
   // taaki jeb me sach me kitna hai wo kabhi gum na ho
@@ -7312,7 +7333,7 @@ function exportMaintCSV() {
   lines.push('');
   lines.push([q('TOTAL RECEIVED'), '', '', '', q(inSum), ''].join(','));
   lines.push([q('TOTAL SPENT'), '', '', '', q(outSum), ''].join(','));
-  lines.push([q('BALANCE'), '', '', '', q(r.on ? (inSum - outSum) : d.balance), ''].join(','));
+  lines.push([q(r.on && r.to ? 'BALANCE as on ' + maintDate(r.to) : 'BALANCE'), '', '', '', q(maintClosing(d, r)), ''].join(','));
 
   const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
