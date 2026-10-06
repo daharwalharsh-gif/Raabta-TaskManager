@@ -1870,6 +1870,8 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
         style="padding:7px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;outline:none;background:#fff">
       <button class="btn btn-outline" id="maintFClear" onclick="clearMaintFilter()"
         style="font-size:12px;padding:6px 12px;display:none">&#10005; Clear</button>
+      <button class="btn btn-outline" id="maintPdfBtn" onclick="maintPdf()"
+        style="font-size:12px;padding:6px 12px">&#128196; PDF</button>
       <span id="maintFInfo" style="font-size:12px;color:#64748b"></span>
     </div>
 
@@ -7344,6 +7346,130 @@ function exportMaintCSV() {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+// ── Filter ke hisaab se PDF ──────────────────────────────────────────
+// Harsh, 6 Oct: "jo bhi filter lagaye, month select kare, to PDF me us
+// mahine ka poora hisaab aa jaye -- kitna aaya, kitna kharch hua, balance
+// kitna tha". Alag se koi library nahi jodi: report ek naye tab me khulti
+// hai aur browser ka apna "Save as PDF" kaam karta hai -- phone par bhi.
+function maintPdf() {
+  const d = _maintData;
+  const r = maintRange();
+  const credits = (d.credits || []).filter(function (c) { return maintInRange(c.date, r); });
+  const expenses = (d.expenses || []).filter(function (e) { return maintInRange(e.spentOn, r); });
+  const sum = function (list) { return list.reduce(function (a, x) { return a + (Number(x.amount) || 0); }, 0); };
+  const inSum = r.on ? sum(credits) : (Number(d.totalIn) || 0);
+  const outSum = r.on ? sum(expenses) : (Number(d.totalOut) || 0);
+  const bal = maintClosing(d, r);
+  const kab = r.on ? r.label : 'All time';
+  const balNote = (r.on && r.to)
+    ? ('as on ' + maintDate(r.to) + ' \u00b7 cash in hand')
+    : 'received \u2212 spent';
+  const aaj = maintDate(new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
+    .toISOString().split('T')[0]);
+
+  const kharchRows = expenses.length
+    ? expenses.map(function (e) {
+        return '<tr><td class="dt">' + maintDate(e.spentOn) + '</td>' +
+          '<td>' + maintEsc(e.description) +
+            (e.by ? '<div class="by">\u2014 ' + maintEsc(e.by) + '</div>' : '') + '</td>' +
+          '<td>' + (e.person ? maintEsc(e.person) : '\u2014') + '</td>' +
+          '<td class="amt out">' + maintMoney(e.amount) + '</td></tr>';
+      }).join('')
+    : '<tr><td colspan="4" class="none">No entries in this filter</td></tr>';
+
+  const aayaRows = credits.length
+    ? credits.map(function (c) {
+        return '<tr><td class="dt">' + maintDate(c.date) + '</td>' +
+          '<td>' + maintEsc(c.name) + '</td>' +
+          '<td>' + maintEsc(c.manual ? 'Added by hand' : (c.mode || '')) + '</td>' +
+          '<td class="amt in">' + maintMoney(c.amount) + '</td></tr>';
+      }).join('')
+    : '<tr><td colspan="4" class="none">No entries in this filter</td></tr>';
+
+  const html =
+'<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/>' +
+'<title>Maintenance \u2014 ' + maintEsc(kab) + '</title>' +
+'<style>' +
+'*{margin:0;padding:0;box-sizing:border-box;}' +
+'body{font-family:-apple-system,"Segoe UI",Inter,Arial,sans-serif;color:#1e293b;background:#f1f5f9;padding:24px;}' +
+'.sheet{max-width:860px;margin:0 auto;background:#fff;padding:28px 30px;border-radius:12px;}' +
+'.bar{display:flex;justify-content:space-between;align-items:flex-end;' +
+'  border-bottom:2px solid #0f172a;padding-bottom:12px;margin-bottom:20px;}' +
+'h1{font-size:19px;letter-spacing:.3px;}' +
+'.per{font-size:13px;color:#475569;margin-top:3px;}' +
+'.gen{font-size:11px;color:#94a3b8;text-align:right;}' +
+'.cards{display:flex;gap:12px;margin-bottom:24px;}' +
+'.card{flex:1;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;}' +
+'.card .lbl{font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:#64748b;}' +
+'.card .num{font-size:21px;font-weight:700;margin-top:5px;}' +
+'.card .sub{font-size:10px;color:#94a3b8;margin-top:3px;}' +
+'.c1{background:#f0fdf4;}.c1 .num{color:#15803d;}' +
+'.c2{background:#fef2f2;}.c2 .num{color:#dc2626;}' +
+'.c3{background:#fffbeb;}.c3 .num{color:#b45309;}' +
+'h2{font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:#334155;' +
+'  margin:22px 0 8px;padding-bottom:5px;border-bottom:1px solid #e2e8f0;}' +
+'table{width:100%;border-collapse:collapse;font-size:11.5px;}' +
+'th{text-align:left;background:#f8fafc;color:#64748b;font-size:9.5px;letter-spacing:.5px;' +
+'  text-transform:uppercase;padding:7px 8px;border-bottom:1px solid #e2e8f0;}' +
+'td{padding:7px 8px;border-bottom:1px solid #f1f5f9;vertical-align:top;}' +
+'.dt{white-space:nowrap;color:#475569;}' +
+'.amt{text-align:right;white-space:nowrap;font-weight:700;}' +
+'.in{color:#16a34a;}.out{color:#dc2626;}' +
+'.by{font-size:9.5px;color:#94a3b8;margin-top:2px;}' +
+'.none{text-align:center;color:#94a3b8;padding:16px;}' +
+'tfoot td{border-top:2px solid #cbd5e1;border-bottom:none;font-weight:700;padding-top:9px;}' +
+'.tools{max-width:860px;margin:0 auto 14px;display:flex;gap:8px;justify-content:flex-end;}' +
+'.tools button{font-family:inherit;font-size:13px;font-weight:600;padding:8px 16px;' +
+'  border-radius:8px;border:1px solid #cbd5e1;background:#fff;color:#334155;cursor:pointer;}' +
+'.tools .go{background:#0f172a;color:#fff;border-color:#0f172a;}' +
+'@media print{body{background:#fff;padding:0;}.tools{display:none;}' +
+'  .sheet{max-width:none;padding:0;border-radius:0;}' +
+'  thead{display:table-header-group;}tr{page-break-inside:avoid;}}' +
+'@page{size:A4;margin:14mm;}' +
+'</style></head><body>' +
+'<div class="tools">' +
+'  <button class="go" onclick="window.print()">Save as PDF / Print</button>' +
+'  <button onclick="window.close()">Close</button>' +
+'</div>' +
+'<div class="sheet">' +
+'  <div class="bar"><div>' +
+'    <h1>Maintenance \u2014 Office Cash</h1>' +
+'    <div class="per">Period: <b>' + maintEsc(kab) + '</b></div>' +
+'  </div><div class="gen">Generated<br/>' + aaj + '</div></div>' +
+'  <div class="cards">' +
+'    <div class="card c1"><div class="lbl">Total Received</div>' +
+'      <div class="num">' + maintMoney(inSum) + '</div>' +
+'      <div class="sub">' + credits.length + ' entries</div></div>' +
+'    <div class="card c2"><div class="lbl">Total Spent</div>' +
+'      <div class="num">' + maintMoney(outSum) + '</div>' +
+'      <div class="sub">' + expenses.length + ' entries</div></div>' +
+'    <div class="card c3"><div class="lbl">Balance</div>' +
+'      <div class="num">' + maintMoney(bal) + '</div>' +
+'      <div class="sub">' + balNote + '</div></div>' +
+'  </div>' +
+'  <h2>Spent \u2014 where it was used</h2>' +
+'  <table><thead><tr><th>Date</th><th>Description</th><th>Name</th>' +
+'    <th style="text-align:right">Amount</th></tr></thead>' +
+'    <tbody>' + kharchRows + '</tbody>' +
+'    <tfoot><tr><td colspan="3">Total Spent</td>' +
+'      <td class="amt out">' + maintMoney(outSum) + '</td></tr></tfoot></table>' +
+'  <h2>Received \u2014 from Purchase_System sheet</h2>' +
+'  <table><thead><tr><th>Date</th><th>Name</th><th>Payment Mode</th>' +
+'    <th style="text-align:right">Amount</th></tr></thead>' +
+'    <tbody>' + aayaRows + '</tbody>' +
+'    <tfoot><tr><td colspan="3">Total Received</td>' +
+'      <td class="amt in">' + maintMoney(inSum) + '</td></tr></tfoot></table>' +
+'</div>' +
+'<scr' + 'ipt>window.onload=function(){setTimeout(function(){window.print();},350);};</scr' + 'ipt>' +
+'</body></html>';
+
+  const w = window.open('', '_blank');
+  if (!w) { showToast('PDF ke liye is site par popup allow kar do', 'error'); return; }
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
 }
 
 // Maintenance ke andar hi do view — alag sidebar tab nahi (Harsh, 29 Aug:
