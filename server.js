@@ -3076,26 +3076,98 @@ function flipToIso(v) {
   return y + '-' + String(mo).padStart(2, '0') + '-' + String(da).padStart(2, '0');
 }
 
-// ── Ulti likhi due_date har start par seedhi karo ───────────────────
+// ── Ulti likhi due_date: dhoondho, ginti karo, seedhi karo ──────────
 // Pehle ye ek-baar-chalne wale marker se bandha tha (v2). Us tarah kuch rows
 // chhoot gayi thin: marker "ho gaya" bolta raha aur Nishant ki 7 monthly rows
 // July se ulti padi rahin. Ab har start par dekh lete hain -- kuch ulta na
 // mile to ek bhi write nahi hota, isliye ye sasta hai aur chhoot nahi sakta.
+
+// Ulti date do tarah ka nuksaan karti hai. App date ko seedha string ki tarah
+// tolta hai, isliye:
+//   "21-" se "31-" tak  ->  har cutoff se BADI  ->  task KABHI nahi dikhta
+//   "01-" se "20-" tak  ->  har cutoff se CHHOTI ->  task waqt se PEHLE dikhta
+// Nishant ki saari rows 28 aur 30 taarikh ki thin, isliye ek bhi nahi dikhi.
+function ultiKaHaal(v) {
+  const m = String(v == null ? '' : v).trim().match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/);
+  if (!m) return null;
+  return (+m[1] >= 21) ? 'chhipi' : 'jaldi';
+}
+
+// Dono table me ulti date dhoondho. Ye sirf padhta hai, kuch badalta nahi.
+async function scanUltiDates() {
+  const d = await getDB();
+  const [chl, del, users] = await Promise.all([
+    d.findAll('Checklist_Tasks').catch(() => []),
+    d.findAll('Delegation_Tasks').catch(() => []),
+    d.findAll('Users').catch(() => [])
+  ]);
+  const naam = {};
+  for (const u of users) naam[String(u.id)] = u.name || '';
+  const out = [];
+  const dekho = (rows, tab) => rows.forEach(t => {
+    const v = String(t.due_date == null ? '' : t.due_date).trim();
+    if (!v || /^\d{4}-\d{2}-\d{2}$/.test(v)) return;
+    const iso = flipToIso(v);
+    if (!iso) return;                        // samajh na aaye to haath mat lagao
+    out.push({
+      tab, id: t.id, iso,
+      doer: (tab === 'Checklist_Tasks' && t.doer_name)
+        ? t.doer_name : (naam[String(t.assigned_to)] || ('id ' + t.assigned_to)),
+      khula: (t.status === 'pending' || t.status === 'revised'),
+      haal: ultiKaHaal(v)
+    });
+  });
+  dekho(chl, 'Checklist_Tasks');
+  dekho(del, 'Delegation_Tasks');
+  return out;
+}
+
+// Khule task doer ke hisaab se: kitne chhipe the, kitne jaldi dikh rahe the
+function ultiGinti(list) {
+  const g = {};
+  list.filter(x => x.khula).forEach(x => {
+    const k = x.doer + ' \u2014 ' + (x.tab === 'Checklist_Tasks' ? 'Checklist' : 'Delegation');
+    const r = g[k] = g[k] || { chhipi: 0, jaldi: 0 };
+    if (x.haal === 'chhipi') r.chhipi++; else r.jaldi++;
+  });
+  return g;
+}
+
 async function straightenChecklistDates() {
   try {
     const d = await getDB();
-    const all = await d.findAll('Checklist_Tasks').catch(() => []);
-    const ulti = all.filter(t => {
-      const v = String(t.due_date == null ? '' : t.due_date).trim();
-      return v && !/^\d{4}-\d{2}-\d{2}$/.test(v) && flipToIso(v);
-    });
+    const ulti = await scanUltiDates();
     if (!ulti.length) return;                     // sab seedhi -- kuch mat chhedo
+
+    // Pehli baar jo mila wo likh kar rakh lo. Seedhi karne ke BAAD ye sawaal
+    // kahin se nahi poochha ja sakta ki kiske kitne task chhipe hue the.
+    try {
+      await ensureAppStateTab(d);
+      const pehle = await d.findWhere('App_State', { key_name: 'checklist_ulti_date_report' });
+      if (!pehle || !pehle.length) {
+        const g = ultiGinti(ulti);
+        const lines = Object.keys(g).sort().map(k =>
+          k + ': ' + g[k].chhipi + ' chhipi + ' + g[k].jaldi + ' jaldi');
+        await d.insert('App_State', {
+          key_name: 'checklist_ulti_date_report',
+          value: 'kul ' + ulti.length + ' ulti date, ' + ulti.filter(x => x.khula).length +
+                 ' khule task | ' + (lines.join(' | ') || 'koi khula task nahi'),
+          updated_at: new Date(Date.now() + 330 * 60000).toISOString().replace('T', ' ').split('.')[0]
+        });
+      }
+    } catch { /* report na likh paye to bhi fix to karna hi hai */ }
+
+    // Seedhi sirf Checklist ki karte hain -- Delegation ko purane fix ne bhi
+    // haath nahi lagaya tha, aur uska task date se chhipta bhi nahi. Uski
+    // ginti report me aa jaati hai, faisla Harsh ka.
+    const karne = ulti.filter(x => x.tab === 'Checklist_Tasks');
     let fixed = 0;
-    for (const t of ulti) {
-      try { await d.update('Checklist_Tasks', t.id, { due_date: flipToIso(t.due_date) }); fixed++; }
+    for (const x of karne) {
+      try { await d.update(x.tab, x.id, { due_date: x.iso }); fixed++; }
       catch { /* agli baar phir koshish hogi */ }
     }
-    console.log('  \u2705 checklist date: ' + fixed + '/' + ulti.length + ' ulti date seedhi ki');
+    console.log('  \u2705 checklist date: ' + fixed + '/' + karne.length + ' ulti date seedhi ki' +
+                (ulti.length > karne.length ? ' (Delegation ki ' + (ulti.length - karne.length) + ' chhodi)' : ''));
   } catch (e) {
     console.error('  straightenChecklistDates error (agli baar retry hogi):', e.message);
   }
@@ -7215,6 +7287,25 @@ async function checklistDateHealth() {
            (samples.length ? ` (jaise: ${samples.join(' , ')})` : '');
   } catch { return null; }
 }
+
+// Ulti date ka hisaab -- sirf padhta hai: na message bhejta hai, na kuch
+// badalta hai. Naam ke alawa task ka koi text bahar nahi jaata.
+app.get('/api/cron/date-check', async (req, res) => {
+  try {
+    const ab = await scanUltiDates();
+    res.json({
+      pehliBaarJoMila: await appStateValue('checklist_ulti_date_report'),
+      abhiBaaki: {
+        kul: ab.length,
+        checklist: ab.filter(x => x.tab === 'Checklist_Tasks').length,
+        delegation: ab.filter(x => x.tab === 'Delegation_Tasks').length,
+        khuleTask: ab.filter(x => x.khula).length
+      },
+      doerWise: ultiGinti(ab),
+      puranaFix: await appStateValue('checklist_date_format_fix_v2')
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
 app.get('/api/cron/wa-reminders', async (req, res) => {
   try {
