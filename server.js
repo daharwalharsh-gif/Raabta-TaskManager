@@ -1684,7 +1684,7 @@ async function runWhatsAppReminders(slotKey, force) {
     const userMap = {};
     for (const u of users) userMap[String(u.id)] = u;
 
-    const isPending = t => t.status === 'pending' && t.due_date && t.due_date <= cutoff;
+    const isPending = t => t.status === 'pending' && t.due_date && dueIso(t.due_date) <= cutoff;
     const byUser = {};
     const push = (t, kind) => {
       const uid = String(t.assigned_to);
@@ -1999,6 +1999,39 @@ function getTabName(type) {
 
 function today() { return new Date().toISOString().split('T')[0]; }
 
+// ── Checklist ki due_date: padhne se pehle seedhi kar lo ─────────────
+// DB me kabhi-kabhi ulti date reh jaati hai ("30-09-2026"). App date ko
+// seedha string ki tarah tolta hai, isliye "30-..." har cutoff se BADI
+// nikalti hai aur wo row kabhi dikhti hi nahi. Nishant ka monthly task
+// (Home Staff Salary Logs) isi wajah se July se DB me pada tha par ek baar
+// bhi screen par nahi aaya. Ab compare se pehle hamesha YYYY-MM-DD bana
+// lete hain, taaki aisi row chhipe nahi.
+function dueIso(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (!s) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  return flipToIso(s) || s;
+}
+
+function isoPlusDays(iso, n) {
+  const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return iso;
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().split('T')[0];
+}
+
+// Monthly aur quarterly task DO DIN PEHLE dikhne lagte hain -- Harsh, 6 Oct:
+// "monthly ya quarterly jo bhi task ho do din pehle show ho jane chahiye".
+// Mahine me ek baar aane wale kaam ke liye ek din ka notice kaafi nahi hota.
+// Baaki (daily, weekly) apne hi din par, jaise pehle the.
+const CHL_EARLY_FREQ = new Set(['monthly', 'quarterly']);
+const CHL_EARLY_DAYS = 2;
+function chlCutoff(t, todayStr) {
+  const f = String(t.frequency || '').toLowerCase().trim();
+  return CHL_EARLY_FREQ.has(f) ? isoPlusDays(todayStr, CHL_EARLY_DAYS) : todayStr;
+}
+
 function parseIntSafe(v) { const n = parseInt(v); return isNaN(n) ? 0 : n; }
 
 // ══════════════════════════════════════════════════════
@@ -2149,8 +2182,9 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
         if (t.status === 'pending') pending++;
         else if (t.status === 'revised') revised++;
         else if (t.status === 'completed' || t.status === 'closed') completed++;
-        // Dashboard table: only show tasks due today or overdue (not future)
-        if (t.status === 'pending' && (!t.due_date || t.due_date <= todayStr)) {
+        // Dashboard table: aaj tak ke (ya pichhle) task. Monthly/quarterly
+        // do din pehle se. Date ulti likhi ho to bhi chhipti nahi -- dueIso.
+        if (t.status === 'pending' && (!t.due_date || dueIso(t.due_date) <= chlCutoff(t, todayStr))) {
           checklistPending.push({
             id: parseInt(t.id), type: 'checklist',
             description: t.description, status: t.status,
@@ -2260,7 +2294,7 @@ app.get('/api/tasks', requireAuth, async (req, res) => {
       // Approval-pending naya task: doer ko tabhi dikhe jab approve ho jaye
       if (t.status === 'waiting_approval' && !isAdmin && role !== 'pc') return false;
       if (allowedUserIds && !allowedUserIds.includes(String(t.assigned_to))) return false;
-      if (!isDeleg && !includeFuture && t.due_date > todayStr) return false;
+      if (!isDeleg && !includeFuture && dueIso(t.due_date) > chlCutoff(t, todayStr)) return false;
       return true;
     }).map(t => ({
       id: parseInt(t.id),
@@ -3040,6 +3074,31 @@ function flipToIso(v) {
   const d = new Date(Date.UTC(y, mo - 1, da));
   if (d.getUTCFullYear() !== y || d.getUTCMonth() !== mo - 1 || d.getUTCDate() !== da) return '';
   return y + '-' + String(mo).padStart(2, '0') + '-' + String(da).padStart(2, '0');
+}
+
+// ── Ulti likhi due_date har start par seedhi karo ───────────────────
+// Pehle ye ek-baar-chalne wale marker se bandha tha (v2). Us tarah kuch rows
+// chhoot gayi thin: marker "ho gaya" bolta raha aur Nishant ki 7 monthly rows
+// July se ulti padi rahin. Ab har start par dekh lete hain -- kuch ulta na
+// mile to ek bhi write nahi hota, isliye ye sasta hai aur chhoot nahi sakta.
+async function straightenChecklistDates() {
+  try {
+    const d = await getDB();
+    const all = await d.findAll('Checklist_Tasks').catch(() => []);
+    const ulti = all.filter(t => {
+      const v = String(t.due_date == null ? '' : t.due_date).trim();
+      return v && !/^\d{4}-\d{2}-\d{2}$/.test(v) && flipToIso(v);
+    });
+    if (!ulti.length) return;                     // sab seedhi -- kuch mat chhedo
+    let fixed = 0;
+    for (const t of ulti) {
+      try { await d.update('Checklist_Tasks', t.id, { due_date: flipToIso(t.due_date) }); fixed++; }
+      catch { /* agli baar phir koshish hogi */ }
+    }
+    console.log('  \u2705 checklist date: ' + fixed + '/' + ulti.length + ' ulti date seedhi ki');
+  } catch (e) {
+    console.error('  straightenChecklistDates error (agli baar retry hogi):', e.message);
+  }
 }
 
 async function fixChecklistDateFormat() {
@@ -6840,7 +6899,7 @@ async function reminderWho() {
       d.findAll('Delegation_Tasks'), d.findAll('Checklist_Tasks'), d.findAll('Users')
     ]);
     const cutoff = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const isPending = t => t.status === 'pending' && t.due_date && t.due_date <= cutoff;
+    const isPending = t => t.status === 'pending' && t.due_date && dueIso(t.due_date) <= cutoff;
     const byUser = {};
     [...del, ...chl].forEach(t => {
       if (!isPending(t)) return;
@@ -7989,6 +8048,9 @@ async function seedAdminIfNeeded() {
       .then(() => setTimeout(() => seedHolidays2026().catch(() => {}), 36 * 1000))
       .then(() => setTimeout(() => repairNaNChecklistDates().catch(() => {}), 35 * 1000))
       .then(() => setTimeout(() => fixChecklistDateFormat().catch(() => {}), 45 * 1000))
+      // Purana fix marker se bandha hai aur kuch rows chhod chuka hai --
+      // ye har start par baaki ulti dates seedhi kar deta hai
+      .then(() => setTimeout(() => straightenChecklistDates().catch(() => {}), 50 * 1000))
       .then(() => setTimeout(() => removeOrphanOpenTasks().catch(() => {}), 55 * 1000))
       // Outbox aane se pehle jo assign-alert gum ho gaye — ek baar bhej do
       .then(() => setTimeout(() => backfillMissedAssignAlerts().catch(() => {}), 45 * 1000))
