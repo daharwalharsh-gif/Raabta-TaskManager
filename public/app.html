@@ -4427,9 +4427,25 @@ function renderTasksTable() {
     tasks.forEach(t => { const n = t.assignedToName || '—'; (groups[n] = groups[n] || []).push(t); });
     const names = Object.keys(groups).sort((a, b) => a.localeCompare(b));
     window._tasksGroupNames = names;
+    // Closed Tasks tab me do tarah ke task ek saath aate hain: jo doer ne Done
+    // kiye (status 'completed') aur jo admin ne band kiye ('closed'). Card par
+    // sirf "total" likha tha, to ye pata hi nahi chalta tha ki kitne completed
+    // hain. Harsh, 8 Oct: "close task me completed show dikha do card me".
+    // Baaki tab me sab task ek hi status ke hote hain, isliye wahan ye chip
+    // nahi aati -- warna bekaar me "131 completed, 131 total" jaisa dikhta.
+    const doneChip = (list) => {
+      if (taskStatusFilter !== 'closed') return '';
+      const done = list.filter(t => t.status === 'completed').length;
+      if (!done) return '';
+      return '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;' +
+             'background:#dcfce7;color:#15803d;border:1px solid #bbf7d0">' + done + ' completed</span>';
+    };
     container.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
-        <div style="font-size:13px;color:#64748b;font-weight:600">${names.length} doer(s) · ${tasks.length} task(s)</div>
+        <div style="font-size:13px;color:#64748b;font-weight:600">${names.length} doer(s) · ${tasks.length} task(s)${
+          taskStatusFilter === 'closed'
+            ? ' · ' + tasks.filter(t => t.status === 'completed').length + ' completed'
+            : ''}</div>
         <div style="display:flex;gap:8px">
           <button class="btn btn-outline btn-sm" onclick="tasksExpandAll(true)">Expand all</button>
           <button class="btn btn-outline btn-sm" onclick="tasksExpandAll(false)">Collapse all</button>
@@ -4441,7 +4457,7 @@ function renderTasksTable() {
         return `<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:10px;overflow:hidden">
           <div onclick="toggleTasksDoerGroup(${i})" style="padding:12px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;background:#f8fafc">
             <div style="font-size:14px;font-weight:700;color:#1e293b"><span style="color:#64748b">${open ? '▼' : '▶'}</span> ${name}</div>
-            <span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe">${list.length} total</span>
+            <span style="display:flex;align-items:center;gap:6px">${doneChip(list)}<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe">${list.length} total</span></span>
           </div>
           ${open ? `<div class="flat-tasks-table" style="border:none;border-radius:0"><div style="overflow-x:auto"><table style="min-width:760px">${theadHtml}<tbody>${list.map(t => renderTaskRow(t, isAdmin)).join('')}</tbody></table></div></div>` : ''}
         </div>`;
