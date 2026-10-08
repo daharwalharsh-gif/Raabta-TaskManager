@@ -3114,7 +3114,9 @@ async function scanUltiDates() {
       doer: (tab === 'Checklist_Tasks' && t.doer_name)
         ? t.doer_name : (naam[String(t.assigned_to)] || ('id ' + t.assigned_to)),
       khula: (t.status === 'pending' || t.status === 'revised'),
-      haal: ultiKaHaal(v)
+      haal: ultiKaHaal(v),
+      // pehla khaana 12 se bada = wo mahina ho hi nahi sakta = pakka DIN hai
+      dinPakka: (parseInt(v, 10) > 12)
     });
   });
   dekho(chl, 'Checklist_Tasks');
@@ -3133,7 +3135,7 @@ function ultiGinti(list) {
   return g;
 }
 
-async function straightenChecklistDates() {
+async function straightenTaskDates() {
   try {
     const d = await getDB();
     const ulti = await scanUltiDates();
@@ -3148,28 +3150,36 @@ async function straightenChecklistDates() {
         const g = ultiGinti(ulti);
         const lines = Object.keys(g).sort().map(k =>
           k + ': ' + g[k].chhipi + ' chhipi + ' + g[k].jaldi + ' jaldi');
+        const pakka = ulti.filter(x => x.dinPakka).length;
         await d.insert('App_State', {
           key_name: 'checklist_ulti_date_report',
           value: 'kul ' + ulti.length + ' ulti date, ' + ulti.filter(x => x.khula).length +
-                 ' khule task | ' + (lines.join(' | ') || 'koi khula task nahi'),
+                 ' khule task | DD-first saboot: ' + pakka + ' rows me din 12 se bada | ' +
+                 (lines.join(' | ') || 'koi khula task nahi'),
           updated_at: new Date(Date.now() + 330 * 60000).toISOString().replace('T', ' ').split('.')[0]
         });
       }
     } catch { /* report na likh paye to bhi fix to karna hi hai */ }
 
-    // Seedhi sirf Checklist ki karte hain -- Delegation ko purane fix ne bhi
-    // haath nahi lagaya tha, aur uska task date se chhipta bhi nahi. Uski
-    // ginti report me aa jaati hai, faisla Harsh ka.
-    const karne = ulti.filter(x => x.tab === 'Checklist_Tasks');
-    let fixed = 0;
-    for (const x of karne) {
+    // Ab Delegation ki bhi -- Harsh, 8 Oct. Pehle ise chhoda tha, par uski
+    // ulti date "overdue" ki ginti galat karti hai, aur overdue seedha SCORE
+    // ke formula me jaata hai: -(pending/total)*100 -(overdue/total)*50 ...
+    // Yaani logon ke number galat ban rahe the. Ek jagah data seedha karne se
+    // badge, ginti, sorting aur report -- sab ek saath theek ho jaate hain.
+    //
+    // Ulta padhne ka khatra nahi: flipToIso dusre khaane ko mahina maanta hai
+    // aur 12 se bada mahina maante hi row chhod deta hai. Aur ginti me dikhta
+    // hai ki bahut si rows ka pehla khaana 12 se bada hai -- wo mahina ho hi
+    // nahi sakta, to pehle DIN hi likha hai.
+    let fixed = 0, chhodi = 0;
+    for (const x of ulti) {
       try { await d.update(x.tab, x.id, { due_date: x.iso }); fixed++; }
-      catch { /* agli baar phir koshish hogi */ }
+      catch { chhodi++; }                     // agli start par phir koshish hogi
     }
-    console.log('  \u2705 checklist date: ' + fixed + '/' + karne.length + ' ulti date seedhi ki' +
-                (ulti.length > karne.length ? ' (Delegation ki ' + (ulti.length - karne.length) + ' chhodi)' : ''));
+    console.log('  \u2705 ulti date seedhi ki: ' + fixed + '/' + ulti.length +
+                (chhodi ? ' (' + chhodi + ' reh gayi, agli baar phir)' : ''));
   } catch (e) {
-    console.error('  straightenChecklistDates error (agli baar retry hogi):', e.message);
+    console.error('  straightenTaskDates error (agli baar retry hogi):', e.message);
   }
 }
 
@@ -8141,7 +8151,7 @@ async function seedAdminIfNeeded() {
       .then(() => setTimeout(() => fixChecklistDateFormat().catch(() => {}), 45 * 1000))
       // Purana fix marker se bandha hai aur kuch rows chhod chuka hai --
       // ye har start par baaki ulti dates seedhi kar deta hai
-      .then(() => setTimeout(() => straightenChecklistDates().catch(() => {}), 50 * 1000))
+      .then(() => setTimeout(() => straightenTaskDates().catch(() => {}), 50 * 1000))
       .then(() => setTimeout(() => removeOrphanOpenTasks().catch(() => {}), 55 * 1000))
       // Outbox aane se pehle jo assign-alert gum ho gaye — ek baar bhej do
       .then(() => setTimeout(() => backfillMissedAssignAlerts().catch(() => {}), 45 * 1000))
