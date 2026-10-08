@@ -3738,8 +3738,15 @@ async function openDashStatusPopup(status) {
     ]);
     fetched = [...((del && del.tasks) || []), ...((chl && chl.tasks) || [])];
   }
+  // Card par jo ginti likhi hai, popup me bhi utne hi task khulein.
+  // Card me "Completed" ka matlab server par 'completed' YA 'closed' hai
+  // (server.js: else if (t.status === 'completed' || t.status === 'closed')).
+  // Popup sirf 'completed' chhaanta tha, isliye 208 dikha kar sirf 55 kholta
+  // tha -- delegation task report hone ke baad 'closed' ho jaate hain, aur wo
+  // saare gayab the (Harsh, 8 Oct).
+  const chahiyeStatus = (status === 'completed') ? ['completed', 'closed'] : [status];
   _dashStatusTasks = fetched
-    .filter(t => t.status === status)
+    .filter(t => chahiyeStatus.indexOf(t.status) >= 0)
     .sort((a, b) => (a.due_date || '').localeCompare(b.due_date || ''));
 
   // Tab labels par counts + default Delegation tab
