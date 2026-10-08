@@ -3529,9 +3529,15 @@ async function loadDashboard() {
 
   if (dashChartInst) dashChartInst.destroy();
 
-  const combinedPending   = (dDel.pending||0)   + (dChl.pending||0);
-  const combinedCompleted = (dDel.completed||0) + (dChl.completed||0);
-  const combinedRevised   = dDel.revised||0;
+  // Chart wahi ginti dikhaye jo upar ke teen card dikhate hain.
+  // Pehle yahan delegationPending + checklistPending aate the -- par wo
+  // "aaj ki table me kitni row dikh rahi hain" hai, kul pending nahi. Isiliye
+  // card 179 bolta tha aur pie 106 (Harsh, 8 Oct). Upar wali delegation list
+  // me revised task bhi hote hain, to wo alag se dobara bhi gin jaate the.
+  // Ab teeno seedha wahi field se aate hain jo card me jaata hai.
+  const combinedPending   = d.pending   || 0;
+  const combinedCompleted = d.completed || 0;
+  const combinedRevised   = d.revised   || 0;
   const chartLabels = ['Completed','Pending','Revised'];
   const chartData   = [combinedCompleted, combinedPending, combinedRevised];
   const chartColors = ['#10b981','#ef4444','#f59e0b'];
