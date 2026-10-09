@@ -2138,6 +2138,8 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
     };
 
     let pending = 0, revised = 0, completed = 0;
+    // Pie chart ke liye alag ginti -- niche dekho
+    let pendingDue = 0;
     let delegationPending = [], checklistPending = [];
 
     // Fetch all needed tabs in parallel (promise coalescing prevents duplicate API calls)
@@ -2152,7 +2154,15 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
     if (taskType === 'delegation' || taskType === 'both') {
       for (const t of allDel) {
         if (!taskFilter(t)) continue;
-        if (t.status === 'pending') pending++;
+        if (t.status === 'pending') {
+          pending++;
+          // Pie ke liye: sirf wo pending jinki date aaj ki hai ya nikal chuki
+          // hai. Aage ki date wale (upcoming) ismein nahi aate -- Harsh, 9 Oct:
+          // "pie me bass current aur overdue dikhao, upcoming mat karwao".
+          // Bina date wale task ko current hi maante hain, wo kabhi "aage ka"
+          // nahi hota. dueIso isliye ki ulti likhi date bhi theek padhi jaye.
+          if (!t.due_date || dueIso(t.due_date) <= todayStr) pendingDue++;
+        }
         else if (t.status === 'revised') revised++;
         else if (t.status === 'completed' || t.status === 'closed') completed++;
         // Delegation: due date chahe aage ki ho, task assign hote hi dashboard
@@ -2179,7 +2189,15 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
     if (taskType === 'checklist' || taskType === 'both') {
       for (const t of allChl) {
         if (!taskFilter(t)) continue;
-        if (t.status === 'pending') pending++;
+        if (t.status === 'pending') {
+          pending++;
+          // Pie ke liye: sirf wo pending jinki date aaj ki hai ya nikal chuki
+          // hai. Aage ki date wale (upcoming) ismein nahi aate -- Harsh, 9 Oct:
+          // "pie me bass current aur overdue dikhao, upcoming mat karwao".
+          // Bina date wale task ko current hi maante hain, wo kabhi "aage ka"
+          // nahi hota. dueIso isliye ki ulti likhi date bhi theek padhi jaye.
+          if (!t.due_date || dueIso(t.due_date) <= todayStr) pendingDue++;
+        }
         else if (t.status === 'revised') revised++;
         else if (t.status === 'completed' || t.status === 'closed') completed++;
         // Dashboard table: aaj tak ke (ya pichhle) task. Monthly/quarterly
@@ -2201,7 +2219,7 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
     }
 
     res.json({
-      pending, revised, completed,
+      pending, revised, completed, pendingDue,
       todayPending: [...delegationPending, ...checklistPending],
       // separate counts for backward compat
       delegationPending: delegationPending.length,

@@ -3535,7 +3535,11 @@ async function loadDashboard() {
   // card 179 bolta tha aur pie 106 (Harsh, 8 Oct). Upar wali delegation list
   // me revised task bhi hote hain, to wo alag se dobara bhi gin jaate the.
   // Ab teeno seedha wahi field se aate hain jo card me jaata hai.
-  const combinedPending   = d.pending   || 0;
+  // Pie me Pending ka matlab ab "current + overdue" hai -- aage ki date wale
+  // task ismein nahi aate (Harsh, 9 Oct). Isliye ye ginti upar ke Pending card
+  // se kam ho sakti hai; card poora pending dikhata hai, jaisa pehle tha.
+  // (pendingDue na mile -- purana server -- to pehle jaisa chalega.)
+  const combinedPending   = (d.pendingDue != null) ? d.pendingDue : (d.pending || 0);
   const combinedCompleted = d.completed || 0;
   const combinedRevised   = d.revised   || 0;
   const chartLabels = ['Completed','Pending','Revised'];
