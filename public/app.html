@@ -2974,6 +2974,19 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script>
 <script>
+// ── "Aaj" kaun si taarikh hai ──────────────────────────────────────
+// toISOString() HAMESHA UTC deta hai, aur IST UTC se 5:30 aage hai. Matlab
+// raat 12 se subah 5:30 ke beech wo PICHHLI taarikh bolta hai. Isse do tarah
+// ka nuksaan ho raha tha:
+//   * us waqt naya task banao to date apne aap KAL ki bhar jaati thi, aur
+//     task banate hi overdue ho jaata tha
+//   * overdue ke laal badge aur "aaj tak" wale filter galat chalte the
+// Isliye ab har jagah browser ki apni taarikh leti hai ye function.
+// (11 Oct ko raat 1 baje Navratri ki patti isi wajah se gayab thi.)
+function aajKiDate() {
+  return new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
+    .toISOString().split('T')[0];
+}
 // ══════════════════════════════════════════════════════
 // DELEGATE BY ME — modal jisme login user ne jo tasks doosron ko delegate kiye un ki list dikhti hai
 // ══════════════════════════════════════════════════════
@@ -3029,7 +3042,7 @@ function renderDbmTable() {
     return;
   }
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = aajKiDate();
   const rows = filtered.map(t => {
     const isOverdue = t.status === 'pending' && t.due_date && t.due_date < today;
     return `<tr>
@@ -3279,8 +3292,7 @@ async function festCheckToday() {
     // ke beech wo PICHHLI taarikh bolta hai. 11 October ko raat 1 baje isi
     // wajah se Navratri ki patti dikhi hi nahi: code ko "10 October" dikh
     // raha tha, jo span me hai hi nahi (Harsh, 11 Oct).
-    const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
-      .toISOString().split('T')[0];
+    const today = aajKiDate();
     const list = await api('/api/holidays');
     if (!Array.isArray(list)) return;
     // Pehle Holidays list (ek din wale tyohaar), phir lambe tyohaar ki range
@@ -3689,7 +3701,7 @@ async function loadChecklistNotifications() {
   try {
     const res = await api('/api/my-checklist-reminders');
     const tasks = (res && Array.isArray(res.tasks)) ? res.tasks : [];
-    const todayStr = (res && res.today) || new Date().toISOString().split('T')[0];
+    const todayStr = (res && res.today) || aajKiDate();
     const badge = document.getElementById('notifBadge');
     if (badge) {
       if (tasks.length) { badge.style.display = 'block'; badge.textContent = tasks.length > 99 ? '99+' : tasks.length; }
@@ -3858,7 +3870,7 @@ async function loadDashFMS() {
   }
 
   const rows = data.rows || [];
-  const today = new Date().toISOString().split('T')[0];
+  const today = aajKiDate();
 
   document.getElementById('dashFMSCount').textContent = rows.length ? `(${rows.length} pending)` : '';
 
@@ -4789,7 +4801,7 @@ async function deleteTask(id, type) {
 // REVISE DATE MODAL
 // ══════════════════════════════════════════════════════
 function openReviseModal(taskId, taskType) {
-  const today = new Date().toISOString().split('T')[0];
+  const today = aajKiDate();
   // Min date = tomorrow
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -4985,7 +4997,7 @@ async function openDelegate() {
   document.getElementById('dDesc').value='';
   document.getElementById('dRemarks').value='';
   document.getElementById('dPriority').value='low';
-  const today = new Date().toISOString().split('T')[0];
+  const today = aajKiDate();
   document.getElementById('dDate').value=today;
   // Purani date bhi select ho sake (backdated task) — min hata diya
   document.getElementById('dDate').removeAttribute('min');
@@ -5034,7 +5046,7 @@ async function openChecklist() {
   document.getElementById('cRemarks').value='';
   document.getElementById('cFrequency').value='daily';
   document.getElementById('cPreview').style.display='none';
-  const today = new Date().toISOString().split('T')[0];
+  const today = aajKiDate();
   document.getElementById('cDate').value=today;
   document.getElementById('cDate').removeAttribute('min'); // allow past-month start dates
   const users = await api('/api/users');
@@ -5258,7 +5270,7 @@ async function renderHolidayList() {
     return;
   }
   const isAdmin = !!(ME && ME.role === 'admin');
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = aajKiDate();
   container.innerHTML = list.map(h=>`
     <div class="holiday-item"${h.date < todayStr ? ' style="opacity:.55"' : ''}>
       <span><strong>${formatDate(h.date)}</strong> — ${h.name}${h.date < todayStr ? ' <span style="font-size:11px;color:#94a3b8">(past)</span>' : ''}</span>
@@ -5946,7 +5958,7 @@ function ftDelayInfo(row) {
     if (done <= due) return null;                 // us din ya usse pehle -> theek
     return { date: due, days: din(due, done), doneOn: done, finished: true };
   }
-  const today = new Date().toISOString().split('T')[0];
+  const today = aajKiDate();
   if (due >= today) return null;                  // abhi tareekh aayi hi nahi
   return { date: due, days: din(due, today), finished: false };
 }
@@ -6685,7 +6697,7 @@ function renderCRM() {
   const cont = document.getElementById('crmContent');
   if (!cont) return;
   const doer = document.getElementById('crmDoerFilter')?.value || 'all';
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = aajKiDate();
   let rows = _crmTasks;
   if (_crmTab === 'overdue') {
     // Overdue = due date nikal chuki hai
@@ -7403,7 +7415,7 @@ function exportMaintCSV() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `Maintenance_${new Date().toISOString().split('T')[0]}.csv`;
+  a.download = `Maintenance_${aajKiDate()}.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -7746,7 +7758,7 @@ function exportMaint2CSV() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `Maintenance2_${new Date().toISOString().split('T')[0]}.csv`;
+  a.download = `Maintenance2_${aajKiDate()}.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -8131,7 +8143,7 @@ async function openMISDetail(userId, userName) {
       <td style="color:#64748b;font-size:12px">${t.assigned_by_name||'—'}</td>
       <td style="white-space:nowrap;font-size:12px">${fmtDate(t.due_date)}</td>
       <td><span class="status-badge ${t.status}">${t.status==='revised'?'Revision Requested':t.status.charAt(0).toUpperCase()+t.status.slice(1)}</span></td>
-      ${t.status==='pending' && t.due_date < new Date().toISOString().split('T')[0]
+      ${t.status==='pending' && t.due_date < aajKiDate()
         ? `<td style="color:#dc2626;font-size:11px;font-weight:600">⏰ Overdue</td>`
         : `<td></td>`}
     </tr>`).join('');
@@ -8422,7 +8434,7 @@ async function openAllMISDetail(userId, userName) {
     emp.checklist.total > 0  ? api(`/api/mis/detail?userId=${userId}&type=checklist&start=${start}&end=${end}`)  : Promise.resolve({ tasks: [] })
   ]);
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = aajKiDate();
 
   const makeTaskRows = (tasks, showRevised) => tasks.map(t => `
     <tr>
@@ -8625,7 +8637,7 @@ async function openRecordDetail(userId) {
   const r = (recordsData || []).find(e => String(e.userId) === String(userId));
   if (!r) { showToast('Generate first', 'error'); return; }
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = aajKiDate();
   const scoreColor = r.score === null ? '#64748b' : r.score < 0 ? '#dc2626' : '#16a34a';
 
   // Committed summary
