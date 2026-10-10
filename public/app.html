@@ -3256,19 +3256,37 @@ function festClose() {
 //   POPUP  -> din me SIRF EK BAAR (warna har refresh par aake chidhata)
 // Dono alag isliye hain ki Harsh ne kaha: "popup 4 second ka, par upar
 // wali patti us din poore din dikhti rahe."
+// ── Kai din chalne wale tyohaar ───────────────────────────────────
+// Har tyohaar ek din ka nahi hota -- Navratri nau raat ka hai. In sab ki
+// alag-alag entry Holidays list me daalna theek nahi: wo chhutti ki list
+// hai, usme nau baar "Navratri" bhar jaata aur asli chhuttiyan dab jaatin.
+// Isliye lambe tyohaar yahan rakhte hain -- aaj ki date is range me ho to
+// wahi theme lag jaata hai. Harsh, 10 Oct: "kal se Navratri wali theme
+// show honi chahiye" -- yaani 11 se 19 October, poore nau din.
+const FEST_SPANS = [
+  { from: '2026-10-11', to: '2026-10-19', name: 'Navratri' }
+];
+
+function festSpanToday(today) {
+  const s = FEST_SPANS.find(x => today >= x.from && today <= x.to);
+  return s ? s.name : '';
+}
+
 async function festCheckToday() {
   try {
     const today = new Date().toISOString().split('T')[0];
     const list = await api('/api/holidays');
     if (!Array.isArray(list)) return;
+    // Pehle Holidays list (ek din wale tyohaar), phir lambe tyohaar ki range
     const hit = list.find(h => String(h.date || '').slice(0, 10) === today);
-    if (!hit) return;                       // aaj koi tyohaar nahi
+    const naam = hit ? hit.name : festSpanToday(today);
+    if (!naam) return;                      // aaj koi tyohaar nahi
 
-    festStrip(hit.name);                    // patti -- hamesha
+    festStrip(naam);                        // patti -- hamesha
 
     if (localStorage.getItem('fest_shown') === today) return;   // popup aaj dikha chuke
     localStorage.setItem('fest_shown', today);
-    setTimeout(function () { festShow(hit.name, hit.date, FEST_AUTO_MS); }, 700);   // page settle hone do
+    setTimeout(function () { festShow(naam, today, FEST_AUTO_MS); }, 700);   // page settle hone do
   } catch (e) { /* greeting na aaye to app ka kaam nahi rukna chahiye */ }
 }
 
