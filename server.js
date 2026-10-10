@@ -1372,7 +1372,9 @@ async function drainWhatsAppOutbox() {
         // alawa, ya 7 PM ke baad, KABHI nahi bheja jaata — baasi ho to
         // 'expired' likh kar chhod dete hain. (Assign-time alert par koi
         // rok nahi — wo kabhi bhi ja sakta hai, Harsh ne wahi kaha hai.)
-        if (row.kind === 'daily-reminder') {
+        // Greeting par bhi wahi rok: apne din ke baad, ya 7 PM ke baad, kabhi
+        // nahi. Raat ko "Happy Navratri" pahunchna greeting nahi, pareshani hai.
+        if (row.kind === 'daily-reminder' || row.kind === 'festival-wish') {
           const istNow = new Date(Date.now() + 330 * 60000);
           const todayIst = istNow.toISOString().split('T')[0];
           const m = String(row.ref || '').match(/\d{4}-\d{2}-\d{2}/);
@@ -1804,6 +1806,83 @@ async function checkAndFireDueSlots() {
   return { skipped: 'outside-slot-window' };
 }
 
+// ── Tyohaar ka greeting -- ek hi baar, sab ko ───────────────────────
+// Harsh, 10 Oct: "kal se Navratri start hai, sab ko kal subah 6 baje message
+// jana chahiye".
+//
+// Do baar kaise nahi jaata: har bande ka apna ref outbox me likha jaata hai
+// (fest_navratri_<date>_<userId>). Dobara chalne par jiska ref pehle se hai
+// use chhod dete hain. Isliye app chahe din me 50 baar jaage, message ek hi
+// baar jaata hai. Aur ulta fayda bhi: pehli koshish me koi reh gaya to agli
+// baar sirf wahi bacha hua judta hai -- kisi ka chhootta bhi nahi.
+const FEST_WISH = {
+  naam:    'Navratri',
+  date:    '2026-10-11',        // IST ki date -- isi din jaata hai
+  fromMin: 6 * 60,              // 6:00 AM IST se
+  tillMin: 19 * 60,             // 7 PM ke baad bilkul nahi -- baasi greeting bekaar
+  text:
+    '\u{1F33A} *Happy Navratri* \u{1F33A}\n\n' +
+    'Hello {name},\n\n' +
+    'May Maa Durga bless you with strength, good health and happiness through these nine nights.\n\n' +
+    'Wishing you and your family a very happy and prosperous Navratri.\n\n' +
+    '\u2014 Team Raabta'
+};
+
+let _festWishRunning = false;
+async function sendFestivalWish() {
+  if (_festWishRunning) return { skipped: 'already-running' };
+  if (!waAutoAllowed()) return { skipped: 'not-production' };
+  if (!WA.enabled || !WA.url || !WA.apiKey) return { skipped: 'wa-not-configured' };
+  const ist = new Date(Date.now() + 330 * 60000);
+  if (ist.toISOString().split('T')[0] !== FEST_WISH.date) return { skipped: 'aaj ka din nahi' };
+  const nowMin = ist.getUTCHours() * 60 + ist.getUTCMinutes();
+  if (nowMin < FEST_WISH.fromMin) return { skipped: 'abhi 6 baje nahi' };
+  if (nowMin >= FEST_WISH.tillMin) return { skipped: 'bahut der ho gayi' };
+
+  _festWishRunning = true;
+  try {
+    const d = await getDB();
+    const [users, outbox] = await Promise.all([
+      d.findAll('Users'),
+      d.findAll('WA_Outbox').catch(() => [])
+    ]);
+    const refFor = (u) => 'fest_navratri_' + FEST_WISH.date + '_' + u.id;
+    // Jo pehle hi kataar me lag chuke -- unhe dobara mat lagao
+    const pehleSe = new Set(
+      outbox.filter(r => r.kind === 'festival-wish').map(r => String(r.ref || ''))
+    );
+    // Bhejne wala khud ka number chhodo (wahi list jo reminder me chhodi jaati hai)
+    const chhodo = new Set((WA.reminderExcludePhones || []).map(normalizePhone).filter(Boolean));
+
+    let queued = 0, pehleSeThe = 0, binaPhone = 0, chhode = 0;
+    for (const u of users) {
+      const ref = refFor(u);
+      if (pehleSe.has(ref)) { pehleSeThe++; continue; }
+      const phone = u.phone ? normalizePhone(u.phone) : '';
+      if (!phone) { binaPhone++; continue; }
+      if (chhodo.has(phone)) { chhode++; continue; }
+      await queueWhatsApp(
+        phone,
+        FEST_WISH.text.replace('{name}', u.name || 'there'),
+        'festival-wish', ref, u.name || '',
+        { immediate: false }            // kataar me lagao -- drain ek-ek karke bhejega
+      );
+      queued++;
+    }
+    if (queued) {
+      console.log('  \u{1F33A} ' + FEST_WISH.naam + ' greeting: ' + queued + ' kataar me (' +
+                  pehleSeThe + ' pehle se, ' + binaPhone + ' bina phone, ' + chhode + ' chhode)');
+      drainWhatsAppOutbox().catch(() => {});
+    }
+    return { queued, pehleSeThe, binaPhone, chhode };
+  } catch (e) {
+    console.error('  sendFestivalWish error:', e.message);
+    return { error: e.message };
+  } finally {
+    _festWishRunning = false;
+  }
+}
+
 // Har request par slot check — par minute me ek baar se zyada nahi.
 let _waLastCheck = 0;
 function waRequestHook(req, res, next) {
@@ -1811,6 +1890,7 @@ function waRequestHook(req, res, next) {
   if (now - _waLastCheck > 60000) {
     _waLastCheck = now;
     checkAndFireDueSlots().catch(e => console.error('  WA request-hook error:', e.message));
+    sendFestivalWish().catch(e => console.error('  fest wish error:', e.message));
   }
   next();
 }
@@ -1882,6 +1962,7 @@ function whatsAppReminderScheduler() {
   const label = waSlots().map(s => `${s.h}:${String(s.m || 0).padStart(2, '0')}`).join(' & ');
   setInterval(() => {
     checkAndFireDueSlots().catch(e => console.error('  WA scheduler tick error:', e.message));
+    sendFestivalWish().catch(e => console.error('  fest wish tick error:', e.message));
     // Outbox: jo assign-time message pehli baar me nahi gaya, wo yahan retry
     // hota hai — isliye kisi ko message chhutta nahi
     drainWhatsAppOutbox().catch(e => console.error('  WA outbox tick error:', e.message));
@@ -3472,13 +3553,14 @@ const HOLIDAYS_2026 = [
   { date: '2026-08-15', name: 'Independence Day' },
   { date: '2026-08-28', name: 'Raksha Bandhan' },
   { date: '2026-10-02', name: 'Mahatma Gandhi Jayanti' },
+  { date: '2026-10-11', name: 'Navratri' },
   { date: '2026-11-08', name: 'Diwali (Deepavali)' },
   { date: '2026-11-09', name: 'Govardhan Puja' },
   { date: '2026-11-11', name: 'Bhai Dooj' }
 ];
 
 async function seedHolidays2026() {
-  const MARKER = 'holidays_2026_seed_v1';
+  const MARKER = 'holidays_2026_seed_v2';   // v2: Navratri judi (10 Oct)
   try {
     const d = await getDB();
     await ensureAppStateTab(d);
