@@ -7515,7 +7515,12 @@ function maintAccessFor(user) {
     const key = pn.split(' ')[0].toLowerCase();       // "bappi" / "bajji"
     if (hay.includes(key)) return { view: 'person', person: pn };
   }
-  if (hay.includes('ashok')) return { view: 'main', person: '' };
+  // Maintenance (Office Cash) kis-kis ko dikhe. Pehle sirf Ashok ka hisaab
+  // tha; Harsh (10 Oct) ne Gurjeet ko bhi jodne ko kaha --
+  // gurjeet-inventory@raabtajewels.com. Naam ya email me ye shabd mil jaye to
+  // Maintenance ka sidebar aur page khul jata hai.
+  const MAINT_MAIN_LOG = ['ashok', 'gurjeet'];
+  if (MAINT_MAIN_LOG.some(k => hay.includes(k))) return { view: 'main', person: '' };
   return { view: '', person: '' };
 }
 
