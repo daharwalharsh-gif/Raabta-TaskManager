@@ -3274,7 +3274,13 @@ function festSpanToday(today) {
 
 async function festCheckToday() {
   try {
-    const today = new Date().toISOString().split('T')[0];
+    // Browser ki APNI taarikh lo, UTC waali nahi. toISOString() hamesha UTC
+    // deta hai, aur IST UTC se 5:30 aage hai -- isliye raat 12 se subah 5:30
+    // ke beech wo PICHHLI taarikh bolta hai. 11 October ko raat 1 baje isi
+    // wajah se Navratri ki patti dikhi hi nahi: code ko "10 October" dikh
+    // raha tha, jo span me hai hi nahi (Harsh, 11 Oct).
+    const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
+      .toISOString().split('T')[0];
     const list = await api('/api/holidays');
     if (!Array.isArray(list)) return;
     // Pehle Holidays list (ek din wale tyohaar), phir lambe tyohaar ki range
