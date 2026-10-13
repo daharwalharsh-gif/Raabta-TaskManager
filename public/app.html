@@ -12,6 +12,32 @@
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:'Inter',sans-serif;background:#f1f5f9;color:#1e293b;min-height:100vh;}
 
+/* ── GOLD SYSTEM ── */
+.gold-lbl{display:block;font-size:11px;font-weight:600;color:#64748b;margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px;}
+.gold-inp{width:100%;padding:9px 11px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;
+  font-family:'Inter',sans-serif;outline:none;background:#fff;margin-bottom:12px;color:#1e293b;}
+.gold-inp:focus{border-color:#94a3b8;}
+textarea.gold-inp{resize:vertical;}
+.gold-type{flex:1;padding:9px 0;border-radius:8px;border:1.5px solid #e2e8f0;background:#fff;
+  font-family:'Inter',sans-serif;font-size:14px;font-weight:700;color:#64748b;cursor:pointer;}
+.gold-type.on{color:#fff;border-color:transparent;}
+#goldTypeIn.on{background:#16a34a;}
+#goldTypeOut.on{background:#ef4444;}
+.gold-filt{padding:6px 9px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:12px;
+  font-family:'Inter',sans-serif;outline:none;background:#fff;}
+.gold-chip{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;}
+.gold-chip.in{background:#dcfce7;color:#15803d;}
+.gold-chip.out{background:#fee2e2;color:#b91c1c;}
+/* Grid ka column apne content se chhota ho hi nahi sakta jab tak min-width:0
+   na ho. Andar table 860px chaudi hai, isliye poora page daayein khisak kar
+   kat raha tha -- sidebar aur topbar tak kat gaye the (Harsh, 13 Oct).
+   Ab column sikud jaata hai aur table apne hi dibbe me scroll hoti hai. */
+#goldGrid{min-width:0;}
+#goldGrid > *{min-width:0;}
+#goldGrid table{width:100%;}
+@media (max-width:1100px){
+  #goldGrid{grid-template-columns:1fr !important;}
+}
 /* ══════════════════════════════════════
    SIDEBAR - Premium 3D Blue-Dark
 ══════════════════════════════════════ */
@@ -1086,6 +1112,10 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
       <span class="nav-label-text">Maintenance</span>
     </div>
+    <div class="nav-item" id="nav-gold" style="display:none" onclick="navigate('gold',this)">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3l2.3 4.6 5.2 .8-3.8 3.6.9 5.1L12 14.7 7.4 17.1l.9-5.1L4.5 8.4l5.2-.8L12 3z"/></svg>
+      <span class="nav-label-text">Gold System</span>
+    </div>
     <div class="nav-divider"></div>
     <div class="nav-item" onclick="navigate('profile',this)">
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
@@ -2033,6 +2063,131 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
   </div>
 
 
+
+  <!-- ══════════════════════════════════════
+       GOLD SYSTEM — do alag khaate, dhaancha ek jaisa
+       Gold Stock aur Gold Wire Stock. Har entry IN (aaya) ya OUT (gaya).
+  ══════════════════════════════════════ -->
+  <div id="page-gold" class="page">
+    <div class="page-header">
+      <h2 id="goldHeading">Gold Stock Management</h2>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-outline" onclick="loadGold(1)">&#8635; Refresh</button>
+      </div>
+    </div>
+
+    <div class="tab-group" id="goldTabs" style="margin-bottom:16px">
+      <div class="tab active" id="goldTabStock" onclick="switchGoldTab('stock',this)">Gold Stock</div>
+      <div class="tab" id="goldTabWire" onclick="switchGoldTab('wire',this)">Gold Wire Stock</div>
+    </div>
+
+    <!-- Teen card: abhi kitna hai / kitna aaya / kitna gaya -->
+    <div class="overview-cards" style="margin-bottom:18px">
+      <div class="ov-card revised">
+        <div class="label">Current Balance</div>
+        <div class="number" id="goldBal">&mdash;</div>
+        <div style="font-size:11px;color:#64748b;margin-top:4px">in &minus; out</div>
+      </div>
+      <div class="ov-card completed">
+        <div class="label">Total IN</div>
+        <div class="number" id="goldIn">&mdash;</div>
+        <div style="font-size:11px;color:#64748b;margin-top:4px" id="goldInSub">entries</div>
+      </div>
+      <div class="ov-card pending">
+        <div class="label">Total OUT</div>
+        <div class="number" id="goldOut">&mdash;</div>
+        <div style="font-size:11px;color:#64748b;margin-top:4px" id="goldOutSub">entries</div>
+      </div>
+    </div>
+
+    <div class="dash-bottom" id="goldGrid" style="grid-template-columns:360px minmax(0,1fr);gap:18px;align-items:start">
+
+      <!-- ── Nayi entry ── -->
+      <div class="task-table-card">
+        <div class="card-head">
+          <div class="card-head-title" id="goldFormTitle">Add Stock Entry</div>
+          <button class="btn btn-outline" id="goldCancelEdit" onclick="clearGoldForm()"
+            style="font-size:12px;padding:5px 10px;display:none">Cancel edit</button>
+        </div>
+        <div style="padding:14px 16px 18px">
+          <div id="goldErr" style="display:none;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:8px;padding:9px 12px;font-size:13px;margin-bottom:12px"></div>
+
+          <label class="gold-lbl">Entry Type (IN / OUT)</label>
+          <div style="display:flex;gap:8px;margin-bottom:12px">
+            <button type="button" class="gold-type on" id="goldTypeIn" onclick="goldSetType('IN')">IN</button>
+            <button type="button" class="gold-type" id="goldTypeOut" onclick="goldSetType('OUT')">OUT</button>
+          </div>
+
+          <label class="gold-lbl">Date</label>
+          <input type="date" id="goldDate" class="gold-inp">
+
+          <label class="gold-lbl" id="goldWeightLbl">Weight of Gold (grams)</label>
+          <input type="number" id="goldWeight" class="gold-inp" step="0.001" min="0" placeholder="0.000">
+
+          <label class="gold-lbl">Purity / Karat (kt/ct)</label>
+          <select id="goldKarat" class="gold-inp">
+            <option>24 Karat</option>
+            <option>22 Karat</option>
+            <option>20 Karat</option>
+            <option>18 Karat</option>
+            <option>14 Karat</option>
+            <option>9 Karat</option>
+          </select>
+
+          <label class="gold-lbl">Rate of Gold (per gram)</label>
+          <input type="number" id="goldRate" class="gold-inp" step="0.01" min="0" placeholder="&#8377; 0.00">
+
+          <label class="gold-lbl">Upload Picture</label>
+          <input type="file" id="goldImage" accept="image/*,application/pdf" onchange="onGoldImagePick()" class="gold-inp">
+          <div id="goldImageInfo" style="font-size:11px;color:#94a3b8;margin:-6px 0 12px"></div>
+
+          <div id="goldVendorBlock" style="display:none">
+            <label class="gold-lbl">Vendor Name</label>
+            <input type="text" id="goldVendor" class="gold-inp" placeholder="Enter Vendor Name">
+          </div>
+
+          <label class="gold-lbl">Remarks / Additional Comment</label>
+          <textarea id="goldRemarks" class="gold-inp" rows="3" placeholder="Optional comments..."></textarea>
+
+          <button class="btn btn-primary" id="goldSaveBtn" onclick="saveGoldEntry()"
+            style="width:100%;margin-top:4px">Save Transaction</button>
+        </div>
+      </div>
+
+      <!-- ── Puri list ── -->
+      <div class="task-table-card">
+        <div class="card-head" style="flex-wrap:wrap;gap:8px">
+          <div class="card-head-title">Transaction Records</div>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <input type="date" id="goldFrom" onchange="renderGold()" class="gold-filt" title="From date">
+            <span style="font-size:12px;color:#94a3b8">to</span>
+            <input type="date" id="goldTo" onchange="renderGold()" class="gold-filt" title="To date">
+            <button class="btn btn-outline" onclick="goldResetFilter()" style="font-size:12px;padding:5px 12px">Reset</button>
+          </div>
+        </div>
+        <div style="overflow-x:auto;max-height:560px;overflow-y:auto">
+          <table style="min-width:860px">
+            <thead style="position:sticky;top:0;z-index:2;background:#f8fafc">
+              <tr>
+                <th style="white-space:nowrap">Date</th>
+                <th style="white-space:nowrap">Type</th>
+                <th style="white-space:nowrap;text-align:right">Weight</th>
+                <th style="white-space:nowrap">Karat</th>
+                <th style="white-space:nowrap;text-align:right">Rate</th>
+                <th style="white-space:nowrap">Vendor</th>
+                <th style="white-space:nowrap">Image</th>
+                <th>Remarks</th>
+                <th style="white-space:nowrap">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="goldBody">
+              <tr><td colspan="9" class="empty">Loading&hellip;</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
 
 </div>
 
@@ -3371,6 +3526,11 @@ async function init() {
     if (ME.role === 'admin' || PC_EMAILS.includes((ME.email || '').trim().toLowerCase())) {
       document.getElementById('nav-crm').style.display = 'flex';
     }
+    // Gold System — server tay karta hai (goldAllowed). Purane deploy me
+    // flag na aaye to admin role se kaam chala lete hain.
+    const goldNav = document.getElementById('nav-gold');
+    if (goldNav) goldNav.style.display = (ME.goldSystem === true || ME.role === 'admin') ? 'flex' : 'none';
+
     // Maintenance tab kise dikhe (server ka maintView flag batata hai):
     //   'all'    = admin — dono view
     //   'main'   = Ashok — sirf Maintenance
@@ -3462,7 +3622,7 @@ function setMinDates() {
 // ══════════════════════════════════════════════════════
 // NAVIGATION
 // ══════════════════════════════════════════════════════
-const pageTitles = {dashboard:'Dashboard',alltasks:'All Tasks',approvals:'Approvals',users:'Users',profile:'Profile',mis:'MIS Report',fms:'FMS Admin','fms-tasks':'FMS Tasks','fms-tracking':'FMS Tracking',records:'Employee Records',leave:'Leave',crm:'PC',hrreport:'HR Reporting',maintenance:'Maintenance'};
+const pageTitles = {dashboard:'Dashboard',alltasks:'All Tasks',approvals:'Approvals',users:'Users',profile:'Profile',mis:'MIS Report',fms:'FMS Admin','fms-tasks':'FMS Tasks','fms-tracking':'FMS Tracking',records:'Employee Records',leave:'Leave',crm:'PC',hrreport:'HR Reporting',maintenance:'Maintenance',gold:'Gold System'};
 
 function navigate(page, el) {
   window._currentPage = page;
@@ -3488,6 +3648,7 @@ function navigate(page, el) {
   if (page==='mis') initMISDeptFilter();
   if (page==='records') loadRecords();
   if (page==='maintenance') loadMaintenance();
+  if (page==='gold') loadGold();
   window.scrollTo(0,0);
 }
 
@@ -7544,6 +7705,271 @@ function maintPdf() {
   w.document.open();
   w.document.write(html);
   w.document.close();
+}
+
+// ══════════════════════════════════════════════════════
+// GOLD SYSTEM — Gold Stock + Gold Wire Stock
+// ══════════════════════════════════════════════════════
+// Do alag khaate, dhaancha bilkul ek jaisa. Isliye ek hi set of functions
+// dono ko chalata hai -- _goldKind batata hai abhi kaun sa khula hai.
+// Har entry IN (aaya) ya OUT (gaya) hoti hai; Vendor sirf OUT me poochha
+// jaata hai (Harsh ke screenshot me bhi wahin dikhta hai).
+
+let _goldKind = 'stock';
+let _goldData = { rows: [], totalIn: 0, totalOut: 0, balance: 0 };
+let _goldType = 'IN';
+let _goldEditId = '';
+let _goldImg = { name: '', type: '', data: '' };
+
+const GOLD_NAAM = { stock: 'Gold Stock', wire: 'Gold Wire Stock' };
+
+// 0.56 -> "0.560 g"  (sona teen dashamlav tak tolta hai)
+function goldG(v) {
+  const x = Number(v) || 0;
+  return x.toLocaleString('en-IN', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + ' g';
+}
+
+function goldErr(msg) {
+  const el = document.getElementById('goldErr');
+  if (!el) return;
+  if (!msg) { el.style.display = 'none'; el.textContent = ''; return; }
+  el.textContent = msg; el.style.display = 'block';
+}
+
+function switchGoldTab(kind, el) {
+  _goldKind = (kind === 'wire') ? 'wire' : 'stock';
+  document.querySelectorAll('#goldTabs .tab').forEach(t => t.classList.remove('active'));
+  if (el) el.classList.add('active');
+  document.getElementById('goldHeading').textContent = GOLD_NAAM[_goldKind] + ' Management';
+  // Wire wale khaate me "Gold Wire" tolte hain, "Gold" nahi -- label bhi wahi
+  // bole, warna do alag cheezon ka ek hi naam dikhta hai (Harsh, 13 Oct)
+  document.getElementById('goldWeightLbl').textContent =
+    (_goldKind === 'wire') ? 'Weight of Gold Wire (grams)' : 'Weight of Gold (grams)';
+  document.getElementById('goldFormTitle').textContent = 'Add Stock Entry';
+  clearGoldForm();              // ek khaate ka adhoora form doosre me na chala jaye
+  // Purana date filter bhi hata do -- warna naye khaate me "No entries in
+  // this date range" dikhta hai aur lagta hai data hi nahi hai
+  ['goldFrom', 'goldTo'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  loadGold();
+}
+
+async function loadGold(force) {
+  const body = document.getElementById('goldBody');
+  if (body && !(_goldData.rows || []).length) body.innerHTML = '<tr><td colspan="9" class="empty">Loading…</td></tr>';
+  const d = document.getElementById('goldDate');
+  if (d && !d.value) d.value = aajKiDate();
+  try {
+    const r = await api('/api/gold/' + _goldKind + (force ? '?refresh=1' : ''));
+    if (!r || r.error) throw new Error((r && r.error) || 'Could not load');
+    _goldData = r;
+    renderGold();
+  } catch (e) {
+    _goldData = { rows: [], totalIn: 0, totalOut: 0, balance: 0 };
+    if (body) body.innerHTML = '<tr><td colspan="9" class="empty">⚠️ ' + maintEsc(e.message || 'Failed to load') + '</td></tr>';
+    showToast('Could not load ' + GOLD_NAAM[_goldKind] + ': ' + (e.message || ''), 'error');
+  }
+}
+
+// Filter sirf list par lagta hai -- teen card hamesha poora hisaab dikhate
+// hain, warna "abhi kitna sona hai" ka jawab filter ke saath badal jaata.
+function goldInRange(row) {
+  const f = (document.getElementById('goldFrom') || {}).value || '';
+  const t = (document.getElementById('goldTo') || {}).value || '';
+  const dt = String(row.date || '');
+  if (f && dt < f) return false;
+  if (t && dt > t) return false;
+  return true;
+}
+
+function goldResetFilter() {
+  ['goldFrom', 'goldTo'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  renderGold();
+}
+
+function renderGold() {
+  const d = _goldData;
+  document.getElementById('goldBal').textContent = goldG(d.balance);
+  document.getElementById('goldIn').textContent = goldG(d.totalIn);
+  document.getElementById('goldOut').textContent = goldG(d.totalOut);
+  const all = d.rows || [];
+  document.getElementById('goldInSub').textContent = all.filter(r => r.type === 'IN').length + ' entries';
+  document.getElementById('goldOutSub').textContent = all.filter(r => r.type === 'OUT').length + ' entries';
+  const balEl = document.getElementById('goldBal');
+  balEl.style.color = (Number(d.balance) || 0) < 0 ? '#dc2626' : '';
+
+  const rows = all.filter(goldInRange);
+  const body = document.getElementById('goldBody');
+  if (!rows.length) {
+    body.innerHTML = '<tr><td colspan="9" class="empty">' +
+      (all.length ? 'No entries in this date range' : 'No records found.') + '</td></tr>';
+    return;
+  }
+  body.innerHTML = rows.map(r =>
+    '<tr>' +
+    '<td data-lbl="Date" style="white-space:nowrap">' + maintDate(r.date) + '</td>' +
+    '<td data-lbl="Type"><span class="gold-chip ' + (r.type === 'OUT' ? 'out' : 'in') + '">' + r.type + '</span></td>' +
+    '<td data-lbl="Weight" style="white-space:nowrap;text-align:right;font-weight:700;color:' +
+      (r.type === 'OUT' ? '#dc2626' : '#16a34a') + '">' + goldG(r.weight) + '</td>' +
+    '<td data-lbl="Karat" style="white-space:nowrap">' + (r.karat ? maintEsc(r.karat) : '—') + '</td>' +
+    '<td data-lbl="Rate" style="white-space:nowrap;text-align:right">' +
+      (r.rate === '' || r.rate == null ? '—' : maintMoney(r.rate)) + '</td>' +
+    '<td data-lbl="Vendor">' + (r.vendor ? maintEsc(r.vendor) : '—') + '</td>' +
+    '<td data-lbl="Image" style="white-space:nowrap">' + (r.hasImage
+      ? '<button class="btn btn-outline" style="font-size:11px;padding:3px 8px" onclick="goldViewImage(\'' + r.id + '\')">📎 View</button>'
+      : '<span style="color:#cbd5e1">—</span>') + '</td>' +
+    '<td data-lbl="Remarks">' + (r.remarks ? maintEsc(r.remarks) : '<span style="color:#cbd5e1">—</span>') +
+      (r.by ? '<div style="font-size:10px;color:#94a3b8;margin-top:2px">— ' + maintEsc(r.by) + '</div>' : '') + '</td>' +
+    '<td style="white-space:nowrap">' +
+      '<button class="btn btn-outline" style="font-size:11px;padding:3px 8px" onclick="goldEdit(\'' + r.id + '\')" title="Edit">✏️</button> ' +
+      '<button class="btn btn-outline" style="font-size:11px;padding:3px 8px;color:#dc2626;border-color:#fecaca" onclick="goldDelete(\'' + r.id + '\')" title="Delete">🗑</button>' +
+    '</td></tr>').join('');
+}
+
+// IN / OUT — Vendor sirf OUT me poochha jaata hai
+function goldSetType(t) {
+  _goldType = (t === 'OUT') ? 'OUT' : 'IN';
+  document.getElementById('goldTypeIn').classList.toggle('on', _goldType === 'IN');
+  document.getElementById('goldTypeOut').classList.toggle('on', _goldType === 'OUT');
+  document.getElementById('goldVendorBlock').style.display = (_goldType === 'OUT') ? '' : 'none';
+}
+
+function onGoldImagePick() {
+  const inp = document.getElementById('goldImage');
+  const info = document.getElementById('goldImageInfo');
+  const f = inp.files && inp.files[0];
+  _goldImg = { name: '', type: '', data: '' };
+  if (!f) { info.textContent = ''; return; }
+  const MAX = 5 * 1024 * 1024;        // 5 MB se bada DB me bhaari padta hai
+  if (f.size > MAX) {
+    info.innerHTML = '<span style="color:#dc2626">⚠️ File is larger than 5MB — please pick a smaller one</span>';
+    inp.value = '';
+    return;
+  }
+  info.textContent = f.name + ' · ' + (f.size / 1024).toFixed(0) + ' KB — reading…';
+  const rd = new FileReader();
+  rd.onload = () => {
+    _goldImg = { name: f.name, type: f.type, data: String(rd.result || '') };
+    info.innerHTML = '✅ ' + maintEsc(f.name) + ' · ' + (f.size / 1024).toFixed(0) + ' KB';
+  };
+  rd.onerror = () => { info.innerHTML = '<span style="color:#dc2626">⚠️ Could not read the file</span>'; };
+  rd.readAsDataURL(f);
+}
+
+function clearGoldForm() {
+  _goldEditId = '';
+  _goldImg = { name: '', type: '', data: '' };
+  goldErr('');
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+  set('goldDate', aajKiDate());
+  set('goldWeight', '');
+  set('goldKarat', '24 Karat');
+  set('goldRate', '');
+  set('goldVendor', '');
+  set('goldRemarks', '');
+  set('goldImage', '');
+  const info = document.getElementById('goldImageInfo'); if (info) info.textContent = '';
+  goldSetType('IN');
+  document.getElementById('goldSaveBtn').textContent = 'Save Transaction';
+  document.getElementById('goldFormTitle').textContent = 'Add Stock Entry';
+  document.getElementById('goldCancelEdit').style.display = 'none';
+}
+
+async function saveGoldEntry() {
+  goldErr('');
+  const date = (document.getElementById('goldDate').value || '').trim();
+  const weight = document.getElementById('goldWeight').value;
+  if (!date) return goldErr('Date daalo');
+  if (!(Number(weight) > 0)) return goldErr('Weight 0 se zyada hona chahiye');
+
+  const payload = {
+    type: _goldType,
+    date: date,
+    weight: weight,
+    karat: document.getElementById('goldKarat').value,
+    rate: document.getElementById('goldRate').value,
+    vendor: document.getElementById('goldVendor').value,
+    remarks: document.getElementById('goldRemarks').value
+  };
+  // Nayi photo chuni ho to hi bhejte hain -- edit me na bhejo to purani bani rehti hai
+  if (_goldImg.data) {
+    payload.imageName = _goldImg.name;
+    payload.imageType = _goldImg.type;
+    payload.imageData = _goldImg.data;
+  }
+
+  const btn = document.getElementById('goldSaveBtn');
+  btn.disabled = true;
+  const purana = btn.textContent;
+  btn.textContent = 'Saving…';
+  try {
+    const url = '/api/gold/' + _goldKind + (_goldEditId ? '/' + _goldEditId : '');
+    const r = await api(url, _goldEditId ? 'PUT' : 'POST', payload);
+    if (!r || r.error) throw new Error((r && r.error) || 'Save failed');
+    showToast(_goldEditId ? '✅ Entry updated' : '✅ Entry saved', 'success');
+    clearGoldForm();
+    await loadGold(1);
+  } catch (e) {
+    goldErr(e.message || 'Save failed');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = _goldEditId ? purana : 'Save Transaction';
+  }
+}
+
+function goldEdit(id) {
+  const r = (_goldData.rows || []).find(x => String(x.id) === String(id));
+  if (!r) return;
+  _goldEditId = String(id);
+  _goldImg = { name: '', type: '', data: '' };   // nayi photo tabhi jab chuni jaye
+  goldErr('');
+  goldSetType(r.type);
+  document.getElementById('goldDate').value = String(r.date || '').slice(0, 10);
+  document.getElementById('goldWeight').value = r.weight;
+  document.getElementById('goldKarat').value = r.karat || '24 Karat';
+  document.getElementById('goldRate').value = (r.rate === '' || r.rate == null) ? '' : r.rate;
+  document.getElementById('goldVendor').value = r.vendor || '';
+  document.getElementById('goldRemarks').value = r.remarks || '';
+  document.getElementById('goldImage').value = '';
+  document.getElementById('goldImageInfo').innerHTML = r.hasImage
+    ? '<span style="color:#64748b">Purani photo lagi hai — nayi chuno to badal jayegi</span>' : '';
+  document.getElementById('goldSaveBtn').textContent = 'Update Transaction';
+  document.getElementById('goldFormTitle').textContent = 'Edit Stock Entry';
+  document.getElementById('goldCancelEdit').style.display = '';
+  document.getElementById('page-gold').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function goldDelete(id) {
+  if (!confirm('Delete this entry? Ye wapas nahi aayegi.')) return;
+  try {
+    const r = await api('/api/gold/' + _goldKind + '/' + id, 'DELETE');
+    if (r && r.error) throw new Error(r.error);
+    showToast('🗑 Entry deleted', 'success');
+    if (String(_goldEditId) === String(id)) clearGoldForm();
+    await loadGold(1);
+  } catch (e) {
+    showToast('Could not delete: ' + (e.message || ''), 'error');
+  }
+}
+
+// Photo dekhne ke liye Maintenance wala hi modal -- dobara banane ki zaroorat nahi
+async function goldViewImage(id) {
+  const row = (_goldData.rows || []).find(x => String(x.id) === String(id));
+  const modal = document.getElementById('maintImageModal');
+  const body = document.getElementById('maintImageBody');
+  // Naam yahin list se lete hain -- onclick me chipkane par apostrophe wale
+  // naam ("Ritika's ring.jpg") button hi tod dete the
+  document.getElementById('maintImageTitle').textContent = (row && row.imageName) || 'Picture';
+  body.innerHTML = '<div class="empty">Loading…</div>';
+  modal.classList.add('open');
+  try {
+    const r = await api('/api/gold/' + _goldKind + '/' + id + '/image');
+    if (!r || r.error || !r.data) throw new Error((r && r.error) || 'Image not found');
+    body.innerHTML = String(r.type || '').includes('pdf')
+      ? '<iframe src="' + r.data + '" style="width:100%;height:68vh;border:1px solid #e2e8f0;border-radius:8px"></iframe>'
+      : '<img src="' + r.data + '" style="max-width:100%;border-radius:8px"/>';
+  } catch (e) {
+    body.innerHTML = '<div class="empty">⚠️ ' + maintEsc(e.message || 'Image not found') + '</div>';
+  }
 }
 
 // Maintenance ke andar hi do view — alag sidebar tab nahi (Harsh, 29 Aug:

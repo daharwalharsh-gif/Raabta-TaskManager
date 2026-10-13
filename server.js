@@ -622,6 +622,41 @@ const MYSQL_SCHEMA = {
     created_by: "VARCHAR(20) DEFAULT ''",
     created_by_name: "VARCHAR(120) DEFAULT ''",
     created_at: "VARCHAR(40) DEFAULT ''"
+  },
+
+  // ── GOLD SYSTEM (Harsh, 13 Oct) ──────────────────────────────────
+  // Do alag khaate, dhaancha bilkul ek jaisa: Gold Stock aur Gold Wire
+  // Stock. Har row ek entry hai -- IN (aaya) ya OUT (gaya). Weight gram me
+  // rakhte hain, aur balance = sab IN ka jod minus sab OUT ka jod.
+  Gold_Stock: {
+    entry_type: "VARCHAR(5) DEFAULT 'IN'",      // IN = aaya, OUT = gaya
+    entry_date: "VARCHAR(20) DEFAULT ''",       // YYYY-MM-DD
+    weight: "VARCHAR(30) DEFAULT '0'",          // gram
+    karat: "VARCHAR(30) DEFAULT ''",            // 24 Karat waghairah
+    rate: "VARCHAR(30) DEFAULT ''",             // per gram
+    vendor: "VARCHAR(200) DEFAULT ''",          // sirf OUT wali entry me
+    remarks: "TEXT",
+    image_name: "VARCHAR(255) DEFAULT ''",
+    image_type: "VARCHAR(120) DEFAULT ''",
+    image_data: "LONGTEXT",                     // photo base64 (optional)
+    created_by: "VARCHAR(20) DEFAULT ''",
+    created_by_name: "VARCHAR(120) DEFAULT ''",
+    created_at: "VARCHAR(40) DEFAULT ''"
+  },
+  Gold_Wire_Stock: {
+    entry_type: "VARCHAR(5) DEFAULT 'IN'",      // IN = aaya, OUT = gaya
+    entry_date: "VARCHAR(20) DEFAULT ''",       // YYYY-MM-DD
+    weight: "VARCHAR(30) DEFAULT '0'",          // gram
+    karat: "VARCHAR(30) DEFAULT ''",            // 24 Karat waghairah
+    rate: "VARCHAR(30) DEFAULT ''",             // per gram
+    vendor: "VARCHAR(200) DEFAULT ''",          // sirf OUT wali entry me
+    remarks: "TEXT",
+    image_name: "VARCHAR(255) DEFAULT ''",
+    image_type: "VARCHAR(120) DEFAULT ''",
+    image_data: "LONGTEXT",                     // photo base64 (optional)
+    created_by: "VARCHAR(20) DEFAULT ''",
+    created_by_name: "VARCHAR(120) DEFAULT ''",
+    created_at: "VARCHAR(40) DEFAULT ''"
   }
 };
 
@@ -2162,6 +2197,8 @@ app.get('/api/me', requireAuth, async (req, res) => {
       // HR Reporting tab sirf Admin + HR ko (PC/HOD ko nahi)
       hrReport: isHrReportUser(user.role, user.email, user.notification_email),
       // Maintenance tab kis roop me dikhe — dekho maintAccessFor()
+      // Gold System kise dikhe -- abhi sirf admin (goldAllowed dekho)
+      goldSystem: goldAllowed(user),
       maintView: maintAccessFor(user).view,
       maintPerson: maintAccessFor(user).person
     });
@@ -7553,6 +7590,169 @@ app.post('/api/admin/run-wa-reminders', requireAuth, requireAdmin, async (req, r
     .then(r => console.log('  WA reminders (manual):', JSON.stringify(r)))
     .catch(e => console.error('  WA reminders (manual) error:', e.message));
   res.json({ started: true });
+});
+
+// ══════════════════════════════════════════════════════
+// GOLD SYSTEM — Gold Stock + Gold Wire Stock
+// ══════════════════════════════════════════════════════
+// Dono khaate ek jaise hain, isliye ek hi set of endpoints dono ko chalata
+// hai. URL me kaun sa khaata hai wo :kind batata hai.
+const GOLD_TABS = { stock: 'Gold_Stock', wire: 'Gold_Wire_Stock' };
+function goldTable(kind) { return GOLD_TABS[String(kind || '').toLowerCase()] || ''; }
+
+// "0.560" / "0.560 g" / khali -- sab se number nikal lo
+function goldNum(v) {
+  const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, ''));
+  return isFinite(n) ? n : 0;
+}
+
+// Gold System kise dikhe. Admin ko hamesha, aur is list wale logon ko --
+// Harsh, 13 Oct: "sirf admin aur Gurjeet ko". Email se milate hain, naam se
+// nahi: naam badal sakta hai, email nahi. Aage kisi aur ko dena ho to bas
+// yahan email jod do (app.html ka nav flag server ke isi jawab se chalta hai).
+const GOLD_EMAILS = ['gurjeet-inventory@raabtajewels.com'];
+function goldAllowed(user) {
+  if (String((user && user.role) || '') === 'admin') return true;
+  const em = String((user && user.email) || '').trim().toLowerCase();
+  return !!em && GOLD_EMAILS.includes(em);
+}
+
+// Ek row ko screen ke layak banao -- image_data kabhi list me nahi bhejte,
+// wo bhaari hota hai (Maintenance me yahi tareeka hai).
+function goldRowOut(r) {
+  return {
+    id: r.id,
+    type: (String(r.entry_type || 'IN').toUpperCase() === 'OUT') ? 'OUT' : 'IN',
+    date: r.entry_date || '',
+    weight: goldNum(r.weight),
+    karat: r.karat || '',
+    rate: r.rate === '' || r.rate == null ? '' : goldNum(r.rate),
+    vendor: r.vendor || '',
+    remarks: r.remarks || '',
+    hasImage: !!(r.image_data && String(r.image_data).length > 10),
+    imageName: r.image_name || '',
+    by: r.created_by_name || '',
+    createdAt: r.created_at || ''
+  };
+}
+
+app.get('/api/gold/:kind', requireAuth, async (req, res) => {
+  try {
+    const tab = goldTable(req.params.kind);
+    if (!tab) return res.status(400).json({ error: 'Galat khaata' });
+    const d = await getDB();
+    const me = await d.findOne('Users', { id: String(req.session.userId) });
+    if (!goldAllowed(me)) return res.status(403).json({ error: 'Not allowed' });
+
+    const raw = await d.findAll(tab).catch(() => []);
+    const rows = raw.map(goldRowOut)
+      // nayi entry sabse upar; ek hi din ki ho to baad me bani pehle
+      .sort((a, b) => String(b.date).localeCompare(String(a.date))
+                   || String(b.createdAt).localeCompare(String(a.createdAt)));
+    const totalIn = rows.filter(r => r.type === 'IN').reduce((s, r) => s + r.weight, 0);
+    const totalOut = rows.filter(r => r.type === 'OUT').reduce((s, r) => s + r.weight, 0);
+    res.json({ rows, totalIn, totalOut, balance: totalIn - totalOut });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Photo alag se -- list ko bhaari nahi karte
+app.get('/api/gold/:kind/:id/image', requireAuth, async (req, res) => {
+  try {
+    const tab = goldTable(req.params.kind);
+    if (!tab) return res.status(400).json({ error: 'Galat khaata' });
+    const d = await getDB();
+    const me = await d.findOne('Users', { id: String(req.session.userId) });
+    if (!goldAllowed(me)) return res.status(403).json({ error: 'Not allowed' });
+    const row = await d.findOne(tab, { id: String(req.params.id) });
+    if (!row || !row.image_data) return res.status(404).json({ error: 'Photo nahi hai' });
+    res.json({ name: row.image_name || '', type: row.image_type || '', data: row.image_data });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Nayi entry ke fields -- add aur edit dono yahin se bante hain, taaki
+// dono jagah ek hi niyam lage
+function goldFields(body) {
+  const type = (String(body.type || 'IN').toUpperCase() === 'OUT') ? 'OUT' : 'IN';
+  return {
+    entry_type: type,
+    entry_date: String(body.date || '').trim(),
+    weight: String(goldNum(body.weight)),
+    karat: String(body.karat || '').trim().slice(0, 28),
+    rate: String(body.rate || '').trim() === '' ? '' : String(goldNum(body.rate)),
+    // Vendor sirf OUT me rakhte hain -- IN me bhara bhi ho to gira dete hain,
+    // warna table me bemtlab naam dikhta
+    vendor: type === 'OUT' ? String(body.vendor || '').trim().slice(0, 190) : '',
+    remarks: String(body.remarks || '').trim()
+  };
+}
+
+function goldCheck(f) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(f.entry_date)) return 'Date sahi daalo';
+  if (goldNum(f.weight) <= 0) return 'Weight 0 se zyada hona chahiye';
+  return '';
+}
+
+app.post('/api/gold/:kind', requireAuth, async (req, res) => {
+  try {
+    const tab = goldTable(req.params.kind);
+    if (!tab) return res.status(400).json({ error: 'Galat khaata' });
+    const d = await getDB();
+    const me = await d.findOne('Users', { id: String(req.session.userId) });
+    if (!goldAllowed(me)) return res.status(403).json({ error: 'Not allowed' });
+
+    const f = goldFields(req.body || {});
+    const bura = goldCheck(f);
+    if (bura) return res.status(400).json({ error: bura });
+
+    const nowStr = new Date(Date.now() + 330 * 60000).toISOString().replace('T', ' ').split('.')[0];
+    const b = req.body || {};
+    const row = await d.insert(tab, Object.assign({}, f, {
+      image_name: String(b.imageName || '').slice(0, 250),
+      image_type: String(b.imageType || '').slice(0, 110),
+      image_data: String(b.imageData || ''),
+      created_by: String(req.session.userId || ''),
+      created_by_name: String(req.session.name || ''),
+      created_at: nowStr
+    }));
+    res.json({ success: true, id: row && row.id });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/gold/:kind/:id', requireAuth, async (req, res) => {
+  try {
+    const tab = goldTable(req.params.kind);
+    if (!tab) return res.status(400).json({ error: 'Galat khaata' });
+    const d = await getDB();
+    const me = await d.findOne('Users', { id: String(req.session.userId) });
+    if (!goldAllowed(me)) return res.status(403).json({ error: 'Not allowed' });
+
+    const f = goldFields(req.body || {});
+    const bura = goldCheck(f);
+    if (bura) return res.status(400).json({ error: bura });
+
+    const upd = Object.assign({}, f);
+    // Nayi photo aayi to hi badlo -- warna purani jyun ki tyun rehni chahiye
+    const b = req.body || {};
+    if (b.imageData) {
+      upd.image_name = String(b.imageName || '').slice(0, 250);
+      upd.image_type = String(b.imageType || '').slice(0, 110);
+      upd.image_data = String(b.imageData);
+    }
+    await d.update(tab, String(req.params.id), upd);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/gold/:kind/:id', requireAuth, async (req, res) => {
+  try {
+    const tab = goldTable(req.params.kind);
+    if (!tab) return res.status(400).json({ error: 'Galat khaata' });
+    const d = await getDB();
+    const me = await d.findOne('Users', { id: String(req.session.userId) });
+    if (!goldAllowed(me)) return res.status(403).json({ error: 'Not allowed' });
+    await d.delete(tab, String(req.params.id));
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ══════════════════════════════════════════════════════
