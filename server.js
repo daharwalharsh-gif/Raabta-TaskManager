@@ -7625,10 +7625,11 @@ function goldNum(v) {
 }
 
 // Gold System kise dikhe. Admin ko hamesha, aur is list wale logon ko --
-// Harsh, 13 Oct: "sirf admin aur Gurjeet ko". Email se milate hain, naam se
+// Harsh, 13 Oct: "sirf admin aur Gurjeet ko"; 14 Oct: Ashok Sn bhi
+// (ashok@raabtajewels.com). Email se milate hain, naam se
 // nahi: naam badal sakta hai, email nahi. Aage kisi aur ko dena ho to bas
 // yahan email jod do (app.html ka nav flag server ke isi jawab se chalta hai).
-const GOLD_EMAILS = ['gurjeet-inventory@raabtajewels.com'];
+const GOLD_EMAILS = ['gurjeet-inventory@raabtajewels.com', 'ashok@raabtajewels.com'];
 function goldAllowed(user) {
   if (String((user && user.role) || '') === 'admin') return true;
   const em = String((user && user.email) || '').trim().toLowerCase();

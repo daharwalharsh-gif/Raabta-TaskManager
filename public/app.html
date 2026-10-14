@@ -698,6 +698,82 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
   /* Maintenance 2 ke card me Received/Spent ki chhoti lines */
   #maintView2 .ov-card strong{font-size:11px !important;}
   #maintView2 .ov-card span{font-size:9px !important;}
+  /* ══════════════════════════════════════
+     GOLD SYSTEM — PHONE VIEW  (Harsh, 14 Oct)
+     Maintenance jaisa hi: table ki jagah har entry ek card. Column ka naam
+     har value ke saath chhote label me aata hai (data-lbl se).
+  ══════════════════════════════════════ */
+  /* Generic task-table ka "3rd/5th column chhupao" rule Gold par NA lage --
+     warna Weight aur Rate gayab ho jaate */
+  .gold-table thead th:nth-child(3),
+  .gold-table thead th:nth-child(5),
+  .gold-table tbody td:nth-child(3),
+  .gold-table tbody td:nth-child(5){display:block !important;}
+
+  .gold-table > div{overflow-x:visible !important;max-height:none !important;}
+  .gold-table table{min-width:unset !important;width:100% !important;}
+  .gold-table thead{display:none !important;}
+  .gold-table table,.gold-table tbody,.gold-table tr,.gold-table td{
+    display:block !important;width:auto !important;
+  }
+  .gold-table tbody tr{
+    background:#fff;border-radius:14px;
+    border:1px solid #e8edf4 !important;
+    margin:0 12px 10px;padding:12px 14px 12px 16px;
+    box-shadow:0 2px 10px rgba(0,0,0,.06);
+    position:relative;overflow:hidden;
+  }
+  .gold-table tbody tr::before{
+    content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
+    background:linear-gradient(180deg,#10b981,#34d399);
+  }
+  .gold-table tbody td{
+    border:none !important;padding:2px 0 !important;
+    font-size:12px;color:#475569;line-height:1.5;overflow-wrap:anywhere;
+  }
+  /* Remarks poora dikhe (generic rule dusre column par ellipsis lagata hai) */
+  .gold-table tbody td{max-width:none !important;overflow:visible !important;
+    text-overflow:clip !important;white-space:normal !important;}
+  .gold-table tbody td[data-lbl]{
+    position:relative;padding-left:72px !important;min-height:16px;
+  }
+  .gold-table tbody td[data-lbl]::before{
+    content:attr(data-lbl);position:absolute;left:0;top:3px;width:66px;
+    font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;line-height:1.4;
+  }
+  /* Weight card ka main number */
+  .gold-table tbody td[data-lbl="Weight"]{
+    font-size:17px !important;font-weight:800 !important;
+    text-align:left !important;padding-top:4px !important;
+  }
+  .gold-table tbody td[data-lbl="Weight"]::before{top:8px;}
+  /* Rate bhi dahine nahi, baayein se -- card me sab ek seedh me */
+  .gold-table tbody td[data-lbl="Rate"]{text-align:left !important;}
+  /* Khali row (No records / Loading) card na bane */
+  .gold-table tbody td.empty{
+    text-align:center !important;padding:22px 8px !important;font-size:12px;color:#94a3b8;
+  }
+  .gold-table tbody tr:has(td.empty){
+    background:transparent;border:none !important;box-shadow:none;margin:0;padding:0;
+  }
+  .gold-table tbody tr:has(td.empty)::before{display:none;}
+  /* Edit / Delete ungli se dabane layak */
+  .gold-table tbody td .btn{
+    font-size:12px !important;padding:6px 12px !important;margin-top:4px;border-radius:8px;
+  }
+  /* OUT wali entry laal patti */
+  .gold-table tbody tr.gold-out::before{background:linear-gradient(180deg,#ef4444,#f87171);}
+
+  /* Gold ke apne teen card -- ek line me teen, jaise Maintenance me */
+  #page-gold .overview-cards{gap:8px;}
+  #page-gold .ov-card{padding:12px 5px;}
+  #page-gold .ov-card .label{font-size:8px;letter-spacing:.3px;line-height:1.25;}
+  #page-gold .ov-card .number{font-size:15px;word-break:break-all;}
+  #page-gold .ov-card .number + div{font-size:8px !important;}
+  /* Form poori chaudai le, aur date/filter wali patti sikud kar ek ke neeche */
+  #page-gold .gold-inp{font-size:16px;}   /* iPhone 16px se chhota text par zoom kar deta hai */
+  #page-gold .card-head > div:last-child{width:100%;}
+  #page-gold .gold-filt{flex:1;min-width:0;}
 
   /* Maintenance / Maintenance 2 ke button — poori chaudai me do */
   #maintViewTabs{display:flex;width:100%;gap:8px;margin-bottom:14px;}
@@ -1037,6 +1113,10 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     <button class="mob-nav-item" id="mob-maintenance" style="display:none" onclick="navigate('maintenance',this);setMobActive(this)">
       <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
       <span class="mob-nav-label">Cash</span>
+    </button>
+    <button class="mob-nav-item" id="mob-gold" style="display:none" onclick="navigate('gold',this);setMobActive(this)">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3l2.3 4.6 5.2 .8-3.8 3.6.9 5.1L12 14.7 7.4 17.1l.9-5.1L4.5 8.4l5.2-.8L12 3z"/></svg>
+      <span class="mob-nav-label">Gold</span>
     </button>
     <button class="mob-nav-item" id="mob-profile" onclick="navigate('profile',this);setMobActive(this)">
       <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
@@ -2157,7 +2237,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       </div>
 
       <!-- ── Puri list ── -->
-      <div class="task-table-card">
+      <div class="task-table-card gold-table">
         <div class="card-head" style="flex-wrap:wrap;gap:8px">
           <div class="card-head-title">Transaction Records</div>
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
@@ -3531,7 +3611,13 @@ async function init() {
     // Gold System — server tay karta hai (goldAllowed). Purane deploy me
     // flag na aaye to admin role se kaam chala lete hain.
     const goldNav = document.getElementById('nav-gold');
-    if (goldNav) goldNav.style.display = (ME.goldSystem === true || ME.role === 'admin') ? 'flex' : 'none';
+    const goldOK = (ME.goldSystem === true || ME.role === 'admin');
+    if (goldNav) goldNav.style.display = goldOK ? 'flex' : 'none';
+    // Phone par sidebar hota hi nahi -- wahan bottom-nav ka button chahiye.
+    // Pehle ye button tha hi nahi, isliye phone par Gold tab dikhta nahi tha
+    // (Harsh, 14 Oct). Same flag, taaki dono jagah ek hi log dekhein.
+    const goldMob = document.getElementById('mob-gold');
+    if (goldMob) goldMob.style.display = goldOK ? 'flex' : 'none';
 
     // Maintenance tab kise dikhe (server ka maintView flag batata hai):
     //   'all'    = admin — dono view
@@ -3634,7 +3720,7 @@ function navigate(page, el) {
   if (el && el.classList.contains('nav-item')) el.classList.add('active');
   document.getElementById('topbarTitle').textContent = pageTitles[page] || page;
   // Sync mobile bottom nav active state
-  const mobMap = {dashboard:'mob-dashboard',alltasks:'mob-alltasks','fms-tasks':'mob-fms-tasks',approvals:'mob-approvals',users:'mob-users',mis:'mob-mis',profile:'mob-profile',leave:'mob-leave',maintenance:'mob-maintenance'};
+  const mobMap = {dashboard:'mob-dashboard',alltasks:'mob-alltasks','fms-tasks':'mob-fms-tasks',approvals:'mob-approvals',users:'mob-users',mis:'mob-mis',profile:'mob-profile',leave:'mob-leave',maintenance:'mob-maintenance',gold:'mob-gold'};
   document.querySelectorAll('.mob-nav-item').forEach(b=>b.classList.remove('active'));
   if (mobMap[page]) { const mb=document.getElementById(mobMap[page]); if(mb) mb.classList.add('active'); }
   if (page==='dashboard') loadDashboard();
@@ -7808,6 +7894,10 @@ function switchGoldTab(kind, el) {
   document.querySelectorAll('#goldTabs .tab').forEach(t => t.classList.remove('active'));
   if (el) el.classList.add('active');
   goldApplyCfg();
+  // Purane khaate ka data turant hata do. Warna naya data aane tak (ya load
+  // fail ho jaye to hamesha) Silver ke heading ke neeche Gold ka balance dikhta
+  _goldData = { rows: [], totalIn: 0, totalOut: 0, balance: 0 };
+  renderGold();
   document.getElementById('goldFormTitle').textContent = 'Add Stock Entry';
   clearGoldForm();              // ek khaate ka adhoora form doosre me na chala jaye
   // Purana date filter bhi hata do -- warna naye khaate me "No entries in
@@ -7821,12 +7911,17 @@ async function loadGold(force) {
   if (body && !(_goldData.rows || []).length) body.innerHTML = '<tr><td colspan="9" class="empty">Loading…</td></tr>';
   const d = document.getElementById('goldDate');
   if (d && !d.value) d.value = aajKiDate();
+  // Jis khaate ke liye maanga, wahi yaad rakho. Stock -> Wire -> Silver jaldi
+  // badlo to Stock ka slow jawab baad me aakar Silver ka data kuchal sakta tha.
+  const maangaKhaata = _goldKind;
   try {
-    const r = await api('/api/gold/' + _goldKind + (force ? '?refresh=1' : ''));
+    const r = await api('/api/gold/' + maangaKhaata + (force ? '?refresh=1' : ''));
+    if (maangaKhaata !== _goldKind) return;      // tab tab tak badal chuka -- ye jawab purana hai
     if (!r || r.error) throw new Error((r && r.error) || 'Could not load');
     _goldData = r;
     renderGold();
   } catch (e) {
+    if (maangaKhaata !== _goldKind) return;
     _goldData = { rows: [], totalIn: 0, totalOut: 0, balance: 0 };
     if (body) body.innerHTML = '<tr><td colspan="9" class="empty">⚠️ ' + maintEsc(e.message || 'Failed to load') + '</td></tr>';
     showToast('Could not load ' + (GOLD_CFG[_goldKind] || GOLD_CFG.stock).naam + ': ' + (e.message || ''), 'error');
@@ -7836,8 +7931,11 @@ async function loadGold(force) {
 // Filter sirf list par lagta hai -- teen card hamesha poora hisaab dikhate
 // hain, warna "abhi kitna sona hai" ka jawab filter ke saath badal jaata.
 function goldInRange(row) {
-  const f = (document.getElementById('goldFrom') || {}).value || '';
-  const t = (document.getElementById('goldTo') || {}).value || '';
+  let f = (document.getElementById('goldFrom') || {}).value || '';
+  let t = (document.getElementById('goldTo') || {}).value || '';
+  // Ulta bhar diya (From > To) to list khali dikhti hai aur lagta hai data
+  // gayab hai -- Maintenance ke filter ki tarah yahan bhi seedha kar do
+  if (f && t && f > t) { const x = f; f = t; t = x; }
   const dt = String(row.date || '');
   if (f && dt < f) return false;
   if (t && dt > t) return false;
@@ -7868,7 +7966,7 @@ function renderGold() {
     return;
   }
   body.innerHTML = rows.map(r =>
-    '<tr>' +
+    '<tr class="' + (r.type === 'OUT' ? 'gold-out' : '') + '">' +
     '<td data-lbl="Date" style="white-space:nowrap">' + maintDate(r.date) + '</td>' +
     '<td data-lbl="Type"><span class="gold-chip ' + (r.type === 'OUT' ? 'out' : 'in') + '">' + r.type + '</span></td>' +
     '<td data-lbl="Weight" style="white-space:nowrap;text-align:right;font-weight:700;color:' +
@@ -7876,7 +7974,8 @@ function renderGold() {
     '<td data-lbl="Karat" style="white-space:nowrap">' + (r.karat ? maintEsc(r.karat) : '—') + '</td>' +
     '<td data-lbl="Rate" class="gold-c-rate" style="white-space:nowrap;text-align:right">' +
       (r.rate === '' || r.rate == null ? '—' : maintMoney(r.rate)) + '</td>' +
-    '<td data-lbl="Vendor">' + (r.vendor ? maintEsc(r.vendor) : '—') + '</td>' +
+    '<td data-lbl="' + (_goldKind === 'silver' ? (r.type === 'OUT' ? 'Karigar' : 'Vendor') : 'Vendor') + '">' +
+      (r.vendor ? maintEsc(r.vendor) : '—') + '</td>' +
     '<td data-lbl="Image" class="gold-c-img" style="white-space:nowrap">' + (r.hasImage
       ? '<button class="btn btn-outline" style="font-size:11px;padding:3px 8px" onclick="goldViewImage(\'' + r.id + '\')">📎 View</button>'
       : '<span style="color:#cbd5e1">—</span>') + '</td>' +
