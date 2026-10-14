@@ -643,6 +643,24 @@ const MYSQL_SCHEMA = {
     created_by_name: "VARCHAR(120) DEFAULT ''",
     created_at: "VARCHAR(40) DEFAULT ''"
   },
+  // Silver ka khaata. Dhaancha wahi hai, par naam alag padte hain:
+  //   karat  = Purity (92.5 / 999)
+  //   vendor = IN me Vendor ka naam, OUT me Karigar ka naam
+  Silver_Stock: {
+    entry_type: "VARCHAR(5) DEFAULT 'IN'",      // IN = aaya, OUT = gaya
+    entry_date: "VARCHAR(20) DEFAULT ''",       // YYYY-MM-DD
+    weight: "VARCHAR(30) DEFAULT '0'",          // gram
+    karat: "VARCHAR(30) DEFAULT ''",            // Purity -- 92.5 ya 999
+    rate: "VARCHAR(30) DEFAULT ''",             // Silver me nahi poochhte, jagah rakhi hai
+    vendor: "VARCHAR(200) DEFAULT ''",          // IN = Vendor, OUT = Karigar
+    remarks: "TEXT",
+    image_name: "VARCHAR(255) DEFAULT ''",
+    image_type: "VARCHAR(120) DEFAULT ''",
+    image_data: "LONGTEXT",
+    created_by: "VARCHAR(20) DEFAULT ''",
+    created_by_name: "VARCHAR(120) DEFAULT ''",
+    created_at: "VARCHAR(40) DEFAULT ''"
+  },
   Gold_Wire_Stock: {
     entry_type: "VARCHAR(5) DEFAULT 'IN'",      // IN = aaya, OUT = gaya
     entry_date: "VARCHAR(20) DEFAULT ''",       // YYYY-MM-DD
@@ -7597,7 +7615,7 @@ app.post('/api/admin/run-wa-reminders', requireAuth, requireAdmin, async (req, r
 // ══════════════════════════════════════════════════════
 // Dono khaate ek jaise hain, isliye ek hi set of endpoints dono ko chalata
 // hai. URL me kaun sa khaata hai wo :kind batata hai.
-const GOLD_TABS = { stock: 'Gold_Stock', wire: 'Gold_Wire_Stock' };
+const GOLD_TABS = { stock: 'Gold_Stock', wire: 'Gold_Wire_Stock', silver: 'Silver_Stock' };
 function goldTable(kind) { return GOLD_TABS[String(kind || '').toLowerCase()] || ''; }
 
 // "0.560" / "0.560 g" / khali -- sab se number nikal lo
@@ -7671,17 +7689,18 @@ app.get('/api/gold/:kind/:id/image', requireAuth, async (req, res) => {
 
 // Nayi entry ke fields -- add aur edit dono yahin se bante hain, taaki
 // dono jagah ek hi niyam lage
-function goldFields(body) {
+function goldFields(body, kind) {
   const type = (String(body.type || 'IN').toUpperCase() === 'OUT') ? 'OUT' : 'IN';
+  // Gold/Wire: naam sirf OUT me (Vendor). Silver: dono me (IN = Vendor,
+  // OUT = Karigar) -- isliye wahan IN ka naam girana galat hoga.
+  const naamChahiye = (String(kind) === 'silver') || (type === 'OUT');
   return {
     entry_type: type,
     entry_date: String(body.date || '').trim(),
     weight: String(goldNum(body.weight)),
     karat: String(body.karat || '').trim().slice(0, 28),
     rate: String(body.rate || '').trim() === '' ? '' : String(goldNum(body.rate)),
-    // Vendor sirf OUT me rakhte hain -- IN me bhara bhi ho to gira dete hain,
-    // warna table me bemtlab naam dikhta
-    vendor: type === 'OUT' ? String(body.vendor || '').trim().slice(0, 190) : '',
+    vendor: naamChahiye ? String(body.vendor || '').trim().slice(0, 190) : '',
     remarks: String(body.remarks || '').trim()
   };
 }
@@ -7700,7 +7719,7 @@ app.post('/api/gold/:kind', requireAuth, async (req, res) => {
     const me = await d.findOne('Users', { id: String(req.session.userId) });
     if (!goldAllowed(me)) return res.status(403).json({ error: 'Not allowed' });
 
-    const f = goldFields(req.body || {});
+    const f = goldFields(req.body || {}, req.params.kind);
     const bura = goldCheck(f);
     if (bura) return res.status(400).json({ error: bura });
 
@@ -7726,7 +7745,7 @@ app.put('/api/gold/:kind/:id', requireAuth, async (req, res) => {
     const me = await d.findOne('Users', { id: String(req.session.userId) });
     if (!goldAllowed(me)) return res.status(403).json({ error: 'Not allowed' });
 
-    const f = goldFields(req.body || {});
+    const f = goldFields(req.body || {}, req.params.kind);
     const bura = goldCheck(f);
     if (bura) return res.status(400).json({ error: bura });
 

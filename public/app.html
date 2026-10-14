@@ -32,6 +32,10 @@ textarea.gold-inp{resize:vertical;}
    na ho. Andar table 860px chaudi hai, isliye poora page daayein khisak kar
    kat raha tha -- sidebar aur topbar tak kat gaye the (Harsh, 13 Oct).
    Ab column sikud jaata hai aur table apne hi dibbe me scroll hoti hai. */
+/* Silver me rate aur photo poochhte hi nahi -- to table me unke column bhi
+   nahi dikhne chahiye, warna poori list me sirf "—" bharta hai */
+#page-gold.hide-rate .gold-c-rate{display:none;}
+#page-gold.hide-pic .gold-c-img{display:none;}
 #goldGrid{min-width:0;}
 #goldGrid > *{min-width:0;}
 #goldGrid table{width:100%;}
@@ -2079,6 +2083,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     <div class="tab-group" id="goldTabs" style="margin-bottom:16px">
       <div class="tab active" id="goldTabStock" onclick="switchGoldTab('stock',this)">Gold Stock</div>
       <div class="tab" id="goldTabWire" onclick="switchGoldTab('wire',this)">Gold Wire Stock</div>
+      <div class="tab" id="goldTabSilver" onclick="switchGoldTab('silver',this)">Silver</div>
     </div>
 
     <!-- Teen card: abhi kitna hai / kitna aaya / kitna gaya -->
@@ -2124,29 +2129,26 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
           <label class="gold-lbl" id="goldWeightLbl">Weight of Gold (grams)</label>
           <input type="number" id="goldWeight" class="gold-inp" step="0.001" min="0" placeholder="0.000">
 
-          <label class="gold-lbl">Purity / Karat (kt/ct)</label>
-          <select id="goldKarat" class="gold-inp">
-            <option>24 Karat</option>
-            <option>22 Karat</option>
-            <option>20 Karat</option>
-            <option>18 Karat</option>
-            <option>14 Karat</option>
-            <option>9 Karat</option>
-          </select>
+          <label class="gold-lbl" id="goldKaratLbl">Purity / Karat (kt/ct)</label>
+          <select id="goldKarat" class="gold-inp"></select>
 
-          <label class="gold-lbl">Rate of Gold (per gram)</label>
-          <input type="number" id="goldRate" class="gold-inp" step="0.01" min="0" placeholder="&#8377; 0.00">
-
-          <label class="gold-lbl">Upload Picture</label>
-          <input type="file" id="goldImage" accept="image/*,application/pdf" onchange="onGoldImagePick()" class="gold-inp">
-          <div id="goldImageInfo" style="font-size:11px;color:#94a3b8;margin:-6px 0 12px"></div>
-
-          <div id="goldVendorBlock" style="display:none">
-            <label class="gold-lbl">Vendor Name</label>
-            <input type="text" id="goldVendor" class="gold-inp" placeholder="Enter Vendor Name">
+          <div id="goldRateBlock">
+            <label class="gold-lbl">Rate of Gold (per gram)</label>
+            <input type="number" id="goldRate" class="gold-inp" step="0.01" min="0" placeholder="&#8377; 0.00">
           </div>
 
-          <label class="gold-lbl">Remarks / Additional Comment</label>
+          <div id="goldPicBlock">
+            <label class="gold-lbl">Upload Picture</label>
+            <input type="file" id="goldImage" accept="image/*,application/pdf" onchange="onGoldImagePick()" class="gold-inp">
+            <div id="goldImageInfo" style="font-size:11px;color:#94a3b8;margin:-6px 0 12px"></div>
+          </div>
+
+          <div id="goldVendorBlock" style="display:none">
+            <label class="gold-lbl" id="goldVendorLbl">Vendor Name</label>
+            <input type="text" id="goldVendor" class="gold-inp" placeholder="Enter name">
+          </div>
+
+          <label class="gold-lbl" id="goldRemarkLbl">Remarks / Additional Comment</label>
           <textarea id="goldRemarks" class="gold-inp" rows="3" placeholder="Optional comments..."></textarea>
 
           <button class="btn btn-primary" id="goldSaveBtn" onclick="saveGoldEntry()"
@@ -2173,9 +2175,9 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
                 <th style="white-space:nowrap">Type</th>
                 <th style="white-space:nowrap;text-align:right">Weight</th>
                 <th style="white-space:nowrap">Karat</th>
-                <th style="white-space:nowrap;text-align:right">Rate</th>
-                <th style="white-space:nowrap">Vendor</th>
-                <th style="white-space:nowrap">Image</th>
+                <th class="gold-c-rate" style="white-space:nowrap;text-align:right">Rate</th>
+                <th id="goldThVendor" style="white-space:nowrap">Vendor</th>
+                <th class="gold-c-img" style="white-space:nowrap">Image</th>
                 <th>Remarks</th>
                 <th style="white-space:nowrap">Actions</th>
               </tr>
@@ -7721,7 +7723,72 @@ let _goldType = 'IN';
 let _goldEditId = '';
 let _goldImg = { name: '', type: '', data: '' };
 
-const GOLD_NAAM = { stock: 'Gold Stock', wire: 'Gold Wire Stock' };
+// Har khaate ka apna naksha. Silver me label IN aur OUT par ALAG hote hain
+// (IN par Vendor se aata hai, OUT par Karigar ko jaata hai), isliye har label
+// { IN, OUT } ki jodi hai. rate/pic false ho to wo field aur table ka column
+// dono gayab -- Silver me ye poochhe hi nahi jaate (Harsh, 13 Oct).
+const GOLD_CFG = {
+  stock: {
+    naam: 'Gold Stock',
+    weight:   { IN: 'Weight of Gold (grams)', OUT: 'Weight of Gold (grams)' },
+    naamLbl:  { IN: '', OUT: 'Vendor Name' },          // khali = ye khana dikhega hi nahi
+    remark:   { IN: 'Remarks / Additional Comment', OUT: 'Remarks / Additional Comment' },
+    purityLbl: 'Purity / Karat (kt/ct)',
+    purity: ['24 Karat', '22 Karat', '20 Karat', '18 Karat', '14 Karat', '9 Karat'],
+    naamCol: 'Vendor', rate: true, pic: true
+  },
+  wire: {
+    naam: 'Gold Wire Stock',
+    weight:   { IN: 'Weight of Gold Wire (grams)', OUT: 'Weight of Gold Wire (grams)' },
+    naamLbl:  { IN: '', OUT: 'Vendor Name' },
+    remark:   { IN: 'Remarks / Additional Comment', OUT: 'Remarks / Additional Comment' },
+    purityLbl: 'Purity / Karat (kt/ct)',
+    purity: ['24 Karat', '22 Karat', '20 Karat', '18 Karat', '14 Karat', '9 Karat'],
+    naamCol: 'Vendor', rate: true, pic: true
+  },
+  silver: {
+    naam: 'Silver',
+    weight:   { IN: 'Silver Weight (grams)', OUT: 'Issue Weight (Gram)' },
+    naamLbl:  { IN: 'Vendor Name', OUT: 'Karigar Name' },
+    remark:   { IN: 'Remark / Purpose', OUT: 'Remark' },
+    purityLbl: 'Purity',
+    purity: ['92.5', '999'],
+    // Rate Silver me nahi poochhte, par photo/PDF chahiye (Harsh, 14 Oct)
+    naamCol: 'Vendor / Karigar', rate: false, pic: true
+  }
+};
+
+// Chune hue khaate aur IN/OUT ke hisaab se poora form set kar do
+function goldApplyCfg() {
+  const c = GOLD_CFG[_goldKind] || GOLD_CFG.stock;
+  const t = _goldType;
+  document.getElementById('goldHeading').textContent = c.naam + ' Management';
+  document.getElementById('goldWeightLbl').textContent = c.weight[t];
+  document.getElementById('goldKaratLbl').textContent = c.purityLbl;
+  document.getElementById('goldRemarkLbl').textContent = c.remark[t];
+  document.getElementById('goldThVendor').textContent = c.naamCol;
+
+  // Naam ka khana -- Gold me sirf OUT par (Vendor), Silver me dono par
+  const lbl = c.naamLbl[t];
+  document.getElementById('goldVendorBlock').style.display = lbl ? '' : 'none';
+  if (lbl) {
+    document.getElementById('goldVendorLbl').textContent = lbl;
+    document.getElementById('goldVendor').placeholder = 'Enter ' + lbl;
+  }
+
+  // Rate aur photo -- form me bhi, table ke column me bhi
+  document.getElementById('goldRateBlock').style.display = c.rate ? '' : 'none';
+  document.getElementById('goldPicBlock').style.display = c.pic ? '' : 'none';
+  const pg = document.getElementById('page-gold');
+  pg.classList.toggle('hide-rate', !c.rate);
+  pg.classList.toggle('hide-pic', !c.pic);
+
+  // Purity ki list. Pehle se chuni hui nayi list me bhi ho to wahi rehne do.
+  const sel = document.getElementById('goldKarat');
+  const pehle = sel.value;
+  sel.innerHTML = c.purity.map(p => '<option>' + p + '</option>').join('');
+  if (c.purity.indexOf(pehle) >= 0) sel.value = pehle;
+}
 
 // 0.56 -> "0.560 g"  (sona teen dashamlav tak tolta hai)
 function goldG(v) {
@@ -7737,14 +7804,10 @@ function goldErr(msg) {
 }
 
 function switchGoldTab(kind, el) {
-  _goldKind = (kind === 'wire') ? 'wire' : 'stock';
+  _goldKind = GOLD_CFG[kind] ? kind : 'stock';
   document.querySelectorAll('#goldTabs .tab').forEach(t => t.classList.remove('active'));
   if (el) el.classList.add('active');
-  document.getElementById('goldHeading').textContent = GOLD_NAAM[_goldKind] + ' Management';
-  // Wire wale khaate me "Gold Wire" tolte hain, "Gold" nahi -- label bhi wahi
-  // bole, warna do alag cheezon ka ek hi naam dikhta hai (Harsh, 13 Oct)
-  document.getElementById('goldWeightLbl').textContent =
-    (_goldKind === 'wire') ? 'Weight of Gold Wire (grams)' : 'Weight of Gold (grams)';
+  goldApplyCfg();
   document.getElementById('goldFormTitle').textContent = 'Add Stock Entry';
   clearGoldForm();              // ek khaate ka adhoora form doosre me na chala jaye
   // Purana date filter bhi hata do -- warna naye khaate me "No entries in
@@ -7766,7 +7829,7 @@ async function loadGold(force) {
   } catch (e) {
     _goldData = { rows: [], totalIn: 0, totalOut: 0, balance: 0 };
     if (body) body.innerHTML = '<tr><td colspan="9" class="empty">⚠️ ' + maintEsc(e.message || 'Failed to load') + '</td></tr>';
-    showToast('Could not load ' + GOLD_NAAM[_goldKind] + ': ' + (e.message || ''), 'error');
+    showToast('Could not load ' + (GOLD_CFG[_goldKind] || GOLD_CFG.stock).naam + ': ' + (e.message || ''), 'error');
   }
 }
 
@@ -7811,10 +7874,10 @@ function renderGold() {
     '<td data-lbl="Weight" style="white-space:nowrap;text-align:right;font-weight:700;color:' +
       (r.type === 'OUT' ? '#dc2626' : '#16a34a') + '">' + goldG(r.weight) + '</td>' +
     '<td data-lbl="Karat" style="white-space:nowrap">' + (r.karat ? maintEsc(r.karat) : '—') + '</td>' +
-    '<td data-lbl="Rate" style="white-space:nowrap;text-align:right">' +
+    '<td data-lbl="Rate" class="gold-c-rate" style="white-space:nowrap;text-align:right">' +
       (r.rate === '' || r.rate == null ? '—' : maintMoney(r.rate)) + '</td>' +
     '<td data-lbl="Vendor">' + (r.vendor ? maintEsc(r.vendor) : '—') + '</td>' +
-    '<td data-lbl="Image" style="white-space:nowrap">' + (r.hasImage
+    '<td data-lbl="Image" class="gold-c-img" style="white-space:nowrap">' + (r.hasImage
       ? '<button class="btn btn-outline" style="font-size:11px;padding:3px 8px" onclick="goldViewImage(\'' + r.id + '\')">📎 View</button>'
       : '<span style="color:#cbd5e1">—</span>') + '</td>' +
     '<td data-lbl="Remarks">' + (r.remarks ? maintEsc(r.remarks) : '<span style="color:#cbd5e1">—</span>') +
@@ -7830,7 +7893,7 @@ function goldSetType(t) {
   _goldType = (t === 'OUT') ? 'OUT' : 'IN';
   document.getElementById('goldTypeIn').classList.toggle('on', _goldType === 'IN');
   document.getElementById('goldTypeOut').classList.toggle('on', _goldType === 'OUT');
-  document.getElementById('goldVendorBlock').style.display = (_goldType === 'OUT') ? '' : 'none';
+  goldApplyCfg();          // Silver me label IN/OUT par badalte hain
 }
 
 function onGoldImagePick() {
@@ -7862,13 +7925,14 @@ function clearGoldForm() {
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
   set('goldDate', aajKiDate());
   set('goldWeight', '');
-  set('goldKarat', '24 Karat');
   set('goldRate', '');
   set('goldVendor', '');
   set('goldRemarks', '');
   set('goldImage', '');
   const info = document.getElementById('goldImageInfo'); if (info) info.textContent = '';
-  goldSetType('IN');
+  goldSetType('IN');        // ye goldApplyCfg bhi chala deta hai
+  const pl = (GOLD_CFG[_goldKind] || GOLD_CFG.stock).purity;
+  set('goldKarat', pl[0]);  // us khaate ki pehli purity
   document.getElementById('goldSaveBtn').textContent = 'Save Transaction';
   document.getElementById('goldFormTitle').textContent = 'Add Stock Entry';
   document.getElementById('goldCancelEdit').style.display = 'none';
@@ -7925,7 +7989,7 @@ function goldEdit(id) {
   goldSetType(r.type);
   document.getElementById('goldDate').value = String(r.date || '').slice(0, 10);
   document.getElementById('goldWeight').value = r.weight;
-  document.getElementById('goldKarat').value = r.karat || '24 Karat';
+  if (r.karat) document.getElementById('goldKarat').value = r.karat;   // list me ho to chun jayegi
   document.getElementById('goldRate').value = (r.rate === '' || r.rate == null) ? '' : r.rate;
   document.getElementById('goldVendor').value = r.vendor || '';
   document.getElementById('goldRemarks').value = r.remarks || '';
