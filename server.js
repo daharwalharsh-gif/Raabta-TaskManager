@@ -3556,6 +3556,66 @@ async function resyncChecklistDoerLabels() {
 // Ye jaan-boojh kar tang rakha hai (sirf yahi naam + yahi id), taaki koi
 // aur row galti se na chhoo jaye. Galat nikle to Edit Task me Doer badal
 // kar kabhi bhi palta ja sakta hai.
+// ── Mumbai SM ke task ka label wapas "Mumbai SM" (14 Oct) ────────────
+// phpMyAdmin me galti se ye query chal gayi thi:
+//   UPDATE Checklist_Tasks SET doer_name = 'Akshatha Pillai'
+//   WHERE doer_name LIKE '%Mumbai SM%'
+// Isse 217 rows ka NAAM badla, par task Mumbai SM (assigned_to) ke paas hi
+// rahe -- yaani "likha Akshatha, dikh Mumbai SM ko raha" wali gadbad bani.
+// Harsh ne kaha: label wapas kar do. Yahi karte hain, aur kuch nahi.
+//
+// Kitna sakht dhaancha:
+//   * sirf Checklist_Tasks ka doer_name likhte hain; assigned_to, status,
+//     date, kuch nahi chhute
+//   * sirf wo rows jinka assigned_to MUMBAI SM ka id ho AUR label
+//     "Akshatha Pillai" ho -- Akshatha ki apni rows (alag id) nahi chhutin
+//   * "Mumbai SM" naam ke ek se zyada user hon, ya ek bhi na ho, to kuch nahi
+//     karte aur marker bhi nahi likhte -- agli baar phir dekhte hain
+//   * koi row update na ho paaye to marker nahi likhte, taaki agli start par
+//     baaki bachi hui rows bhi ho jaayen
+//   * marker ke baad kabhi dobara nahi chalta, isliye baad me koi jaanboojh kar
+//     label badle to ye use wapas nahi palatta
+async function restoreMumbaiSmLabels() {
+  const MARKER = 'checklist_mumbai_sm_label_restore_v1';
+  try {
+    const d = await getDB();
+    await ensureAppStateTab(d);
+    const done = await d.findWhere('App_State', { key_name: MARKER });
+    if (done && done.length) return;
+
+    const norm = x => String(x || '').trim().toLowerCase();
+    const users = await d.findAll('Users');
+    const mumbai = users.filter(u => norm(u.name) === 'mumbai sm');
+    if (mumbai.length !== 1) {
+      console.log('  Mumbai SM label restore: "Mumbai SM" naam ke ' + mumbai.length + ' user mile -- skip');
+      return;
+    }
+    const m = mumbai[0];
+
+    const chl = await d.findAll('Checklist_Tasks');
+    const target = chl.filter(t =>
+      String(t.assigned_to) === String(m.id) &&
+      norm(t.doer_name) === 'akshatha pillai');
+
+    let ho = 0, fail = 0;
+    for (const t of target) {
+      try { await d.update('Checklist_Tasks', t.id, { doer_name: m.name }); ho++; }
+      catch { fail++; }
+    }
+    console.log('  Mumbai SM label restore: ' + ho + '/' + target.length + ' row ho gayi' +
+                (fail ? ', ' + fail + ' reh gayi (agli start par phir)' : ''));
+    if (fail) return;                        // adhoora kaam -- marker mat likho
+
+    await d.insert('App_State', {
+      key_name: MARKER,
+      value: ho + ' row ka label "Akshatha Pillai" -> "' + m.name + '" (id ' + m.id + '); task kisi ka nahi hila',
+      updated_at: new Date().toISOString().replace('T', ' ').split('.')[0]
+    });
+  } catch (e) {
+    console.error('  restoreMumbaiSmLabels error (agli baar retry hogi):', e.message);
+  }
+}
+
 async function fixRaviKantLabelOnAshok() {
   const MARKER = 'checklist_ravikant_label_fix_v1';
   try {
@@ -8471,6 +8531,7 @@ async function seedAdminIfNeeded() {
       // nahi hilta.
       .then(() => setTimeout(() => resyncChecklistDoerLabels().catch(() => {}), 30 * 1000))
       .then(() => setTimeout(() => fixRaviKantLabelOnAshok().catch(() => {}), 33 * 1000))
+      .then(() => setTimeout(() => restoreMumbaiSmLabels().catch(() => {}), 34 * 1000))
       .then(() => setTimeout(() => seedHolidays2026().catch(() => {}), 36 * 1000))
       .then(() => setTimeout(() => repairNaNChecklistDates().catch(() => {}), 35 * 1000))
       .then(() => setTimeout(() => fixChecklistDateFormat().catch(() => {}), 45 * 1000))
