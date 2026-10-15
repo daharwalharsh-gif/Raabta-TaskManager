@@ -7929,9 +7929,20 @@ function castSettlement(st, inR, warnings) {
   const dateCol = castDateCol(headers);
   const dateOf = r => castISO(r[dateCol]) || castISO(r[0]);
 
-  const amtRe = /amount|राशि|रकम|भुगतान|payment|paid|रुपय/i;
-  const amtCols = [];
-  headers.forEach((h, i) => { if (i !== dateCol && amtRe.test(h)) amtCols.push(i); });
+  // Amount: pehle jis header me seedha "amount / राशि / रकम" ho. "payment / paid"
+  // sirf tab, jab aisa koi na mile -- warna "Type of payment" (jo category ka
+  // column hai) galti se amount ban jaata hai. Asli sheet me yahi hua tha.
+  const amtStrong = /amount|राशि|रकम/i;
+  const amtWeak = /payment|paid|भुगतान|रुपय/i;
+  const catHdrRe = /type|category|प्रकार|श्रेणी|कैटेगरी/i;
+  const pick = (re, skipCat) => {
+    const a = [];
+    headers.forEach((h, i) => { if (i !== dateCol && re.test(h) && !(skipCat && catHdrRe.test(h))) a.push(i); });
+    return a;
+  };
+  let amtCols = pick(amtStrong, false);
+  // payment/paid wale header me "Type of payment" (category) kabhi amount nahi
+  if (!amtCols.length) amtCols = pick(amtWeak, true);
   const amountCol = amtCols.length ? amtCols[0] : -1;
   if (amtCols.length > 1) {
     warnings.push('Settlement sheet me "amount" jaise ' + amtCols.length + ' column mile (' +
@@ -7939,23 +7950,32 @@ function castSettlement(st, inR, warnings) {
   }
   if (amountCol < 0) warnings.push('Settlement sheet me amount ka column nahi mila (header me amount / राशि / रकम / payment dhoondha)');
 
-  const catRe = /stone|स्टोन|cast|कास्ट/i;
-  let catCol = -1, best = 0;
-  for (let c = 0; c < Math.max(st.width, 1); c++) {
-    if (c === amountCol) continue;
-    let k = 0;
-    st.data.forEach(r => { if (catRe.test(String(r[c] == null ? '' : r[c]))) k++; });
-    if (k > best) { best = k; catCol = c; }
+  // Category: pehle jis header me type / category / प्रकार ho (asli sheet me
+  // "Type of payment"). Na mile to data se -- jis column me sabse zyada
+  // "Stone"/"Casting" likha ho.
+  let catCol = headers.findIndex((h, i) => i > 0 && i !== amountCol && i !== dateCol && catHdrRe.test(h));
+  if (catCol < 0) {
+    const catRe = /stone|स्टोन|cast|कास्ट/i;
+    let best = 0;
+    for (let c = 0; c < Math.max(st.width, 1); c++) {
+      if (c === amountCol) continue;
+      let k = 0;
+      st.data.forEach(r => { if (catRe.test(String(r[c] == null ? '' : r[c]))) k++; });
+      if (k > best) { best = k; catCol = c; }
+    }
   }
 
   const given = { stone: 0, casting: 0, other: 0, all: 0, stoneN: 0, castingN: 0, otherN: 0 };
+  const unmapped = new Set();
   st.data.forEach(r => {
     if (!inR(dateOf(r))) return;
     const amt = amountCol >= 0 ? castNum(r[amountCol]) : 0;
     const text = catCol >= 0 ? String(r[catCol] == null ? '' : r[catCol]) : r.join(' ');
     const kind = /stone|स्टोन/i.test(text) ? 'stone' : (/cast|कास्ट/i.test(text) ? 'casting' : 'other');
     given[kind] += amt; given[kind + 'N']++; given.all += amt;
+    if (kind === 'other' && unmapped.size < 6) unmapped.add((String(text).trim() || '(khali)').slice(0, 40));
   });
+  given.unmapped = Array.from(unmapped);
 
   const cats = [];
   if (catCol >= 0) {
@@ -8055,7 +8075,8 @@ async function castingBuild(d, kind, fromQ, toQ) {
                 sub: (S.given.stoneN + S.given.castingN + S.given.otherN) + ' entries' });
     kpis.push({ label: 'Stone Setting', value: S.given.stone, kind: 'money', tone: 'balance', sub: S.given.stoneN + ' entries' });
     kpis.push({ label: 'Casting Setting', value: S.given.casting, kind: 'money', tone: 'in', sub: S.given.castingN + ' entries' });
-    if (S.given.otherN) kpis.push({ label: 'Other / unmapped', value: S.given.other, kind: 'money', tone: 'out', sub: S.given.otherN + ' entries -- category pehchaani nahi gayi' });
+    if (S.given.otherN) kpis.push({ label: 'Other / unmapped', value: S.given.other, kind: 'money', tone: 'out',
+      sub: S.given.otherN + ' entries -- category pehchaani nahi gayi: ' + S.given.unmapped.join(', ') });
   }
 
   if (kind === 'stone') {

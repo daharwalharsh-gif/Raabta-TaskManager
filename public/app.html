@@ -8233,6 +8233,10 @@ async function goldViewImage(id) {
 // neeche chhoti line me dikhta hai taaki sheet se milaya ja sake.
 let _castKind = 'settlement';
 let _castData = null;
+// Page pehli baar khule to CURRENT MONTH chuna hua (Harsh, 15 Oct). Uske baad
+// jo bhi chuna -- "All months" ya koi date -- wahi rehta hai, dobara current
+// month par nahi lauta.
+let _castMonthInit = false;
 
 const CAST_NAAM = { settlement: 'Settlement Amount', stone: 'Stone Setting', casting: 'Casting Entry' };
 
@@ -8261,6 +8265,8 @@ function castFillMonths() {
   sel.innerHTML = '<option value="">All months</option>' +
     list.map(ym => '<option value="' + ym + '">' + castMonthLabel(ym) + '</option>').join('');
   if (keep && list.indexOf(keep) >= 0) sel.value = keep;     // reload par chuna hua mahina gum na ho
+  // Pehli baar: chalu mahina chun do (list ka pehla = chalu mahina)
+  if (!_castMonthInit && list.length) { sel.value = list[0]; _castMonthInit = true; }
 }
 // Mahina chuna to date khaali, date chuni to mahina khaali -- dono ek saath nahi
 function castMonthPick() {
@@ -8274,6 +8280,7 @@ function castDatePick() {
 }
 function castResetFilter() {
   ['castFrom', 'castTo', 'castMonth'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  _castMonthInit = false;                          // Reset = shuruaati haal: chalu mahina
   loadCasting();
 }
 
@@ -8296,6 +8303,7 @@ async function loadCasting(force) {
   const maangaTab = _castKind;                    // jis tab ke liye maanga, wahi yaad rakho
   document.getElementById('castHeading').textContent = CAST_NAAM[maangaTab] || 'Casting / Stone Entry';
   document.getElementById('castTableTitle').textContent = (CAST_NAAM[maangaTab] || '') + ' entries';
+  castFillMonths();                               // pehle list + current month taiyar, tab padho
   let from = (document.getElementById('castFrom') || {}).value || '';
   let to = (document.getElementById('castTo') || {}).value || '';
   const ym = (document.getElementById('castMonth') || {}).value || '';
@@ -8303,7 +8311,6 @@ async function loadCasting(force) {
     from = ym + '-01';
     to = ym + '-' + String(new Date(+ym.slice(0, 4), +ym.slice(5, 7), 0).getDate()).padStart(2, '0');
   }
-  castFillMonths();                               // list taiyar rahe (pehli baar bhi)
   let url = '/api/casting/' + maangaTab + '?from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to);
   if (force) url += '&refresh=' + Date.now();
   try {
