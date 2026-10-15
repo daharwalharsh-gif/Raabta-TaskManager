@@ -3575,6 +3575,112 @@ async function resyncChecklistDoerLabels() {
 //     baaki bachi hui rows bhi ho jaayen
 //   * marker ke baad kabhi dobara nahi chalta, isliye baad me koi jaanboojh kar
 //     label badle to ye use wapas nahi palatta
+// ── Mumbai SM ke saare checklist task -> Akshatha Pillai, phir user delete ──
+// Harsh, 15 Oct: "Mumbai SM ke jitne bhi checklist ke task hain wo sab
+// Akshatha Pillai ko transfer kar do, aur Mumbai SM user delete kar do."
+//
+// Kyun app ke Transfer button se nahi: wo ek-ek task par chalta hai aur
+// WhatsApp alert bhejta hai -- 217 task par Akshatha ko 217 message jaate.
+// Yahan seedha assigned_to + doer_name badalte hain, koi message nahi.
+//
+// Kram aur rokne ki jagahein (beech me kuch bhi atke to user NAHI hatta):
+//   1. dono user email se dhoondho, DONO ek-ek hi milne chahiye
+//   2. pehle backup (task ki id list + user ki row) App_State me
+//   3. har task: sirf assigned_to aur doer_name badlo (status/date/assigned_by
+//      kuch nahi chhute) -- completed bhi, kyunki Harsh ne "sab" kaha
+//   4. dobara padh kar pakka karo ki Mumbai SM ke paas ek bhi task nahi bacha
+//   5. Mumbai SM ke khule DELEGATION task hon to user nahi hatate -- wo task
+//      bina doer ke reh jaate (is baat par Harsh ne pehle bhi warning maangi thi)
+//   6. tabhi user delete, aur tabhi marker
+// Marker ke baad kabhi dobara nahi chalta.
+async function transferMumbaiSmToAkshatha() {
+  const MARKER = 'mumbai_sm_to_akshatha_v1';
+  const BACKUP = 'mumbai_sm_to_akshatha_backup_v1';
+  const MUMBAI_EMAIL = 'rbrmumbai@raabtajewels.com';
+  const AKSHATHA_EMAIL = 'pillaiakshatha30@gmail.com';
+  try {
+    const d = await getDB();
+    await ensureAppStateTab(d);
+    const done = await d.findWhere('App_State', { key_name: MARKER });
+    if (done && done.length) return;
+
+    const em = x => String(x || '').trim().toLowerCase();
+    const users = await d.findAll('Users');
+    const mum = users.filter(u => em(u.email) === MUMBAI_EMAIL);
+    const aks = users.filter(u => em(u.email) === AKSHATHA_EMAIL);
+    if (mum.length !== 1 || aks.length !== 1) {
+      console.log('  Mumbai->Akshatha: Mumbai SM ' + mum.length + ' user, Akshatha ' + aks.length +
+                  ' user mile (dono ek-ek chahiye) -- skip');
+      return;
+    }
+    const M = mum[0], A = aks[0];
+    if (String(M.id) === String(A.id)) { console.log('  Mumbai->Akshatha: dono ek hi user -- skip'); return; }
+
+    const chl = await d.findAll('Checklist_Tasks');
+    const target = chl.filter(t => String(t.assigned_to) === String(M.id));
+
+    // ── 2) Backup, kuch bhi badalne se PEHLE. Na bane to kuch nahi karte. ──
+    // Password aur photo nahi rakhte -- wo bhaari/sensitive hai aur ek hi DB me
+    // dusri jagah kyon dohrana. Wapas laana ho to ye row + naya password.
+    const hai = await d.findWhere('App_State', { key_name: BACKUP });
+    if (!hai || !hai.length) {
+      const nowStr = new Date(Date.now() + 330 * 60000).toISOString().replace('T', ' ').split('.')[0];
+      const userCopy = Object.assign({}, M); delete userCopy.password; delete userCopy.profile_image;
+      try {
+        await d.insert('App_State', {
+          key_name: BACKUP,
+          value: JSON.stringify({
+            at: nowStr, from: { id: M.id, name: M.name }, to: { id: A.id, name: A.name },
+            checklist_ids: target.map(t => t.id),     // wapas karna ho: assigned_to = from.id inhi id par
+            deleted_user: userCopy
+          }),
+          updated_at: nowStr
+        });
+      } catch (e) {
+        console.error('  Mumbai->Akshatha: backup nahi bana, isliye kuch NAHI badla:', e.message);
+        return;
+      }
+    }
+
+    // ── 3) Transfer ──
+    let ho = 0, fail = 0;
+    for (const t of target) {
+      try { await d.update('Checklist_Tasks', t.id, { assigned_to: String(A.id), doer_name: A.name }); ho++; }
+      catch { fail++; }
+    }
+    console.log('  Mumbai->Akshatha: ' + ho + '/' + target.length + ' checklist task transfer' +
+                (fail ? ', ' + fail + ' reh gaye' : ''));
+
+    // ── 4) Pakka karo ki Mumbai SM ke paas kuch nahi bacha ──
+    const baaki = (await d.findAll('Checklist_Tasks')).filter(t => String(t.assigned_to) === String(M.id)).length;
+    if (fail || baaki) {
+      console.log('  Mumbai->Akshatha: ' + baaki + ' task abhi bhi Mumbai SM ke paas -- user NAHI hataya, agli start par phir');
+      return;
+    }
+
+    // ── 5) Khule delegation task ho to user mat hatao ──
+    const del = await d.findAll('Delegation_Tasks').catch(() => []);
+    const openDel = del.filter(t => String(t.assigned_to) === String(M.id) &&
+                                    (t.status === 'pending' || t.status === 'revised')).length;
+    if (openDel) {
+      console.log('  Mumbai->Akshatha: Mumbai SM ke ' + openDel + ' khule delegation task hain -- user NAHI hataya');
+      return;
+    }
+
+    // ── 6) User delete + marker ──
+    await d.delete('Users', M.id);
+    const nowStr2 = new Date(Date.now() + 330 * 60000).toISOString().replace('T', ' ').split('.')[0];
+    await d.insert('App_State', {
+      key_name: MARKER,
+      value: ho + ' checklist task Mumbai SM (id ' + M.id + ') -> ' + A.name + ' (id ' + A.id + '); Mumbai SM user delete',
+      updated_at: nowStr2
+    });
+    console.log('  \u2705 Mumbai->Akshatha: ' + ho + ' task transfer, Mumbai SM user delete');
+  } catch (e) {
+    console.error('  transferMumbaiSmToAkshatha error (agli baar retry hogi):', e.message);
+  }
+}
+
 async function restoreMumbaiSmLabels() {
   const MARKER = 'checklist_mumbai_sm_label_restore_v1';
   try {
@@ -8532,6 +8638,7 @@ async function seedAdminIfNeeded() {
       .then(() => setTimeout(() => resyncChecklistDoerLabels().catch(() => {}), 30 * 1000))
       .then(() => setTimeout(() => fixRaviKantLabelOnAshok().catch(() => {}), 33 * 1000))
       .then(() => setTimeout(() => restoreMumbaiSmLabels().catch(() => {}), 34 * 1000))
+      .then(() => setTimeout(() => transferMumbaiSmToAkshatha().catch(() => {}), 40 * 1000))
       .then(() => setTimeout(() => seedHolidays2026().catch(() => {}), 36 * 1000))
       .then(() => setTimeout(() => repairNaNChecklistDates().catch(() => {}), 35 * 1000))
       .then(() => setTimeout(() => fixChecklistDateFormat().catch(() => {}), 45 * 1000))
