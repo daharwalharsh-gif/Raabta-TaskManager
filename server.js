@@ -7801,8 +7801,10 @@ const CASTING_TABS = {
   stone:      { title: 'Stone Setting',     exact: 'Stone setting form', find: /stone/i,      form: '' },
   casting:    { title: 'Casting Entry',     exact: 'Casting Entry Form', find: /casting/i,    form: '' }
 };
-// Abhi sirf admin. Aage kisi ko dena ho to yahan email jod do.
-const CASTING_EMAILS = [];
+// Admin ko hamesha, aur is list wale logon ko. Harsh, 15 Oct: Gurjeet aur
+// Bappi Ji. Email se milate hain (naam badal sakta hai). Aage kisi ko dena ho
+// to yahan email jod do. Dhyan: Google Form ka link sirf admin badal sakta hai.
+const CASTING_EMAILS = ['gurjeet-inventory@raabtajewels.com', 'shekhakram655@gmail.com'];
 function castingAllowed(user) {
   if (String((user && user.role) || '') === 'admin') return true;
   const em = String((user && user.email) || '').trim().toLowerCase();
