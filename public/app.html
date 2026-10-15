@@ -36,6 +36,24 @@ textarea.gold-inp{resize:vertical;}
    nahi dikhne chahiye, warna poori list me sirf "—" bharta hai */
 #page-gold.hide-rate .gold-c-rate{display:none;}
 #page-gold.hide-pic .gold-c-img{display:none;}
+/* ── CASTING / STONE ── */
+.cast-filter{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+.cast-flbl{font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;}
+.cast-note{font-size:12px;color:#64748b;}
+.cast-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:16px;}
+.cast-kpis .ov-card .number{font-size:26px;}
+.cast-kpis .ov-card .cast-sub{font-size:10px;color:#64748b;margin-top:5px;line-height:1.35;word-break:break-word;}
+.cast-warn{background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:10px;padding:9px 12px;font-size:12px;margin-bottom:8px;line-height:1.45;}
+.cast-warn.err{background:#fef2f2;border-color:#fecaca;color:#b91c1c;}
+.cast-card{background:#fff;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,0.07);overflow:hidden;min-width:0;}
+.cast-scroll{overflow:auto;max-height:560px;max-width:100%;}
+.cast-t{border-collapse:collapse;width:100%;font-size:12px;}
+.cast-t th{position:sticky;top:0;z-index:2;background:#f8fafc;text-align:left;font-size:10px;font-weight:700;
+  letter-spacing:.4px;text-transform:uppercase;color:#64748b;padding:9px 10px;white-space:nowrap;border-bottom:1px solid #e2e8f0;}
+.cast-t td{padding:8px 10px;border-bottom:1px solid #f1f5f9;color:#334155;white-space:nowrap;vertical-align:top;}
+.cast-t td.empty{text-align:center;color:#94a3b8;padding:24px;white-space:normal;}
+.cast-t a{color:#2563eb;font-weight:600;text-decoration:none;}
+#castFormBtn.off{opacity:.55;pointer-events:none;}
 #goldGrid{min-width:0;}
 #goldGrid > *{min-width:0;}
 #goldGrid table{width:100%;}
@@ -774,6 +792,12 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
   #page-gold .gold-inp{font-size:16px;}   /* iPhone 16px se chhota text par zoom kar deta hai */
   #page-gold .card-head > div:last-child{width:100%;}
   #page-gold .gold-filt{flex:1;min-width:0;}
+  /* Casting / Stone: KPI do-do, filter patti poori chaudai, table apne dibbe me side scroll */
+  .cast-kpis{grid-template-columns:repeat(2,1fr);gap:8px;}
+  .cast-kpis .ov-card{padding:12px 8px;}
+  .cast-kpis .ov-card .number{font-size:17px;word-break:break-all;}
+  .cast-kpis .ov-card .label{font-size:9px;}
+  #page-casting .gold-filt{flex:1;min-width:0;}
 
   /* Maintenance / Maintenance 2 ke button — poori chaudai me do */
   #maintViewTabs{display:flex;width:100%;gap:8px;margin-bottom:14px;}
@@ -1118,6 +1142,10 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3l2.3 4.6 5.2 .8-3.8 3.6.9 5.1L12 14.7 7.4 17.1l.9-5.1L4.5 8.4l5.2-.8L12 3z"/></svg>
       <span class="mob-nav-label">Gold</span>
     </button>
+    <button class="mob-nav-item" id="mob-casting" style="display:none" onclick="navigate('casting',this);setMobActive(this)">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3zm0 9l8-4.5M12 12v9m0-9L4 7.5"/></svg>
+      <span class="mob-nav-label">Casting</span>
+    </button>
     <button class="mob-nav-item" id="mob-profile" onclick="navigate('profile',this);setMobActive(this)">
       <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
       <span class="mob-nav-label">Profile</span>
@@ -1199,6 +1227,10 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     <div class="nav-item" id="nav-gold" style="display:none" onclick="navigate('gold',this)">
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3l2.3 4.6 5.2 .8-3.8 3.6.9 5.1L12 14.7 7.4 17.1l.9-5.1L4.5 8.4l5.2-.8L12 3z"/></svg>
       <span class="nav-label-text">Gold System</span>
+    </div>
+    <div class="nav-item" id="nav-casting" style="display:none" onclick="navigate('casting',this)">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3zm0 9l8-4.5M12 12v9m0-9L4 7.5"/></svg>
+      <span class="nav-label-text">Casting / Stone</span>
     </div>
     <div class="nav-divider"></div>
     <div class="nav-item" onclick="navigate('profile',this)">
@@ -2267,6 +2299,57 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
             </tbody>
           </table>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       CASTING / STONE ENTRY — Google Sheet se live
+       Teen tab: Settlement Amount, Stone Setting, Casting Entry.
+  ══════════════════════════════════════ -->
+  <div id="page-casting" class="page">
+    <div class="page-header">
+      <h2 id="castHeading">Casting / Stone Entry</h2>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <a class="btn btn-primary" id="castFormBtn" href="#" target="_blank" rel="noopener noreferrer" onclick="return castFormClick(event)" style="text-decoration:none">+ Open Google Form</a>
+        <button class="btn btn-outline" id="castFormEdit" onclick="castSetForm()" title="Form ka link badlo" style="display:none">&#9998;</button>
+        <button class="btn btn-outline" onclick="loadCasting(1)">&#8635; Refresh</button>
+      </div>
+    </div>
+
+    <div class="tab-group" id="castTabs" style="margin-bottom:14px">
+      <div class="tab active" id="castTabSettlement" onclick="switchCastTab('settlement',this)">Settlement Amount</div>
+      <div class="tab" id="castTabStone" onclick="switchCastTab('stone',this)">Stone Setting</div>
+      <div class="tab" id="castTabCasting" onclick="switchCastTab('casting',this)">Casting Entry</div>
+    </div>
+
+    <!-- Date filter: kuch na chuno to 01-09-2026 se aaj tak -->
+    <div class="cast-filter">
+      <span class="cast-flbl">Filter</span>
+      <select id="castMonth" onchange="castMonthPick()" class="gold-filt" title="Month">
+        <option value="">All months</option>
+      </select>
+      <span style="font-size:12px;color:#94a3b8">or</span>
+      <input type="date" id="castFrom" onchange="castDatePick()" class="gold-filt" title="From date">
+      <span style="font-size:12px;color:#94a3b8">to</span>
+      <input type="date" id="castTo" onchange="castDatePick()" class="gold-filt" title="To date">
+      <button class="btn btn-outline" onclick="castResetFilter()" style="font-size:12px;padding:5px 12px">Reset</button>
+      <span id="castNote" class="cast-note"></span>
+    </div>
+
+    <div id="castWarn"></div>
+    <div class="cast-kpis" id="castKpis"></div>
+
+    <div class="cast-card">
+      <div class="card-head" style="flex-wrap:wrap;gap:8px">
+        <div class="card-head-title" id="castTableTitle">Entries</div>
+        <span id="castCount" style="font-size:12px;color:#64748b"></span>
+      </div>
+      <div class="cast-scroll">
+        <table class="cast-t">
+          <thead id="castHead"></thead>
+          <tbody id="castBody"><tr><td class="empty">Loading&hellip;</td></tr></tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -3618,6 +3701,12 @@ async function init() {
     // (Harsh, 14 Oct). Same flag, taaki dono jagah ek hi log dekhein.
     const goldMob = document.getElementById('mob-gold');
     if (goldMob) goldMob.style.display = goldOK ? 'flex' : 'none';
+    // Casting / Stone Entry -- same tareeka: server ka flag, admin ke liye fallback
+    const castOK = (ME.castingSystem === true || ME.role === 'admin');
+    const castNav = document.getElementById('nav-casting');
+    if (castNav) castNav.style.display = castOK ? 'flex' : 'none';
+    const castMob = document.getElementById('mob-casting');
+    if (castMob) castMob.style.display = castOK ? 'flex' : 'none';
 
     // Maintenance tab kise dikhe (server ka maintView flag batata hai):
     //   'all'    = admin — dono view
@@ -3710,7 +3799,7 @@ function setMinDates() {
 // ══════════════════════════════════════════════════════
 // NAVIGATION
 // ══════════════════════════════════════════════════════
-const pageTitles = {dashboard:'Dashboard',alltasks:'All Tasks',approvals:'Approvals',users:'Users',profile:'Profile',mis:'MIS Report',fms:'FMS Admin','fms-tasks':'FMS Tasks','fms-tracking':'FMS Tracking',records:'Employee Records',leave:'Leave',crm:'PC',hrreport:'HR Reporting',maintenance:'Maintenance',gold:'Gold System'};
+const pageTitles = {dashboard:'Dashboard',alltasks:'All Tasks',approvals:'Approvals',users:'Users',profile:'Profile',mis:'MIS Report',fms:'FMS Admin','fms-tasks':'FMS Tasks','fms-tracking':'FMS Tracking',records:'Employee Records',leave:'Leave',crm:'PC',hrreport:'HR Reporting',maintenance:'Maintenance',gold:'Gold System',casting:'Casting / Stone Entry'};
 
 function navigate(page, el) {
   window._currentPage = page;
@@ -3720,7 +3809,7 @@ function navigate(page, el) {
   if (el && el.classList.contains('nav-item')) el.classList.add('active');
   document.getElementById('topbarTitle').textContent = pageTitles[page] || page;
   // Sync mobile bottom nav active state
-  const mobMap = {dashboard:'mob-dashboard',alltasks:'mob-alltasks','fms-tasks':'mob-fms-tasks',approvals:'mob-approvals',users:'mob-users',mis:'mob-mis',profile:'mob-profile',leave:'mob-leave',maintenance:'mob-maintenance',gold:'mob-gold'};
+  const mobMap = {dashboard:'mob-dashboard',alltasks:'mob-alltasks','fms-tasks':'mob-fms-tasks',approvals:'mob-approvals',users:'mob-users',mis:'mob-mis',profile:'mob-profile',leave:'mob-leave',maintenance:'mob-maintenance',gold:'mob-gold',casting:'mob-casting'};
   document.querySelectorAll('.mob-nav-item').forEach(b=>b.classList.remove('active'));
   if (mobMap[page]) { const mb=document.getElementById(mobMap[page]); if(mb) mb.classList.add('active'); }
   if (page==='dashboard') loadDashboard();
@@ -3737,6 +3826,7 @@ function navigate(page, el) {
   if (page==='records') loadRecords();
   if (page==='maintenance') loadMaintenance();
   if (page==='gold') loadGold();
+  if (page==='casting') loadCasting();
   window.scrollTo(0,0);
 }
 
@@ -8133,6 +8223,187 @@ async function goldViewImage(id) {
   } catch (e) {
     body.innerHTML = '<div class="empty">⚠️ ' + maintEsc(e.message || 'Image not found') + '</div>';
   }
+}
+
+// ══════════════════════════════════════════════════════
+// CASTING / STONE ENTRY -- Google Sheet se live (server padhta hai)
+// ══════════════════════════════════════════════════════
+// Teen tab: Settlement Amount, Stone Setting, Casting Entry. Server har tab ke
+// liye rows + KPI bhejta hai, aur ye bhi ki kaun sa column liya -- wo KPI ke
+// neeche chhoti line me dikhta hai taaki sheet se milaya ja sake.
+let _castKind = 'settlement';
+let _castData = null;
+
+const CAST_NAAM = { settlement: 'Settlement Amount', stone: 'Stone Setting', casting: 'Casting Entry' };
+
+// Mahine ki list: 01-09-2026 wale mahine se chalu mahine tak (nayi se purani).
+// Usse pehle ki entry dikhti hi nahi, to usse pehle ke mahine dene ka matlab nahi.
+function castMonths() {
+  const minYm = String((_castData && _castData.minFrom) || '2026-09-01').slice(0, 7);
+  const out = [];
+  let y = +aajKiDate().slice(0, 4), m = +aajKiDate().slice(5, 7);
+  for (let guard = 0; guard < 120; guard++) {
+    const ym = y + '-' + String(m).padStart(2, '0');
+    if (ym < minYm) break;
+    out.push(ym);
+    m--; if (m === 0) { m = 12; y--; }
+  }
+  return out;
+}
+function castMonthLabel(ym) {
+  return (MAINT_MONTHS[+ym.slice(5, 7) - 1] || ym) + ' ' + ym.slice(0, 4);
+}
+function castFillMonths() {
+  const sel = document.getElementById('castMonth');
+  if (!sel) return;
+  const keep = sel.value;
+  const list = castMonths();
+  sel.innerHTML = '<option value="">All months</option>' +
+    list.map(ym => '<option value="' + ym + '">' + castMonthLabel(ym) + '</option>').join('');
+  if (keep && list.indexOf(keep) >= 0) sel.value = keep;     // reload par chuna hua mahina gum na ho
+}
+// Mahina chuna to date khaali, date chuni to mahina khaali -- dono ek saath nahi
+function castMonthPick() {
+  ['castFrom', 'castTo'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  loadCasting();
+}
+function castDatePick() {
+  const m = document.getElementById('castMonth');
+  if (m) m.value = '';
+  loadCasting();
+}
+function castResetFilter() {
+  ['castFrom', 'castTo', 'castMonth'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  loadCasting();
+}
+
+function switchCastTab(kind, el) {
+  _castKind = CAST_NAAM[kind] ? kind : 'settlement';
+  document.querySelectorAll('#castTabs .tab').forEach(t => t.classList.remove('active'));
+  if (el) el.classList.add('active');
+  // Purane tab ka data turant hata do -- naya aane tak (ya load fail ho jaye to
+  // hamesha) Stone ke heading ke neeche Casting ki rakam na dikhe
+  _castData = null;
+  document.getElementById('castKpis').innerHTML = '';
+  document.getElementById('castWarn').innerHTML = '';
+  document.getElementById('castHead').innerHTML = '';
+  document.getElementById('castBody').innerHTML = '<tr><td class="empty">Loading…</td></tr>';
+  document.getElementById('castCount').textContent = '';
+  loadCasting();
+}
+
+async function loadCasting(force) {
+  const maangaTab = _castKind;                    // jis tab ke liye maanga, wahi yaad rakho
+  document.getElementById('castHeading').textContent = CAST_NAAM[maangaTab] || 'Casting / Stone Entry';
+  document.getElementById('castTableTitle').textContent = (CAST_NAAM[maangaTab] || '') + ' entries';
+  let from = (document.getElementById('castFrom') || {}).value || '';
+  let to = (document.getElementById('castTo') || {}).value || '';
+  const ym = (document.getElementById('castMonth') || {}).value || '';
+  if (ym) {                                       // poora mahina: 1 se aakhri din tak
+    from = ym + '-01';
+    to = ym + '-' + String(new Date(+ym.slice(0, 4), +ym.slice(5, 7), 0).getDate()).padStart(2, '0');
+  }
+  castFillMonths();                               // list taiyar rahe (pehli baar bhi)
+  let url = '/api/casting/' + maangaTab + '?from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to);
+  if (force) url += '&refresh=' + Date.now();
+  try {
+    const r = await api(url);
+    if (maangaTab !== _castKind) return;          // tab tab tak badal chuka -- ye jawab purana hai
+    if (!r || r.error) throw new Error((r && r.error) || 'Could not load');
+    _castData = r;
+    renderCasting();
+  } catch (e) {
+    if (maangaTab !== _castKind) return;
+    _castData = null;
+    document.getElementById('castKpis').innerHTML = '';
+    document.getElementById('castHead').innerHTML = '';
+    document.getElementById('castBody').innerHTML = '<tr><td class="empty">⚠️ ' + maintEsc(e.message || 'Failed to load') + '</td></tr>';
+    document.getElementById('castWarn').innerHTML = '';
+    document.getElementById('castCount').textContent = '';
+    showToast('Could not load ' + (CAST_NAAM[maangaTab] || '') + ': ' + (e.message || ''), 'error');
+  }
+}
+
+// Link set na ho aur admin dabaye to link poochho (naye tab me khaali '#' na khule)
+function castFormClick(ev) {
+  if (_castData && _castData.formUrl) return true;
+  ev.preventDefault();
+  if (typeof ME !== 'undefined' && ME && ME.role === 'admin') castSetForm();
+  return false;
+}
+
+async function castSetForm() {
+  const tab = _castKind;
+  const cur = (_castData && _castData.formUrl) || '';
+  const v = prompt('"' + (CAST_NAAM[tab] || '') + '" ka Google Form link daalo (khali chhodoge to link hat jayega):', cur);
+  if (v === null) return;                         // Cancel
+  try {
+    const r = await api('/api/casting/' + tab + '/form', 'PUT', { url: v });
+    if (!r || r.error) throw new Error((r && r.error) || 'Save nahi hua');
+    showToast(r.url ? '✅ Form link save ho gaya' : 'Form link hata diya');
+    await loadCasting(1);
+  } catch (e) {
+    showToast(e.message || 'Save nahi hua', 'error');
+  }
+}
+
+// Sheet ke cell ka link ho (photo wagairah) to "Open" button -- sirf http/https
+function castCell(v) {
+  const t = String(v == null ? '' : v).trim();
+  if (!t) return '<span style="color:#cbd5e1">—</span>';
+  if (/^https?:\/\//i.test(t)) return '<a href="' + maintEsc(t) + '" target="_blank" rel="noopener noreferrer">Open</a>';
+  return maintEsc(t);
+}
+
+function renderCasting() {
+  const d = _castData;
+  if (!d) return;
+
+  // Google Form ka button. Link set hai to naye tab me form khulta hai. Set nahi
+  // hai to admin ko "Set Google Form link" dikhta hai (dabate hi link poochta
+  // hai); baaki ko band button -- unke bas ka kuch nahi.
+  const fb = document.getElementById('castFormBtn');
+  const isAdm = (typeof ME !== 'undefined' && ME && ME.role === 'admin');
+  const fe = document.getElementById('castFormEdit');
+  if (d.formUrl && /^https:\/\//i.test(d.formUrl)) {
+    fb.href = d.formUrl; fb.classList.remove('off'); fb.textContent = '+ Open Google Form';
+    fb.title = d.formUrl;
+    if (fe) fe.style.display = isAdm ? '' : 'none';
+  } else {
+    fb.href = '#'; fb.title = 'Is tab ka Google Form link abhi set nahi hua';
+    if (fe) fe.style.display = 'none';
+    if (isAdm) { fb.classList.remove('off'); fb.textContent = 'Set Google Form link'; }
+    else { fb.classList.add('off'); fb.textContent = 'Form link not set'; }
+  }
+
+  document.getElementById('castNote').textContent =
+    'Showing ' + maintDate(d.from) + ' to ' + maintDate(d.to) + ' (entries 01-09-2026 se hi dikhti hain)';
+
+  // Warning (sheet ka dhaancha ulta-seedha ho to chupchaap 0 nahi dikhate)
+  const w = (d.warnings || []).map(x => '<div class="cast-warn">⚠️ ' + maintEsc(x) + '</div>').join('');
+  document.getElementById('castWarn').innerHTML = w;
+
+  // KPI
+  const toneCls = { in: 'completed', out: 'pending', balance: 'revised' };
+  document.getElementById('castKpis').innerHTML = (d.kpis || []).map(k => {
+    let val = '—';
+    if (k.value !== null && k.value !== undefined) val = (k.kind === 'weight') ? goldG(k.value) : maintMoney(k.value);
+    const neg = (typeof k.value === 'number' && k.value < 0) ? ' style="color:#dc2626"' : '';
+    return '<div class="ov-card ' + (toneCls[k.tone] || 'completed') + '">' +
+      '<div class="label">' + maintEsc(k.label) + '</div>' +
+      '<div class="number"' + neg + '>' + val + '</div>' +
+      '<div class="cast-sub">' + maintEsc(k.sub || '') + '</div></div>';
+  }).join('');
+
+  // Table
+  const heads = d.headers || [];
+  document.getElementById('castHead').innerHTML = heads.length
+    ? '<tr>' + heads.map(h => '<th>' + maintEsc(h) + '</th>').join('') + '</tr>' : '';
+  const rows = d.rows || [];
+  document.getElementById('castCount').textContent = rows.length + ' entries';
+  document.getElementById('castBody').innerHTML = rows.length
+    ? rows.map(r => '<tr>' + r.cells.map(c => '<td>' + castCell(c) + '</td>').join('') + '</tr>').join('')
+    : '<tr><td class="empty" colspan="' + Math.max(heads.length, 1) + '">No entries in this date range</td></tr>';
 }
 
 // Maintenance ke andar hi do view — alag sidebar tab nahi (Harsh, 29 Aug:

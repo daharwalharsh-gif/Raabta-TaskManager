@@ -2217,6 +2217,7 @@ app.get('/api/me', requireAuth, async (req, res) => {
       // Maintenance tab kis roop me dikhe — dekho maintAccessFor()
       // Gold System kise dikhe -- abhi sirf admin (goldAllowed dekho)
       goldSystem: goldAllowed(user),
+      castingSystem: castingAllowed(user),
       maintView: maintAccessFor(user).view,
       maintPerson: maintAccessFor(user).person
     });
@@ -7653,6 +7654,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
         checklistPeek: req.query.peek ? await checklistPeek(String(req.query.peek)) : undefined,
         orphanDoers: req.query.orphans ? await orphanDoers() : undefined,
         doerMismatch: req.query.mismatch ? await doerMismatch() : undefined,
+        casting: req.query.casting ? await castingProbe(await getDB()) : undefined,
         doerJhaank: req.query.doer ? await doerJhaank(String(req.query.doer)) : undefined,
         taskKaHisaab: req.query.task ? await taskKaHisaab(String(req.query.task)) : undefined,
         reminderWho: req.query.who ? await reminderWho() : undefined,
@@ -7735,6 +7737,7 @@ app.get('/api/cron/wa-reminders', async (req, res) => {
       checklistPeek: req.query.peek ? await checklistPeek(String(req.query.peek)) : undefined,
       orphanDoers: req.query.orphans ? await orphanDoers() : undefined,
       doerMismatch: req.query.mismatch ? await doerMismatch() : undefined,
+      casting: req.query.casting ? await castingProbe(await getDB()) : undefined,
       doerJhaank: req.query.doer ? await doerJhaank(String(req.query.doer)) : undefined,
       taskKaHisaab: req.query.task ? await taskKaHisaab(String(req.query.task)) : undefined,
       reminderWho: req.query.who ? await reminderWho() : undefined,
@@ -7774,6 +7777,398 @@ app.post('/api/admin/run-wa-reminders', requireAuth, requireAdmin, async (req, r
     .then(r => console.log('  WA reminders (manual):', JSON.stringify(r)))
     .catch(e => console.error('  WA reminders (manual) error:', e.message));
   res.json({ started: true });
+});
+
+// ══════════════════════════════════════════════════════
+// CASTING / STONE ENTRY (Harsh, 15 Oct)
+// ══════════════════════════════════════════════════════
+// Teen Google Form ki sheet ("Casting Entry") ko app me dikhana: Settlement
+// Amount, Stone Setting aur Casting Entry. Data seedha Google Sheet se aata
+// hai (service account ko sheet share hai) -- koi manual calculation nahi.
+//
+// Column PDF me jaise likhe hain waise hi liye gaye hain (Stone: V = labour,
+// S aur U = silver; Casting: H = labour). Har KPI ke saath ye bhi jaata hai ki
+// kaun sa column liya, taaki screen par sheet se milaya ja sake.
+//
+// ══ CASTING_BLOCK_START ══
+const CASTING_SHEET_ID = '1_N8xDXip9S8sCXua02aTTrR5wYApaIhMJ9YlDWidZDo';
+// "01/09/2026 se lekar aaj tak" -- isse purani entry kabhi nahi dikhti
+const CASTING_FROM = '2026-09-01';
+// form: har tab ka Google Form link. Khali ho to screen par button band dikhta
+// hai ("link set nahi hai") -- link milte hi yahin bhar do.
+const CASTING_TABS = {
+  settlement: { title: 'Settlement Amount', exact: 'Settlement Amount', find: /settlement/i, form: '' },
+  stone:      { title: 'Stone Setting',     exact: 'Stone setting form', find: /stone/i,      form: '' },
+  casting:    { title: 'Casting Entry',     exact: 'Casting Entry Form', find: /casting/i,    form: '' }
+};
+// Abhi sirf admin. Aage kisi ko dena ho to yahan email jod do.
+const CASTING_EMAILS = [];
+function castingAllowed(user) {
+  if (String((user && user.role) || '') === 'admin') return true;
+  const em = String((user && user.email) || '').trim().toLowerCase();
+  return !!em && CASTING_EMAILS.includes(em);
+}
+
+// "V" -> 21,  21 -> "V"
+function castCol(letters) {
+  let n = 0;
+  for (const ch of String(letters).toUpperCase()) n = n * 26 + (ch.charCodeAt(0) - 64);
+  return n - 1;
+}
+function castLetter(i) {
+  let out = '', n = i + 1;
+  while (n > 0) { const m = (n - 1) % 26; out = String.fromCharCode(65 + m) + out; n = Math.floor((n - 1) / 26); }
+  return out;
+}
+function castNum(v) {
+  const x = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, ''));
+  return isFinite(x) ? x : 0;
+}
+// Sheet "15/01/2026 11:40:16" (din pehle) ya "2026-01-15" -- dono ko YYYY-MM-DD
+function castISO(raw) {
+  const t = String(raw == null ? '' : raw).trim();
+  if (!t) return '';
+  let m = t.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return m[1] + '-' + m[2] + '-' + m[3];
+  m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) {
+    const d = +m[1], mo = +m[2];
+    if (mo < 1 || mo > 12 || d < 1 || d > 31) return '';
+    return m[3] + '-' + String(mo).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+  }
+  return '';
+}
+
+// Date filter. Kuch na chuna ho to 01-09-2026 se aaj tak. 01-09 se pehle ki
+// taarikh chun lo to bhi wahi se shuru (purani entry dikhani hi nahi).
+function castRange(fromQ, toQ, today) {
+  let f = castISO(fromQ) || CASTING_FROM;
+  let t = castISO(toQ) || today;
+  if (f > t) { const x = f; f = t; t = x; }          // ulta bhar diya to seedha
+  if (t < CASTING_FROM) return { from: CASTING_FROM, to: CASTING_FROM, none: true };
+  if (f < CASTING_FROM) f = CASTING_FROM;
+  return { from: f, to: t, none: false };
+}
+
+// Tab ka asli naam. Sheet me thoda alag likha ho (bade-chhote akshar, extra
+// space) to bhi mil jaye; na mile to saaf bata de ki kaun se tab hain.
+const _castTitles = { at: 0, list: [] };
+async function castTabTitle(d, kind) {
+  if (!_castTitles.list.length || Date.now() - _castTitles.at > 10 * 60000) {
+    const r = await withRetry(() => d.sheets.spreadsheets.get({
+      spreadsheetId: CASTING_SHEET_ID, fields: 'sheets.properties.title'
+    }));
+    _castTitles.list = ((r.data && r.data.sheets) || []).map(x => x.properties.title);
+    _castTitles.at = Date.now();
+  }
+  const cfg = CASTING_TABS[kind];
+  const norm = x => String(x || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const t = _castTitles.list.find(x => norm(x) === norm(cfg.exact)) || _castTitles.list.find(x => cfg.find.test(x));
+  if (!t) throw new Error('Sheet me "' + cfg.exact + '" naam ka tab nahi mila. Tab ye hain: ' + _castTitles.list.join(', '));
+  return t;
+}
+
+async function castLoad(d, kind) {
+  const title = await castTabTitle(d, kind);
+  const quoted = "'" + title.replace(/'/g, "''") + "'";
+  const rows = await readSheetCached(d, CASTING_SHEET_ID, quoted + '!A1:ZZ');
+  const headers = (rows[0] || []).map(x => String(x == null ? '' : x).trim());
+  let last = headers.length;
+  while (last > 0 && !headers[last - 1]) last--;
+  const data = rows.slice(1).filter(r => r && r.some(c => String(c == null ? '' : c).trim() !== ''));
+  return { title, headers: headers.slice(0, last), data, width: last };
+}
+
+// Date wala column: "तारीख" / "Date" ho to wahi, nahi to pehla (Timestamp)
+function castDateCol(headers) {
+  const i = headers.findIndex(h => /तारीख|दिनांक|date/i.test(h));
+  return i >= 0 ? i : 0;
+}
+
+// Ek column ka jod, chune hue date range ke liye.
+// Column "Running Sum" kehlata hai -- do roop ho sakte hain:
+//   * har row ka apna jod (846.50, 573.07, 12.40 ...)  -> range ki rows ka SUM
+//   * badhta hua cumulative total (100, 250, 480 ...)  -> range ke aakhir ka
+//     total MINUS range se theek pehle ka total (warna poora jod bahut zyada aata)
+// Pehchaan: lagbhag har step par badhe AUR aadhe se zyada step sach me badhe.
+// Kaun sa roop mila, wo "mode" me jaata hai taaki screen par dikhe.
+function castColumnTotal(data, idx, dateOf, inR) {
+  const seq = [];
+  data.forEach(r => {
+    const raw = String(r[idx] == null ? '' : r[idx]).trim();
+    if (raw === '') return;
+    seq.push({ v: castNum(r[idx]), iso: dateOf(r) });
+  });
+  let cum = false;
+  if (seq.length >= 6) {
+    let ge = 0, gt = 0;
+    for (let i = 1; i < seq.length; i++) {
+      if (seq[i].v >= seq[i - 1].v) ge++;
+      if (seq[i].v > seq[i - 1].v) gt++;
+    }
+    const steps = seq.length - 1;
+    cum = ge / steps >= 0.98 && gt / steps >= 0.5 && seq[seq.length - 1].v > seq[0].v;
+  }
+  if (!cum) {
+    return { total: seq.filter(x => inR(x.iso)).reduce((a, x) => a + x.v, 0), mode: 'sum', count: seq.length };
+  }
+  let first = -1, lastIn = -1;
+  seq.forEach((x, i) => { if (inR(x.iso)) { if (first < 0) first = i; lastIn = i; } });
+  if (first < 0) return { total: 0, mode: 'running', count: seq.length };
+  const before = first > 0 ? seq[first - 1].v : 0;
+  return { total: seq[lastIn].v - before, mode: 'running', count: seq.length };
+}
+
+// Settlement sheet: kis category me kitna diya gaya. Columns ke naam pata
+// nahi the, isliye pehchaan data se karte hain:
+//   * amount  -> jis column ke header me amount/राशि/रकम/payment aaye
+//   * category-> jis column me sabse zyada "Stone"/"Casting" likha ho
+// Category column na mile to poori row ka text dekhte hain.
+function castSettlement(st, inR, warnings) {
+  const headers = st.headers;
+  const dateCol = castDateCol(headers);
+  const dateOf = r => castISO(r[dateCol]) || castISO(r[0]);
+
+  const amtRe = /amount|राशि|रकम|भुगतान|payment|paid|रुपय/i;
+  const amtCols = [];
+  headers.forEach((h, i) => { if (i !== dateCol && amtRe.test(h)) amtCols.push(i); });
+  const amountCol = amtCols.length ? amtCols[0] : -1;
+  if (amtCols.length > 1) {
+    warnings.push('Settlement sheet me "amount" jaise ' + amtCols.length + ' column mile (' +
+      amtCols.map(i => castLetter(i) + ': ' + headers[i]).join(', ') + ') -- pehla (' + castLetter(amountCol) + ') liya');
+  }
+  if (amountCol < 0) warnings.push('Settlement sheet me amount ka column nahi mila (header me amount / राशि / रकम / payment dhoondha)');
+
+  const catRe = /stone|स्टोन|cast|कास्ट/i;
+  let catCol = -1, best = 0;
+  for (let c = 0; c < Math.max(st.width, 1); c++) {
+    if (c === amountCol) continue;
+    let k = 0;
+    st.data.forEach(r => { if (catRe.test(String(r[c] == null ? '' : r[c]))) k++; });
+    if (k > best) { best = k; catCol = c; }
+  }
+
+  const given = { stone: 0, casting: 0, other: 0, all: 0, stoneN: 0, castingN: 0, otherN: 0 };
+  st.data.forEach(r => {
+    if (!inR(dateOf(r))) return;
+    const amt = amountCol >= 0 ? castNum(r[amountCol]) : 0;
+    const text = catCol >= 0 ? String(r[catCol] == null ? '' : r[catCol]) : r.join(' ');
+    const kind = /stone|स्टोन/i.test(text) ? 'stone' : (/cast|कास्ट/i.test(text) ? 'casting' : 'other');
+    given[kind] += amt; given[kind + 'N']++; given.all += amt;
+  });
+
+  const cats = [];
+  if (catCol >= 0) {
+    const seen = new Set();
+    st.data.forEach(r => { const v = String(r[catCol] == null ? '' : r[catCol]).trim(); if (v && seen.size < 12) seen.add(v.slice(0, 40)); });
+    cats.push(...seen);
+  }
+  return {
+    given, dateCol, amountCol, catCol, dateOf, categories: cats,
+    mapping: {
+      date: castLetter(dateCol) + (headers[dateCol] ? ' (' + headers[dateCol] + ')' : ''),
+      amount: amountCol >= 0 ? castLetter(amountCol) + ' (' + headers[amountCol] + ')' : null,
+      category: catCol >= 0 ? castLetter(catCol) + (headers[catCol] ? ' (' + headers[catCol] + ')' : '') : 'poori row ka text'
+    }
+  };
+}
+
+// Silver tab ke OUT entry jinka Karigar/Doer "Bappi" hai -- unka silver ka jod
+async function castSilverIssue(d, inR) {
+  const rows = await d.findAll('Silver_Stock').catch(() => []);
+  let total = 0, count = 0;
+  rows.forEach(r => {
+    if (String(r.entry_type || '').toUpperCase() !== 'OUT') return;
+    if (!/bappi/i.test(String(r.vendor || ''))) return;
+    if (!inR(String(r.entry_date || '').slice(0, 10))) return;
+    total += castNum(r.weight); count++;
+  });
+  return { total, count };
+}
+
+// Google Form ka link. PDF me links nahi the, isliye admin app se hi daal sakta
+// hai (App_State me rakha jaata hai) -- redeploy ki zaroorat nahi. Sirf asli
+// Google Form ka link maana jaata hai, kuch bhi nahi (javascript: wagairah).
+const CAST_FORM_RE = /^https:\/\/(docs\.google\.com\/forms\/|forms\.gle\/|forms\.google\.com\/)\S+$/i;
+async function castFormUrl(d, kind) {
+  try {
+    if (typeof d.findWhere === 'function') {
+      const rows = await d.findWhere('App_State', { key_name: 'casting_form_' + kind });
+      const v = rows && rows[0] ? String(rows[0].value || '').trim() : '';
+      if (v && CAST_FORM_RE.test(v)) return v;
+    }
+  } catch (e) { /* link na padh paye to config wala (khali) */ }
+  return CASTING_TABS[kind].form || '';
+}
+// Khali url = link hata do
+async function castSaveFormUrl(d, kind, raw) {
+  const url = String(raw == null ? '' : raw).trim();
+  if (url && (url.length > 500 || !CAST_FORM_RE.test(url))) {
+    const err = new Error('Ye Google Form ka link nahi lagta (docs.google.com/forms/... ya forms.gle/... hona chahiye)');
+    err.status = 400;
+    throw err;
+  }
+  const key = 'casting_form_' + kind;
+  const rows = await d.findWhere('App_State', { key_name: key });
+  const nowStr = new Date(Date.now() + 330 * 60000).toISOString().replace('T', ' ').split('.')[0];
+  if (rows && rows.length) await d.update('App_State', rows[0].id, { value: url, updated_at: nowStr });
+  else await d.insert('App_State', { key_name: key, value: url, updated_at: nowStr });
+  return url;
+}
+
+// Ek tab ka poora jawab: rows (date ke hisaab se chhaanti hui), KPI, aur ye
+// ki kaun sa column liya. kind = settlement | stone | casting
+async function castingBuild(d, kind, fromQ, toQ) {
+  const cfg = CASTING_TABS[kind];
+  const today = new Date(Date.now() + 330 * 60000).toISOString().split('T')[0];
+  const R = castRange(fromQ, toQ, today);
+  const inR = iso => !R.none && !!iso && iso >= R.from && iso <= R.to;
+  const warnings = [];
+
+  const main = await castLoad(d, kind);
+  const dateCol = castDateCol(main.headers);
+  const dateOf = r => castISO(r[dateCol]) || castISO(r[0]);
+  const used = [];                         // KPI me jo columns lage
+  const kpis = [];
+
+  // Settlement sheet: settlement tab me wahi, baaki dono tab me alag se padhte hain
+  let S = null;
+  if (kind === 'settlement') {
+    S = castSettlement(main, inR, warnings);
+  } else {
+    try { S = castSettlement(await castLoad(d, 'settlement'), inR, warnings); }
+    catch (e) { warnings.push('Settlement tab padh nahi paya, isliye "Amount Given" nahi dikha sakte: ' + e.message); }
+  }
+  const checkCol = (letter, what) => {
+    const i = castCol(letter);
+    if (main.headers.length && i >= Math.max(main.width, ...main.data.map(r => r.length))) {
+      warnings.push('Sheet me column ' + letter + ' nahi hai (' + what + ')');
+    }
+    used.push(i);
+    return i;
+  };
+  const colName = i => castLetter(i) + (main.headers[i] ? ' (' + main.headers[i] + ')' : '');
+  const modeNote = t => t.mode === 'running' ? 'cumulative column: range ka antar liya' : 'range ki rows ka jod';
+
+  if (kind === 'settlement') {
+    kpis.push({ label: 'Total Settlement Given', value: S.given.all, kind: 'money', tone: 'out',
+                sub: (S.given.stoneN + S.given.castingN + S.given.otherN) + ' entries' });
+    kpis.push({ label: 'Stone Setting', value: S.given.stone, kind: 'money', tone: 'balance', sub: S.given.stoneN + ' entries' });
+    kpis.push({ label: 'Casting Setting', value: S.given.casting, kind: 'money', tone: 'in', sub: S.given.castingN + ' entries' });
+    if (S.given.otherN) kpis.push({ label: 'Other / unmapped', value: S.given.other, kind: 'money', tone: 'out', sub: S.given.otherN + ' entries -- category pehchaani nahi gayi' });
+  }
+
+  if (kind === 'stone') {
+    const vI = checkCol('V', 'labour'), sI = checkCol('S', 'silver'), uI = checkCol('U', 'silver');
+    const labour = castColumnTotal(main.data, vI, dateOf, inR);
+    const sT = castColumnTotal(main.data, sI, dateOf, inR);
+    const uT = castColumnTotal(main.data, uI, dateOf, inR);
+    const silverUsed = sT.total * 0.95 + uT.total;
+    const given = S ? S.given.stone : null;
+    kpis.push({ label: 'Total Labour Amount', value: labour.total, kind: 'money', tone: 'balance',
+                sub: 'column ' + colName(vI) + ' -- ' + modeNote(labour) });
+    kpis.push({ label: 'Total Amount Given', value: given, kind: 'money', tone: 'in',
+                sub: 'Settlement me sirf "Stone Setting"' });
+    kpis.push({ label: 'Outstanding Labour', value: given == null ? null : labour.total - given, kind: 'money', tone: 'out',
+                sub: 'labour - amount given' });
+    kpis.push({ label: 'Total Silver Used', value: silverUsed, kind: 'weight', tone: 'balance',
+                sub: '(S ' + (sT.total).toFixed(3) + ' x 0.95) + U ' + (uT.total).toFixed(3) });
+    const si = await castSilverIssue(d, inR);
+    kpis.push({ label: 'Silver Issue', value: si.total, kind: 'weight', tone: 'out',
+                sub: 'Silver tab: Bappi ko OUT (' + si.count + ' entries)' });
+  }
+
+  if (kind === 'casting') {
+    const hI = checkCol('H', 'labour');
+    const labour = castColumnTotal(main.data, hI, dateOf, inR);
+    const given = S ? S.given.casting : null;
+    kpis.push({ label: 'Total Labour Amount', value: labour.total, kind: 'money', tone: 'balance',
+                sub: 'column ' + colName(hI) + ' -- ' + modeNote(labour) });
+    kpis.push({ label: 'Total Amount Given', value: given, kind: 'money', tone: 'in',
+                sub: 'Settlement me sirf "Casting Setting"' });
+    kpis.push({ label: 'Outstanding Labour', value: given == null ? null : labour.total - given, kind: 'money', tone: 'out',
+                sub: 'labour - amount given' });
+  }
+
+  const width = Math.max(main.width, ...used.map(i => i + 1), 0);
+  const headers = [];
+  for (let i = 0; i < width; i++) headers.push(main.headers[i] || ('(' + castLetter(i) + ')'));
+  const rows = main.data
+    .map((r, idx) => ({ iso: dateOf(r), idx, cells: headers.map((_, i) => String(r[i] == null ? '' : r[i])) }))
+    .filter(x => inR(x.iso))
+    .sort((a, b) => (a.iso < b.iso ? 1 : a.iso > b.iso ? -1 : b.idx - a.idx))
+    .slice(0, 3000)
+    .map(x => ({ date: x.iso, cells: x.cells }));
+
+  return {
+    kind, title: cfg.title, formUrl: await castFormUrl(d, kind),
+    from: R.from, to: R.to, minFrom: CASTING_FROM,
+    headers, rows, total: rows.length, kpis, warnings,
+    mapping: {
+      tab: main.title, dateColumn: castLetter(dateCol) + (main.headers[dateCol] ? ' (' + main.headers[dateCol] + ')' : ''),
+      settlement: S ? S.mapping : null
+    }
+  };
+}
+
+// Sirf ye dekhne ke liye ki sheet ka dhaancha kaisa mila -- column ke naam,
+// kaun sa column kaise pehchana gaya. Koi rakam ya entry nahi bhejta.
+async function castingProbe(d) {
+  const out = {};
+  for (const kind of Object.keys(CASTING_TABS)) {
+    try {
+      const m = await castLoad(d, kind);
+      const dateCol = castDateCol(m.headers);
+      const dateOf = r => castISO(r[dateCol]) || castISO(r[0]);
+      const dates = m.data.map(dateOf).filter(Boolean).sort();
+      const info = {
+        tab: m.title, entries: m.data.length,
+        pehli_date: dates[0] || null, aakhri_date: dates[dates.length - 1] || null,
+        columns: m.headers.map((h, i) => castLetter(i) + ': ' + (h || '(khali)')),
+        date_column: castLetter(dateCol)
+      };
+      const colsToCheck = kind === 'stone' ? ['S', 'U', 'V'] : (kind === 'casting' ? ['H'] : []);
+      info.kpi_columns = colsToCheck.map(L => {
+        const i = castCol(L);
+        const t = castColumnTotal(m.data, i, dateOf, () => true);
+        return L + ': ' + (m.headers[i] || '(header khali)') + ' -- ' + (i < Math.max(m.width, 1) || m.data.some(r => r[i] != null) ? ('mode=' + t.mode + ', ' + t.count + ' bhari cell') : 'COLUMN SHEET ME NAHI HAI');
+      });
+      if (kind === 'settlement') {
+        const w = [];
+        const S = castSettlement(m, () => true, w);
+        info.settlement_mapping = S.mapping;
+        info.categories_mile = S.categories;
+        info.warnings = w;
+      }
+      out[kind] = info;
+    } catch (e) { out[kind] = { error: e.message }; }
+  }
+  return out;
+}
+// ══ CASTING_BLOCK_END ══
+
+app.get('/api/casting/:kind', requireAuth, async (req, res) => {
+  try {
+    const kind = String(req.params.kind || '').toLowerCase();
+    if (!CASTING_TABS[kind]) return res.status(400).json({ error: 'Galat tab' });
+    const d = await getDB();
+    const me = await d.findOne('Users', { id: String(req.session.userId) });
+    if (!castingAllowed(me)) return res.status(403).json({ error: 'Not allowed' });
+    if (!d.sheets) return res.status(503).json({ error: 'Google Sheets abhi connect nahi hai' });
+    res.json(await castingBuild(d, kind, req.query.from, req.query.to));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Form ka link badlo -- sirf admin
+app.put('/api/casting/:kind/form', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const kind = String(req.params.kind || '').toLowerCase();
+    if (!CASTING_TABS[kind]) return res.status(400).json({ error: 'Galat tab' });
+    const d = await getDB();
+    await ensureAppStateTab(d);
+    const url = await castSaveFormUrl(d, kind, (req.body || {}).url);
+    res.json({ success: true, url });
+  } catch (e) { res.status(e.status || 500).json({ error: e.message }); }
 });
 
 // ══════════════════════════════════════════════════════
