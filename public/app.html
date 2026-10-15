@@ -1619,6 +1619,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
         <span id="apprSearchClear" onclick="clearApprSearch()" title="Clear"
           style="display:none;position:absolute;right:9px;top:50%;transform:translateY(-50%);cursor:pointer;color:#94a3b8;font-size:14px;line-height:1">✕</span>
       </div>
+      <button id="apprGroupBtn" class="btn btn-outline btn-sm" onclick="toggleApprGroupBy()" title="Doer ke hisaab se group karo / seedhi list">👥 Group by Doer: ON</button>
     </div>
 
     <!-- Task approvals panel -->
@@ -6006,6 +6007,8 @@ function switchApprovalTab(tab, el) {
   // use chhupa dete hain -- warna box dikhta aur kaam kuch na karta.
   const sw = document.getElementById('apprSearchWrap');
   if (sw) sw.style.display = tab==='task' ? 'block' : 'none';
+  const gb = document.getElementById('apprGroupBtn');
+  if (gb) gb.style.display = tab==='task' ? '' : 'none';
   if (tab==='transfer') loadTransferApprovals();
 }
 
@@ -6027,6 +6030,51 @@ function clearApprSearch() {
   if (b) { b.value = ''; b.focus(); }
   renderApprovals();
 }
+// Doer-wise grouping (Harsh, 15 Oct: "approval wale sidebar me grouping kar do
+// doer wise"). "Employee" column hi doer hai (requestedByName). Default ON --
+// har doer ka ek card, uske andar uski approvals. Button se purani seedhi list
+// par bhi ja sakte hain.
+let _apprGroupBy = true;
+// Kaunse doer ke card band kiye hain (naam se). Band wahi hote hain jo chuno;
+// baaki khule rehte hain -- isliye approve karne ke baad list dobara aaye
+// (ya naya doer aaye) tab bhi tumhara chuna hua haal bana rehta hai.
+const _apprCollapsed = new Set();
+
+function toggleApprGroupBy() {
+  _apprGroupBy = !_apprGroupBy;
+  const btn = document.getElementById('apprGroupBtn');
+  if (btn) btn.textContent = '👥 Group by Doer: ' + (_apprGroupBy ? 'ON' : 'OFF');
+  renderApprovals();
+}
+function toggleApprDoerGroup(i) {
+  const name = (window._apprGroupNames || [])[i];
+  if (name === undefined) return;
+  if (_apprCollapsed.has(name)) _apprCollapsed.delete(name); else _apprCollapsed.add(name);
+  renderApprovals();
+}
+function apprExpandAll(open) {
+  _apprCollapsed.clear();
+  if (!open) (_apprAll || []).forEach(a => _apprCollapsed.add(a.requestedByName || '—'));
+  renderApprovals();
+}
+
+// Ek approval ki <tr>. showEmp=false ho to Employee column nahi (grouped me card
+// ke header par hi naam hai). showEmp=true par output pehle jaisa hi.
+function apprRowHtml(a, isAdminOrPC, showEmp) {
+  return `
+              <tr>
+                ${showEmp ? `<td style="font-weight:600">${a.requestedByName}</td>` : ''}
+                ${isAdminOrPC ? `<td style="color:#64748b;font-size:12px">${a.requestedToName}</td>` : ''}
+                <td>${a.description||'—'}</td>
+                <td><span class="status-badge ${a.action_type}">${a.action_type==='completed'?'✅ Mark Complete':a.action_type==='pending'?'🆕 New Task':a.action_type==='report'?'📤 Done — Report Approval':'🔄 Revision'}</span></td>
+                <td style="color:#64748b;font-size:12px">${new Date(a.created_at).toLocaleDateString('en-IN')}</td>
+                <td>
+                  <button class="action-btn done" onclick="handleApproval(${a.id},'approved')">Approve</button>
+                  <button class="action-btn delete" style="margin-left:6px" onclick="handleApproval(${a.id},'rejected')">Reject</button>
+                </td>
+              </tr>`;
+}
+
 function renderApprovals() {
   const container = document.getElementById('approvalsContent');
   if (!container) return;
@@ -6052,7 +6100,36 @@ function renderApprovals() {
     container.innerHTML = `<div class="empty" style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;">✅ No pending task approvals!</div>`;
   } else if (!approvals.length) {
     container.innerHTML = `<div class="empty" style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;">🔍 "${maintEsc(q)}" se kuch nahi mila — ${_apprAll.length} approvals me se koi match nahi</div>`;
+  } else if (_apprGroupBy) {
+    // ── Doer-wise: har doer ka ek card ──
+    const groups = {};
+    approvals.forEach(a => { const nm = a.requestedByName || '—'; (groups[nm] = groups[nm] || []).push(a); });
+    const names = Object.keys(groups).sort((x, y) => x.localeCompare(y));
+    window._apprGroupNames = names;
+    // Search chalu ho to saare card khule dikhao -- warna band card ke andar
+    // chhupe nateeje nazar hi nahi aate
+    const thead = `<thead><tr>${isAdminOrPC ? '<th>Approver</th>' : ''}<th>Task</th><th>Action Requested</th><th>Requested On</th><th>Approve / Reject</th></tr></thead>`;
+    container.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+        <div style="font-size:13px;color:#64748b;font-weight:600">${names.length} doer(s) · ${approvals.length} approval(s)</div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-outline btn-sm" onclick="apprExpandAll(true)">Expand all</button>
+          <button class="btn btn-outline btn-sm" onclick="apprExpandAll(false)">Collapse all</button>
+        </div>
+      </div>
+      ${names.map((name, i) => {
+        const list = groups[name];
+        const open = !!q || !_apprCollapsed.has(name);
+        return `<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:10px;overflow:hidden">
+          <div ${q ? '' : `onclick="toggleApprDoerGroup(${i})"`} style="padding:12px 16px;display:flex;align-items:center;justify-content:space-between;${q ? '' : 'cursor:pointer;'}background:#f8fafc">
+            <div style="font-size:14px;font-weight:700;color:#1e293b"><span style="color:#64748b">${open ? '▼' : '▶'}</span> ${maintEsc(name)}</div>
+            <span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe">${list.length} approval${list.length > 1 ? 's' : ''}</span>
+          </div>
+          ${open ? `<div class="flat-tasks-table" style="border:none;border-radius:0"><div style="overflow-x:auto"><table style="min-width:640px">${thead}<tbody>${list.map(x => apprRowHtml(x, isAdminOrPC, false)).join('')}</tbody></table></div></div>` : ''}
+        </div>`;
+      }).join('')}`;
   } else {
+    // ── Seedhi list (purana tareeka, jyun ka tyun) ──
     container.innerHTML = `
       <div class="flat-tasks-table">
         <table>
@@ -6060,18 +6137,7 @@ function renderApprovals() {
             <th>Employee</th>${isAdminOrPC ? '<th>Approver</th>' : ''}<th>Task</th><th>Action Requested</th><th>Requested On</th><th>Approve / Reject</th>
           </tr></thead>
           <tbody>
-            ${approvals.map(a => `
-              <tr>
-                <td style="font-weight:600">${a.requestedByName}</td>
-                ${isAdminOrPC ? `<td style="color:#64748b;font-size:12px">${a.requestedToName}</td>` : ''}
-                <td>${a.description||'—'}</td>
-                <td><span class="status-badge ${a.action_type}">${a.action_type==='completed'?'✅ Mark Complete':a.action_type==='pending'?'🆕 New Task':a.action_type==='report'?'📤 Done — Report Approval':'🔄 Revision'}</span></td>
-                <td style="color:#64748b;font-size:12px">${new Date(a.created_at).toLocaleDateString('en-IN')}</td>
-                <td>
-                  <button class="action-btn done" onclick="handleApproval(${a.id},'approved')">Approve</button>
-                  <button class="action-btn delete" style="margin-left:6px" onclick="handleApproval(${a.id},'rejected')">Reject</button>
-                </td>
-              </tr>`).join('')}
+            ${approvals.map(a => apprRowHtml(a, isAdminOrPC, true)).join('')}
           </tbody>
         </table>
       </div>`;
