@@ -2221,7 +2221,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     <div class="dash-bottom" id="goldGrid" style="grid-template-columns:360px minmax(0,1fr);gap:18px;align-items:start">
 
       <!-- ── Nayi entry ── -->
-      <div class="task-table-card">
+      <div class="task-table-card" id="goldFormCard">
         <div class="card-head">
           <div class="card-head-title" id="goldFormTitle">Add Stock Entry</div>
           <button class="btn btn-outline" id="goldCancelEdit" onclick="clearGoldForm()"
@@ -8043,6 +8043,10 @@ function goldErr(msg) {
   if (!el) return;
   if (!msg) { el.style.display = 'none'; el.textContent = ''; return; }
   el.textContent = msg; el.style.display = 'block';
+  // Ye box form ke SABSE UPAR hai. Update/Save neeche dabate ho (khaaskar phone
+  // par) to error nazar hi nahi aata tha aur lagta tha kuch hua hi nahi. Isliye
+  // toast me bhi dikhao -- wo hamesha screen par aata hai.
+  showToast(msg, 'error');
 }
 
 function switchGoldTab(kind, el) {
@@ -8076,7 +8080,10 @@ async function loadGold(force) {
   // badlo to Stock ka slow jawab baad me aakar Silver ka data kuchal sakta tha.
   const maangaKhaata = _goldKind;
   try {
-    const r = await api('/api/gold/' + maangaKhaata + (force ? '?refresh=1' : ''));
+    // Har baar alag URL -- warna app ka cache purani list wapas de deta hai
+    // (15 sec tak seedha, uske baad bhi pehle purani, taaza baad me) aur Refresh
+    // dabane par bhi kuch nahi badalta tha.
+    const r = await api('/api/gold/' + maangaKhaata + '?t=' + Date.now() + '-' + Math.floor(Math.random() * 1e6));
     if (maangaKhaata !== _goldKind) return;      // tab tab tak badal chuka -- ye jawab purana hai
     if (!r || r.error) throw new Error((r && r.error) || 'Could not load');
     _goldData = r;
@@ -8249,7 +8256,16 @@ function goldEdit(id) {
   goldSetType(r.type);
   document.getElementById('goldDate').value = String(r.date || '').slice(0, 10);
   document.getElementById('goldWeight').value = r.weight;
-  if (r.karat) document.getElementById('goldKarat').value = r.karat;   // list me ho to chun jayegi
+  // Purity list me na ho (purani/import wali entry, jaise "18K") to dropdown khali
+  // ho jata aur Update purity ko chupchaap khali kar deta. Isliye use list me jod do.
+  const kSel = document.getElementById('goldKarat');
+  if (r.karat) {
+    kSel.value = r.karat;
+    if (kSel.value !== String(r.karat)) {
+      kSel.innerHTML += '<option>' + maintEsc(r.karat) + '</option>';
+      kSel.value = r.karat;
+    }
+  }
   document.getElementById('goldRate').value = (r.rate === '' || r.rate == null) ? '' : r.rate;
   document.getElementById('goldVendor').value = r.vendor || '';
   document.getElementById('goldRemarks').value = r.remarks || '';
@@ -8257,9 +8273,22 @@ function goldEdit(id) {
   document.getElementById('goldImageInfo').innerHTML = r.hasImage
     ? '<span style="color:#64748b">Purani photo lagi hai — nayi chuno to badal jayegi</span>' : '';
   document.getElementById('goldSaveBtn').textContent = 'Update Transaction';
-  document.getElementById('goldFormTitle').textContent = 'Edit Stock Entry';
+  // Kaun si entry edit ho rahi hai, wahi likha dikhe -- galat row ka dhokha na ho
+  document.getElementById('goldFormTitle').textContent =
+    'Edit Stock Entry \u00b7 ' + maintDate(r.date) + ' \u00b7 ' + r.type + ' \u00b7 ' + goldG(r.weight);
   document.getElementById('goldCancelEdit').style.display = '';
-  document.getElementById('page-gold').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  // Seedha FORM tak le jao (pehle poore page ke upar jaata tha -- phone par form
+  // list ke upar alag card me hai, wo nazar hi nahi aata tha) aur ek pal chamkao.
+  const t = document.getElementById('goldFormTitle');
+  const card = (t && t.closest) ? t.closest('.task-table-card') : null;
+  const target = card || document.getElementById('page-gold');
+  if (target && target.scrollIntoView) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (card && card.style) {
+    card.style.boxShadow = '0 0 0 3px #10b981, 0 4px 20px rgba(0,0,0,0.07)';
+    setTimeout(function () { card.style.boxShadow = ''; }, 1600);
+  }
+  const wEl = document.getElementById('goldWeight');
+  if (wEl && wEl.focus) { try { wEl.focus({ preventScroll: true }); } catch (e) { /* purana browser */ } }
 }
 
 async function goldDelete(id) {
