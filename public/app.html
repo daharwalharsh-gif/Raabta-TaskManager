@@ -8063,6 +8063,11 @@ function switchGoldTab(kind, el) {
 }
 
 async function loadGold(force) {
+  // Page PEHLI BAAR khule to bhi purity ki list, heading aur label bhar do.
+  // Pehle ye sirf IN/OUT dabane ya tab badalne par chalta tha, isliye Gold page
+  // pehli baar kholne par Purity / Karat ka dropdown KHALI dikhta tha (Harsh,
+  // 16 Oct). Baar-baar chalane me koi dikkat nahi: chuni hui purity bani rehti hai.
+  goldApplyCfg();
   const body = document.getElementById('goldBody');
   if (body && !(_goldData.rows || []).length) body.innerHTML = '<tr><td colspan="9" class="empty">Loading…</td></tr>';
   const d = document.getElementById('goldDate');
