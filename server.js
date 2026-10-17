@@ -5150,6 +5150,31 @@ app.get('/api/users/with-pending-tasks', requireAuth, async (req, res) => {
 // ══════════════════════════════════════════════════════
 // USERS
 // ══════════════════════════════════════════════════════
+// ══ USERS_PW_ROUTE_START ══
+// Admin: kai users ke password ek saath -- Users page ka role tab khulte hi us tab ke
+// password dikhane ke liye (Harsh, 17 Oct). Is app me password seedha DB me rakha hota hai
+// (login "user.password !== password" se milta hai), isliye yahi asli password hai.
+// SIRF admin; baaki sab ko 403. Password ka text log me kabhi nahi likhte -- sirf ginti.
+app.get('/api/users/passwords', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const ids = String(req.query.ids || '')
+      .split(',')
+      .map(x => parseInt(x, 10))
+      .filter(x => Number.isInteger(x) && x > 0)
+      .slice(0, 500);
+    if (!ids.length) return res.json({ passwords: {} });
+    const want = new Set(ids.map(String));
+    const all = await db.findAll('Users');
+    const passwords = {};
+    all.forEach(u => {
+      if (u && want.has(String(u.id)) && u.password) passwords[u.id] = String(u.password);
+    });
+    console.log('  Password dekhe (admin id ' + req.session.userId + '): ' + Object.keys(passwords).length + ' users');
+    res.json({ passwords });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+// ══ USERS_PW_ROUTE_END ══
+
 app.get('/api/users', requireAuth, async (req, res) => {
   try {
     const all = await db.findAll('Users');
@@ -5158,7 +5183,9 @@ app.get('/api/users', requireAuth, async (req, res) => {
       notification_email: u.notification_email || '',
       role: u.role, phone: u.phone || '',
       department: u.department || '', week_off: u.week_off || '',
-      extra_off: u.extra_off || ''
+      extra_off: u.extra_off || '',
+      // Sirf admin ko: password set hai ya nahi (password khud is list me KABHI nahi jaata)
+      ...(req.session.role === 'admin' ? { hasPassword: !!u.password } : {})
     }));
     // Sort: admin first, then by name
     result.sort((a, b) => {

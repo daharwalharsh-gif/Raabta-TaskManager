@@ -624,6 +624,9 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
   .users-grid td:nth-child(3){font-size:11px;color:#94a3b8;padding-bottom:1px !important;}
   .users-grid td:nth-child(4){font-size:11px;color:#94a3b8;padding-bottom:5px !important;}
   .users-grid td:nth-child(5){display:inline-flex !important;padding-bottom:0 !important;}
+  /* Password (sirf admin ko) 6th -- card ke neeche, Role ke baad */
+  .users-grid td.u-pw{padding-top:8px !important;font-size:12px;color:#475569;}
+  .users-grid td.u-pw .u-pw-btn{font-size:11px;padding:3px 9px;}
 
   /* ══════════════════════════════════════
      MAINTENANCE — PHONE VIEW
@@ -833,11 +836,11 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
   #maintImageModal .modal{
     max-width:100% !important;width:calc(100vw - 20px) !important;padding:14px;
   }
-  .users-grid td:nth-child(6){
+  .users-grid td.u-act{
     position:absolute !important;top:12px;right:10px;
     display:flex !important;gap:5px;padding:0 !important;width:auto !important;
   }
-  .users-grid td:nth-child(6) .action-btn{
+  .users-grid td.u-act .action-btn{
     white-space:nowrap !important;font-size:10px;padding:5px 10px;border-radius:7px;
   }
   /* Users page — search bar full width */
@@ -1555,9 +1558,11 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
         <button class="btn btn-primary" onclick="openAddUser()">+ Add User</button>
       </div>
     </div>
+    <!-- Role ke hisaab se tab: All / Admin / HOD / PC / User (counts ke saath) -->
+    <div class="tab-group" id="usersRoleTabs" style="margin-bottom:14px;width:fit-content;max-width:100%;overflow-x:auto"></div>
     <div class="users-grid">
       <table>
-        <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Department</th><th>Role</th><th>Action</th></tr></thead>
+        <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Department</th><th>Role</th><th id="usersPwTh" style="display:none">Password</th><th>Action</th></tr></thead>
         <tbody id="usersTbody"></tbody>
       </table>
     </div>
@@ -5792,16 +5797,117 @@ async function uploadCSVC() {
 // USERS
 // ══════════════════════════════════════════════════════
 let allUsersData = [];
+let _usersRoleTab = '';           // '' = All, warna admin / hod / pc / user
 
 async function loadUsers() {
   allUsersData = await api('/api/users');
-  renderUsersTable(allUsersData);
+  _userPwCache.clear();           // edit / naya user / delete ke baad purana password kabhi na dikhe
+  renderUsersTabs();
+  filterUsers();
 }
+
+// ══ USERS_PW_START ══
+// Role tab (All nahi) khulte hi us tab ke saare password apne aap dikhte hain (admin ko),
+// jaisa Raabta PMS me hai. "All" tab me chhupe rehte hain; eye se ek-ek dekh/chhupa sakte
+// ho. Sab ek hi request me aate hain; search me dobara na maangna pade isliye 60 sec yaad.
+const USERS_ROLES = [['admin', '👑 Admin'], ['hod', '🏢 HOD'], ['pc', '🖥️ PC'], ['user', '👤 User']];
+const _USER_PW_TTL = 60 * 1000;
+const _userPwCache = new Map();    // id -> { pw, at }
+function _pwGet(id) { const h = _userPwCache.get(String(id)); return h && Date.now() - h.at < _USER_PW_TTL ? h.pw : null; }
+function _pwSet(id, pw) { _userPwCache.set(String(id), { pw: pw, at: Date.now() }); }
+function _isAdminMe() { return typeof ME !== 'undefined' && ME && ME.role === 'admin'; }
+
+function renderUsersTabs() {
+  const box = document.getElementById('usersRoleTabs');
+  if (!box) return;
+  const counts = {};
+  (allUsersData || []).forEach(u => { counts[u.role] = (counts[u.role] || 0) + 1; });
+  const tab = (key, label, n) => '<div class="tab' + (_usersRoleTab === key ? ' active' : '') + '" onclick="setUsersRoleTab(\'' + key + '\')" style="white-space:nowrap">' +
+    label + ' <span style="font-weight:500;opacity:.7">' + n + '</span></div>';
+  box.innerHTML = tab('', 'All', (allUsersData || []).length) +
+    USERS_ROLES.map(r => tab(r[0], r[1], counts[r[0]] || 0)).join('');
+}
+
+function setUsersRoleTab(role) {
+  _usersRoleTab = role || '';
+  renderUsersTabs();
+  filterUsers();
+}
+
+// Ek cell me password dikha do (eye "chhupao" ban jaye, Copy button aa jaye)
+function _pwReveal(cell, pw) {
+  const code = cell.querySelector('code');
+  code.textContent = pw;
+  cell.dataset.shown = '1';
+  const eye = cell.querySelector('[data-pw-eye]');
+  if (eye) eye.textContent = '🙈';
+  if (!cell.querySelector('[data-pw-copy]')) {
+    const cp = document.createElement('button');
+    cp.type = 'button';
+    cp.className = 'action-btn u-pw-btn';
+    cp.dataset.pwCopy = '1';
+    cp.style.marginLeft = '4px';
+    cp.title = 'Copy password';
+    cp.textContent = '📋';
+    cp.addEventListener('click', function () { _copyUserPw(code.textContent); });
+    cell.appendChild(cp);
+  }
+}
+function _pwHide(cell) {
+  cell.querySelector('code').textContent = '••••••••';
+  const eye = cell.querySelector('[data-pw-eye]');
+  if (eye) eye.textContent = '👁';
+  delete cell.dataset.shown;
+}
+function _copyUserPw(text) {
+  const done = function () { showToast('Password copied'); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, function () { showToast('Copy nahi hua', 'error'); });
+  else showToast('Copy nahi hua', 'error');
+}
+
+// Eye dabane par: dikha hua ho to chhupao, nahi to dikhao (pehle cache, phir server)
+async function toggleUserPw(btn) {
+  const cell = btn.closest('[data-pw]');
+  if (!cell) return;
+  if (cell.dataset.shown) { _pwHide(cell); return; }
+  const id = cell.dataset.pw;
+  let pw = _pwGet(id);
+  if (pw === null) {
+    const r = await api('/api/users/passwords?ids=' + encodeURIComponent(id));
+    if (!r || r.error) { showToast((r && r.error) || 'Password nahi mila', 'error'); return; }
+    pw = (r.passwords || {})[id];
+    if (!pw) { showToast('Is user ka password saved nahi hai', 'error'); return; }
+    _pwSet(id, pw);
+  }
+  _pwReveal(cell, pw);
+}
+
+async function autoRevealUserPasswords() {
+  const cells = Array.prototype.slice.call(document.querySelectorAll('#usersTbody [data-pw]'));
+  if (!cells.length) return;
+  const need = cells.map(c => Number(c.dataset.pw)).filter(id => _pwGet(id) === null);
+  if (need.length) {
+    try {
+      const r = await api('/api/users/passwords?ids=' + need.join(','));
+      if (!r || r.error) return;       // chhupe rahenge, eye se ek-ek dekh sakte ho
+      Object.keys(r.passwords || {}).forEach(id => _pwSet(id, r.passwords[id]));
+    } catch (e) { return; }
+  }
+  cells.forEach(cell => {
+    if (cell.isConnected === false) return;   // tab tak page / tab badal chuka
+    if (cell.dataset.shown) return;           // pehle se khula (user ne khud khola)
+    const pw = _pwGet(cell.dataset.pw);
+    if (pw) _pwReveal(cell, pw);
+  });
+}
+// ══ USERS_PW_END ══
 
 function filterUsers() {
   const q = (document.getElementById('userSearch')?.value||'').toLowerCase().trim();
-  if (!q) { renderUsersTable(allUsersData); return; }
-  const filtered = allUsersData.filter(u =>
+  // Pehle role tab, phir search -- dono saath chalte hain
+  const base = _usersRoleTab ? allUsersData.filter(u => u.role === _usersRoleTab) : allUsersData;
+  if (!q) { renderUsersTable(base); return; }
+  const filtered = base.filter(u =>
     (u.name||'').toLowerCase().includes(q) ||
     (u.email||'').toLowerCase().includes(q) ||
     (u.department||'').toLowerCase().includes(q) ||
@@ -5816,8 +5922,11 @@ const _usersMap = {};
 
 function renderUsersTable(users) {
   const tbody = document.getElementById('usersTbody');
+  const showPw = _isAdminMe();                    // Password ka column sirf admin ko
+  const pwTh = document.getElementById('usersPwTh');
+  if (pwTh) pwTh.style.display = showPw ? '' : 'none';
   if (!users.length) {
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:24px;color:#94a3b8">No users found</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${showPw ? 7 : 6}" style="text-align:center;padding:24px;color:#94a3b8">No users found</td></tr>`;
     return;
   }
   // Store all users in map so openEditUser(id) can safely retrieve data
@@ -5830,11 +5939,17 @@ function renderUsersTable(users) {
       <td style="color:#64748b">${u.phone||'—'}</td>
       <td style="color:#64748b">${u.department||'—'}</td>
       <td><span class="role-badge ${u.role}">${roleLabel(u.role)}</span></td>
-      <td>
+      ${showPw ? (u.hasPassword
+        ? `<td class="u-pw"><span data-pw="${u.id}"><code>••••••••</code>
+            <button type="button" class="action-btn u-pw-btn" data-pw-eye="1" style="margin-left:4px" title="Show / hide password" onclick="toggleUserPw(this)">👁</button></span></td>`
+        : '<td class="u-pw" style="color:#94a3b8">— no password</td>') : ''}
+      <td class="u-act">
         <button class="action-btn edit" onclick="openEditUser(${u.id})">Edit</button>
         <button class="action-btn delete" style="margin-left:6px" onclick="deleteUser(${u.id})">Delete</button>
       </td>
     </tr>`).join('');
+  // Role tab (All nahi) khula ho to us tab ke saare password dikha do
+  if (showPw && _usersRoleTab) autoRevealUserPasswords();
 }
 
 function _setWeekOff(s) {
