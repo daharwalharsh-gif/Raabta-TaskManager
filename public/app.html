@@ -12048,7 +12048,12 @@ async function openNewTransferModal() {
 
 async function onTransferFromChange() {
   const val = document.getElementById('transferFromUser').value;
-  if (!val) return;
+  if (!val) {   // "-- Select user --" wapas chuna: purani list hata do
+    _transferFromUserId = null; _transferDateTasks = [];
+    document.getElementById('transferStep3').style.display = 'none';
+    document.getElementById('transferCancelBtn').style.display = 'block';
+    return;
+  }
   _transferFromUserId = parseInt(val);
   // Date ab nahi poochhte: us doer ke saare pending + revised task seedha dikhte hain
   await onTransferDateChange();
@@ -12056,6 +12061,7 @@ async function onTransferFromChange() {
 
 async function onTransferDateChange() {
   if (!_transferFromUserId) return;
+  const _forUser = _transferFromUserId;   // tez doer badalne par purani request ki list na chadhe
 
   document.getElementById('transferErr').style.display = 'none';
   document.getElementById('transferTasksListNew').innerHTML =
@@ -12069,6 +12075,7 @@ async function onTransferDateChange() {
     api('/api/tasks?type=delegation'),
     api('/api/tasks?type=checklist&includeFuture=1')
   ]);
+  if (_forUser !== _transferFromUserId) return;
 
   const allTasks = [];
   const pick = (data, type) => {
@@ -12088,6 +12095,7 @@ async function onTransferDateChange() {
       '<div style="padding:12px;color:#94a3b8;font-size:13px;text-align:center">Koi pending ya revised task nahi hai</div>';
   } else {
     const pendingRes = await api('/api/transfers/pending-tasks');
+    if (_forUser !== _transferFromUserId) return;
     const pendingIds = new Set((pendingRes||[]).map(p=>`${p.task_type}_${p.task_id}`));
     document.getElementById('transferTasksListNew').innerHTML = allTasks.map((t,i) => {
       const isPending = pendingIds.has(`${t.taskType}_${t.id}`);
