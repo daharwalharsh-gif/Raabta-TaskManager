@@ -2073,6 +2073,20 @@ function requireAdminOrHod(req, res, next) {
   if (['admin', 'hod', 'pc'].includes(req.session.role)) return next();
   res.status(403).json({ error: 'Admin or HOD only' });
 }
+// MIS Report me SABKI report dekhne wale (admin ke alawa). Harsh, 17 Oct: Cssamritisharma@gmail.com.
+// Email se milate hain. Aage kisi ko dena ho to yahan email jod do. Dhyan: client ko ye
+// /api/me ke misAll flag se pata chalta hai (misAllowed).
+const MIS_ALL_EMAILS = ['cssamritisharma@gmail.com'];
+function misAllowedUser(user) {
+  const em = String((user && user.email) || '').trim().toLowerCase();
+  return !!em && MIS_ALL_EMAILS.includes(em);
+}
+async function misSeesAll(req) {
+  try {
+    const me = await db.findOne('Users', { id: String(req.session.userId) });
+    return misAllowedUser(me);
+  } catch (e) { return false; }
+}
 function requireAdminOrPC(req, res, next) {
   if (['admin', 'pc'].includes(req.session.role)) return next();
   res.status(403).json({ error: 'Admin or PC only' });
@@ -2218,6 +2232,7 @@ app.get('/api/me', requireAuth, async (req, res) => {
       // Gold System kise dikhe -- abhi sirf admin (goldAllowed dekho)
       goldSystem: goldAllowed(user),
       castingSystem: castingAllowed(user),
+      misAll: misAllowedUser(user),
       maintView: maintAccessFor(user).view,
       maintPerson: maintAccessFor(user).person
     });
@@ -4661,9 +4676,10 @@ app.get('/api/mis', requireAuth, async (req, res) => {
   try {
     const { start, end } = req.query;
     if (!start || !end) return res.status(400).json({ error: 'Dates required' });
-    const isHod = req.session.role === 'hod';
+    const seeAll = await misSeesAll(req);
+    const isHod = req.session.role === 'hod' && !seeAll;
     // Doer (normal user) ko sirf apni report dikhti hai
-    const selfOnly = !['admin', 'hod', 'pc'].includes(req.session.role) ? String(req.session.userId) : null;
+    const selfOnly = !seeAll && !['admin', 'hod', 'pc'].includes(req.session.role) ? String(req.session.userId) : null;
     const todayStr = today();
 
     const allUsers = await db.findAll('Users');
@@ -4718,7 +4734,7 @@ app.get('/api/mis/detail', requireAuth, async (req, res) => {
     const { userId, type, start, end } = req.query;
     if (!userId || !start || !end) return res.status(400).json({ error: 'Missing params' });
     // Doer sirf apni detail dekh sakta hai
-    if (!['admin', 'hod', 'pc'].includes(req.session.role) && String(userId) !== String(req.session.userId)) {
+    if (!['admin', 'hod', 'pc'].includes(req.session.role) && String(userId) !== String(req.session.userId) && !(await misSeesAll(req))) {
       return res.status(403).json({ error: 'Not allowed' });
     }
     const tabName = type === 'delegation' ? 'Delegation_Tasks' : 'Checklist_Tasks';
@@ -4742,9 +4758,10 @@ app.get('/api/mis/all', requireAuth, async (req, res) => {
   try {
     const { start, end } = req.query;
     if (!start || !end) return res.status(400).json({ error: 'Dates required' });
-    const isHod = req.session.role === 'hod';
+    const seeAll = await misSeesAll(req);
+    const isHod = req.session.role === 'hod' && !seeAll;
     // Doer (normal user) ko sirf apni row dikhti hai
-    const selfOnly = !['admin', 'hod', 'pc'].includes(req.session.role) ? String(req.session.userId) : null;
+    const selfOnly = !seeAll && !['admin', 'hod', 'pc'].includes(req.session.role) ? String(req.session.userId) : null;
     const todayStr = today();
 
     const allUsers = await db.findAll('Users');
@@ -4842,7 +4859,8 @@ app.get('/api/mis/all', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get('/api/mis/fms', requireAuth, requireAdminOrHod, async (req, res) => {
+app.get('/api/mis/fms', requireAuth, async (req, res) => {
+  if (!['admin', 'hod', 'pc'].includes(req.session.role) && !(await misSeesAll(req))) return res.status(403).json({ error: 'Admin or HOD only' });
   try {
     const d = await getDB();
     let fmsList = [];

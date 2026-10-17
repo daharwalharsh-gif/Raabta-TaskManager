@@ -3685,7 +3685,7 @@ async function init() {
       document.getElementById('nav-mis').style.display = 'flex';
       document.getElementById('mob-mis').style.display = 'flex';
       const fmsTab = document.getElementById('misTabFMS');
-      if (fmsTab) fmsTab.style.display = 'none';
+      if (fmsTab && ME.misAll !== true) fmsTab.style.display = 'none';   // misAll wale ko sabki report, FMS bhi
     }
     if (ME.role === 'admin' || ME.role === 'hod' || ME.role === 'pc') {
       document.getElementById('nav-records').style.display = 'flex';
@@ -9087,7 +9087,7 @@ async function generateMIS() {
       }
 
       // ── Step 2: FMS Overview ko background me append karo (doer ke liye nahi) ──
-      if (misAllData.length && ME.role !== 'user') {
+      if (misAllData.length && (ME.role !== 'user' || ME.misAll === true)) {
         const container = document.getElementById('misResults');
         const placeholder = document.createElement('div');
         placeholder.id = 'fmsOverviewLoading';
