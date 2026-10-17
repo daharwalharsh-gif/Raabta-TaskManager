@@ -3208,7 +3208,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     <!-- STEP 3: Tasks list -->
     <div id="transferStep3" style="display:none">
       <div style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">
-        Tasks on selected date — <span id="transferDateLabel" style="color:#059669"></span>
+        Pending &amp; Revised tasks — <span id="transferDateLabel" style="color:#059669"></span> <span style="text-transform:none;font-weight:500;color:#94a3b8">(task par click karo = select)</span>
       </div>
       <div id="transferTasksListNew" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;max-height:220px;overflow-y:auto;margin-bottom:12px"></div>
 
@@ -12041,30 +12041,28 @@ async function openNewTransferModal() {
     document.getElementById('transferStep1').style.display = 'block';
   } else {
     _transferFromUserId = ME.id;
-    document.getElementById('transferStep2').style.display = 'block';
   }
   document.getElementById('transferModal').classList.add('open');
+  if (_transferFromUserId) await onTransferDateChange();
 }
 
 async function onTransferFromChange() {
   const val = document.getElementById('transferFromUser').value;
   if (!val) return;
   _transferFromUserId = parseInt(val);
-  document.getElementById('transferStep2').style.display = 'block';
-  document.getElementById('transferDate').value = '';
-  document.getElementById('transferStep3').style.display = 'none';
+  // Date ab nahi poochhte: us doer ke saare pending + revised task seedha dikhte hain
+  await onTransferDateChange();
 }
 
 async function onTransferDateChange() {
-  const date = document.getElementById('transferDate').value;
-  if (!date || !_transferFromUserId) return;
+  if (!_transferFromUserId) return;
 
   document.getElementById('transferErr').style.display = 'none';
   document.getElementById('transferTasksListNew').innerHTML =
     '<div style="padding:10px;color:#94a3b8;font-size:13px">Loading...</div>';
   document.getElementById('transferStep3').style.display = 'block';
   document.getElementById('transferCancelBtn').style.display = 'none';
-  document.getElementById('transferDateLabel').textContent = date;
+  document.getElementById('transferDateLabel').textContent = '';
 
   // v16: includeFuture=1 so upcoming checklist tasks bhi dikhe (transfer ke liye)
   const [delData, chlData] = await Promise.all([
@@ -12077,26 +12075,32 @@ async function onTransferDateChange() {
     const list = data.grouped
       ? (data.grouped.find(g => g.userId === _transferFromUserId)?.tasks || [])
       : (data.tasks || []);
-    list.forEach(t => { if (t.due_date === date && t.status === 'pending') allTasks.push({...t, taskType: type}); });
+    list.forEach(t => { if (t.status === 'pending' || t.status === 'revised') allTasks.push({...t, taskType: type}); });
   };
   pick(delData, 'delegation');
   pick(chlData, 'checklist');
+  allTasks.sort((a, b) => String(a.due_date || '').localeCompare(String(b.due_date || '')));
   _transferDateTasks = allTasks;
+  document.getElementById('transferDateLabel').textContent = allTasks.length + ' task';
 
   if (!allTasks.length) {
     document.getElementById('transferTasksListNew').innerHTML =
-      '<div style="padding:12px;color:#94a3b8;font-size:13px;text-align:center">No pending tasks on this date</div>';
+      '<div style="padding:12px;color:#94a3b8;font-size:13px;text-align:center">Koi pending ya revised task nahi hai</div>';
   } else {
     const pendingRes = await api('/api/transfers/pending-tasks');
     const pendingIds = new Set((pendingRes||[]).map(p=>`${p.task_type}_${p.task_id}`));
     document.getElementById('transferTasksListNew').innerHTML = allTasks.map((t,i) => {
       const isPending = pendingIds.has(`${t.taskType}_${t.id}`);
-      return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid #f1f5f9">
+      const dd = t.due_date ? String(t.due_date).split('-').reverse().join('-') : '—';
+      const rev = t.status === 'revised';
+      return `<div ${isPending ? '' : 'onclick="trRowClick(event,this)"'} style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid #f1f5f9;${isPending ? '' : 'cursor:pointer'}">
         ${isPending
           ? `<span style="font-size:10px;background:#fef9c3;color:#92400e;padding:2px 7px;border-radius:10px;font-weight:600;border:1px solid #fde68a;white-space:nowrap">⏳ Sent</span>`
-          : `<input type="checkbox" class="tr-date-cb" data-idx="${i}" checked
+          : `<input type="checkbox" class="tr-date-cb" data-idx="${i}"
               style="width:15px;height:15px;accent-color:#059669;cursor:pointer;flex-shrink:0"/>`}
         <span style="font-size:13px;flex:1">${t.description||'—'}</span>
+        <span style="font-size:11px;color:#64748b;white-space:nowrap">${dd}</span>
+        ${rev ? '<span style="font-size:10px;background:#ede9fe;color:#6d28d9;padding:2px 7px;border-radius:10px;font-weight:600">revised</span>' : ''}
         <span style="font-size:11px;background:#ecfdf5;color:#1d4ed8;padding:2px 7px;border-radius:8px;font-weight:600">${t.taskType}</span>
       </div>`;
     }).join('');
@@ -12109,6 +12113,13 @@ async function onTransferDateChange() {
   document.getElementById('transferToUser').innerHTML =
     '<option value="">-- Select user --</option>' +
     eligible.map(u=>`<option value="${u.id}">${u.name} (${u.department||u.role})</option>`).join('');
+}
+
+// Task wali row par kahin bhi click = checkbox select / unselect
+function trRowClick(ev, row) {
+  if (ev.target && ev.target.tagName === 'INPUT') { row.style.background = ev.target.checked ? '#ecfdf5' : ''; return; }
+  const cb = row.querySelector('.tr-date-cb');
+  if (cb) { cb.checked = !cb.checked; row.style.background = cb.checked ? '#ecfdf5' : ''; }
 }
 
 async function _doTransfer(tasks) {
