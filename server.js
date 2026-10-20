@@ -1868,16 +1868,18 @@ async function checkAndFireDueSlots() {
 // use chhod dete hain. Isliye app chahe din me 50 baar jaage, message ek hi
 // baar jaata hai. Aur ulta fayda bhi: pehli koshish me koi reh gaya to agli
 // baar sirf wahi bacha hua judta hai -- kisi ka chhootta bhi nahi.
+// Harsh, 20 Oct: "sab ko happy dashara ka message bhej do" -- Navratri ki jagah Dussehra.
 const FEST_WISH = {
-  naam:    'Navratri',
-  date:    '2026-10-11',        // IST ki date -- isi din jaata hai
-  fromMin: 6 * 60,              // 6:00 AM IST se
+  naam:    'Dussehra',
+  slug:    'dussehra',          // ref ka hissa -- har tyohaar ka alag, taaki purane se na takraye
+  date:    '2026-10-20',        // IST ki date -- isi din jaata hai
+  fromMin: 0,                   // deploy ke turant baad (message aaj der se maanga gaya)
   tillMin: 19 * 60,             // 7 PM ke baad bilkul nahi -- baasi greeting bekaar
   text:
-    '\u{1F33A} *Happy Navratri* \u{1F33A}\n\n' +
+    '\u{1F3F9} *Happy Dussehra* \u{1F3F9}\n\n' +
     'Hello {name},\n\n' +
-    'May Maa Durga bless you with strength, good health and happiness through these nine nights.\n\n' +
-    'Wishing you and your family a very happy and prosperous Navratri.\n\n' +
+    'May the victory of good over evil bring you strength, good health and happiness.\n\n' +
+    'Wishing you and your family a very happy and prosperous Dussehra.\n\n' +
     '\u2014 Team Raabta'
 };
 
@@ -1889,7 +1891,7 @@ async function sendFestivalWish() {
   const ist = new Date(Date.now() + 330 * 60000);
   if (ist.toISOString().split('T')[0] !== FEST_WISH.date) return { skipped: 'aaj ka din nahi' };
   const nowMin = ist.getUTCHours() * 60 + ist.getUTCMinutes();
-  if (nowMin < FEST_WISH.fromMin) return { skipped: 'abhi 6 baje nahi' };
+  if (nowMin < FEST_WISH.fromMin) return { skipped: 'abhi samay nahi hua' };
   if (nowMin >= FEST_WISH.tillMin) return { skipped: 'bahut der ho gayi' };
 
   _festWishRunning = true;
@@ -1899,7 +1901,7 @@ async function sendFestivalWish() {
       d.findAll('Users'),
       d.findAll('WA_Outbox').catch(() => [])
     ]);
-    const refFor = (u) => 'fest_navratri_' + FEST_WISH.date + '_' + u.id;
+    const refFor = (u) => 'fest_' + FEST_WISH.slug + '_' + FEST_WISH.date + '_' + u.id;
     // Jo pehle hi kataar me lag chuke -- unhe dobara mat lagao
     const pehleSe = new Set(
       outbox.filter(r => r.kind === 'festival-wish').map(r => String(r.ref || ''))
