@@ -2556,6 +2556,158 @@ app.get('/api/crm/tasks', requireAuth, async (req, res) => {
 // Logged-in user's own PENDING checklist tasks due within the next 2 days
 // (drives the dashboard notification bell — "2 din pehle" advance reminder).
 // Includes overdue + today + next 2 days.
+// ══ ALERTS_ROUTE_START ══
+// Chrome notification ke liye: pichhli baar ke baad mere liye kya NAYA aaya --
+// naya delegation / checklist task, approval ki request, transfer ki request,
+// ya koi task mujhe transfer hua. (Harsh, 21 Oct)
+// Client har table ka "aakhri dekha hua id" bhejta hai; jo usse aage hai wahi
+// naya hai. Pehli baar (id na bheja ho) sirf aaj ke max id lautate hain, taaki
+// app kholte hi purane task ki baarish na ho.
+// MySQL par sirf zaroori columns aur "id > X" wali rows padhte hain -- har
+// 30 sec poori table (attachments samet) kheenchna bhaari padta.
+async function alertMaxId(table) {
+  if (db && db.pool) {
+    const [r] = await db.pool.query('SELECT MAX(id) AS m FROM `' + table + '`');
+    return parseInt(r[0] && r[0].m) || 0;
+  }
+  return (await db.findAll(table)).reduce((m, r) => Math.max(m, parseInt(r.id) || 0), 0);
+}
+async function alertRows(table, cols, sinceId, where, params, jsFilter) {
+  if (db && db.pool) {
+    const [rows] = await db.pool.query(
+      'SELECT ' + cols.map(c => '`' + c + '`').join(', ') + ' FROM `' + table + '` WHERE id > ?' +
+      (where ? ' AND ' + where : '') + ' ORDER BY id ASC LIMIT 1000', [sinceId].concat(params || []));
+    return rows.map(r => { const o = {}; cols.forEach(c => { o[c] = r[c] == null ? '' : String(r[c]); }); return o; });
+  }
+  return (await db.findAll(table)).filter(r => (parseInt(r.id) || 0) > sinceId && jsFilter(r));
+}
+async function alertDescs(type, ids) {
+  const table = type === 'checklist' ? 'Checklist_Tasks' : 'Delegation_Tasks';
+  const out = {};
+  const uniq = [...new Set(ids.map(String))].filter(Boolean);
+  if (!uniq.length) return out;
+  if (db && db.pool) {
+    const [rows] = await db.pool.query('SELECT id, description FROM `' + table + '` WHERE id IN (?)', [uniq]);
+    rows.forEach(r => { out[String(r.id)] = String(r.description || ''); });
+    return out;
+  }
+  for (const id of uniq) { const t = await db.findOne(table, { id }); out[id] = (t && t.description) || ''; }
+  return out;
+}
+
+app.get('/api/my-alerts', requireAuth, async (req, res) => {
+  try {
+    const uid = String(req.session.userId);
+    const role = req.session.role;
+    const num = v => { const x = parseInt(v, 10); return Number.isInteger(x) && x >= 0 ? x : null; };
+    const since = { del: num(req.query.del), chl: num(req.query.chl), apr: num(req.query.apr), trf: num(req.query.trf) };
+    const canTransfer = role === 'admin' || role === 'hod' || role === 'pc';
+
+    const max = {
+      del: await alertMaxId('Delegation_Tasks'),
+      chl: await alertMaxId('Checklist_Tasks'),
+      apr: await alertMaxId('Task_Approvals'),
+      trf: await alertMaxId('Task_Transfers').catch(() => 0)
+    };
+    // Mujhe transfer hue task (approve hone par) -- inka id purana hota hai,
+    // isliye client inhe alag se "dekhe hue" ki list se milata hai
+    let tin = [];
+    try {
+      if (db && db.pool) {
+        const [rows] = await db.pool.query("SELECT id, task_id, task_type, from_user FROM `Task_Transfers` WHERE status = 'approved' AND to_user = ? ORDER BY id DESC LIMIT 20", [uid]);
+        tin = rows.map(r => ({ id: String(r.id), task_id: String(r.task_id), task_type: String(r.task_type), from_user: String(r.from_user) }));
+      } else {
+        tin = (await db.findAll('Task_Transfers')).filter(t => t.status === 'approved' && String(t.to_user) === uid)
+          .sort((a, b) => parseInt(b.id) - parseInt(a.id)).slice(0, 20);
+      }
+    } catch (e) { tin = []; }
+
+    // Pehli baar: sirf baseline
+    if (since.del === null || since.chl === null || since.apr === null || since.trf === null) {
+      return res.json({ max, items: [], tin: tin.map(t => String(t.id)) });
+    }
+
+    const users = await db.findAll('Users');
+    const nameOf = id => (users.find(u => String(u.id) === String(id)) || {}).name || '';
+    const items = [];
+
+    // 1) Naye delegation task -- mujhe diye gaye, kisi aur ne diye
+    const del = await alertRows('Delegation_Tasks', ['id', 'description', 'due_date', 'priority', 'assigned_by', 'assigned_to', 'status'],
+      since.del, 'assigned_to = ? AND assigned_by <> ?', [uid, uid],
+      t => String(t.assigned_to) === uid && String(t.assigned_by) !== uid);
+    del.filter(t => (t.status || 'pending') === 'pending').forEach(t => items.push({
+      kind: 'delegation', id: parseInt(t.id), description: t.description, due_date: t.due_date,
+      priority: t.priority || 'low', byName: nameOf(t.assigned_by)
+    }));
+
+    // 2) Naye checklist task -- ek saath kai bante hain, isliye naam ke hisaab se ek
+    const chl = await alertRows('Checklist_Tasks', ['id', 'description', 'due_date', 'frequency', 'assigned_by', 'assigned_to', 'status'],
+      since.chl, 'assigned_to = ? AND assigned_by <> ?', [uid, uid],
+      t => String(t.assigned_to) === uid && String(t.assigned_by) !== uid);
+    const groups = {};
+    chl.forEach(t => {
+      const k = (t.description || '') + '|' + (t.assigned_by || '');
+      if (!groups[k]) groups[k] = { kind: 'checklist', id: parseInt(t.id), description: t.description, frequency: t.frequency || '',
+        first_due: t.due_date, count: 0, byName: nameOf(t.assigned_by) };
+      groups[k].count++;
+      if (t.due_date && (!groups[k].first_due || t.due_date < groups[k].first_due)) groups[k].first_due = t.due_date;
+    });
+    Object.values(groups).forEach(g => items.push(g));
+
+    // 3) Approval ki request -- wahi jo mere Approvals page par aati (admin/PC ko sab)
+    const apr = await alertRows('Task_Approvals', ['id', 'task_id', 'task_type', 'requested_by', 'requested_to', 'action_type', 'status'],
+      since.apr, "status = 'pending'", [], t => t.status === 'pending');
+    const myApr = apr.filter(a => role === 'admin' || role === 'pc' || String(a.requested_to) === uid)
+      .filter(a => String(a.requested_by) !== uid);
+    if (myApr.length) {
+      const dd = await alertDescs('delegation', myApr.filter(a => a.task_type !== 'checklist').map(a => a.task_id));
+      const cd = await alertDescs('checklist', myApr.filter(a => a.task_type === 'checklist').map(a => a.task_id));
+      myApr.forEach(a => items.push({
+        kind: 'approval', id: parseInt(a.id), action_type: a.action_type,
+        description: (a.task_type === 'checklist' ? cd : dd)[String(a.task_id)] || '',
+        byName: nameOf(a.requested_by)
+      }));
+    }
+
+    // 4) Transfer ki request -- admin ko sab, HOD/PC ko apne department ki
+    if (canTransfer) {
+      let trf = await alertRows('Task_Transfers', ['id', 'task_id', 'task_type', 'from_user', 'to_user', 'requested_by', 'status'],
+        since.trf, "status = 'pending'", [], t => t.status === 'pending').catch(() => []);
+      trf = trf.filter(t => String(t.requested_by) !== uid);
+      if (role !== 'admin') {
+        const dept = (users.find(u => String(u.id) === uid) || {}).department || '';
+        const deptIds = users.filter(u => u.department === dept).map(u => String(u.id));
+        trf = trf.filter(t => deptIds.includes(String(t.from_user)) || deptIds.includes(String(t.to_user)));
+      }
+      if (trf.length) {
+        const dd = await alertDescs('delegation', trf.filter(t => t.task_type !== 'checklist').map(t => t.task_id));
+        const cd = await alertDescs('checklist', trf.filter(t => t.task_type === 'checklist').map(t => t.task_id));
+        trf.forEach(t => items.push({
+          kind: 'transfer', id: parseInt(t.id),
+          description: (t.task_type === 'checklist' ? cd : dd)[String(t.task_id)] || '',
+          fromName: nameOf(t.from_user), toName: nameOf(t.to_user)
+        }));
+      }
+    }
+
+    // 5) Mujhe transfer hue task -- client batata hai kaunse pehle dekh chuka
+    const seenTin = new Set(String(req.query.tin || '').split(',').filter(Boolean));
+    const newTin = tin.filter(t => !seenTin.has(String(t.id)));
+    if (newTin.length && req.query.tin !== undefined) {
+      const dd = await alertDescs('delegation', newTin.filter(t => t.task_type !== 'checklist').map(t => t.task_id));
+      const cd = await alertDescs('checklist', newTin.filter(t => t.task_type === 'checklist').map(t => t.task_id));
+      newTin.forEach(t => items.push({
+        kind: 'transfer-in', id: parseInt(t.id),
+        description: (t.task_type === 'checklist' ? cd : dd)[String(t.task_id)] || '',
+        fromName: nameOf(t.from_user)
+      }));
+    }
+
+    res.json({ max, items, tin: tin.map(t => String(t.id)) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+// ══ ALERTS_ROUTE_END ══
+
 app.get('/api/my-checklist-reminders', requireAuth, async (req, res) => {
   try {
     const uid = String(req.session.userId);

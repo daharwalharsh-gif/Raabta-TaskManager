@@ -3741,6 +3741,8 @@ async function init() {
     loadApprovalBadge();
     loadTransferBadge();
     loadChecklistNotifications();
+    // Chrome notification: naya task / approval aaye to (permission + ring)
+    browserAlertsStart();
     // Refresh badges every 30 seconds
     setInterval(loadApprovalBadge, 30000);
     setInterval(loadTransferBadge, 30000);
@@ -4005,6 +4007,147 @@ async function sendWaReminders(btn) {
   if (r && r.error) { showToast('Failed: ' + r.error, 'error'); return; }
   showToast('✅ Reminders started — WhatsApp is being sent to all pending users in the background (this may take a while).', 'success');
 }
+
+// ══ BROWSER_ALERTS_START ══
+// Harsh (21 Oct): koi bhi delegation / checklist task, approval ya transfer ki
+// request aaye to Chrome me app khula ho tab permission maange, notification
+// dikhaye (jaise bell par) aur ring bajaye.
+// Har 30 sec /api/my-alerts se poochhte hain "pichhli baar ke baad kya naya".
+// Aakhri dekhe hue id localStorage me (har user ka alag), taaki do tab khule
+// hon to ek hi cheez ki do baar ghanti na baje, aur refresh par purana phir na aaye.
+const _BA_POLL_MS = 30000;
+let _baTimer = null, _baBusy = false, _baAudio = null;
+function _baKey() { return 'raabta_alerts_v1_' + (ME && ME.id); }
+function _baLoad() { try { return JSON.parse(localStorage.getItem(_baKey()) || 'null'); } catch (e) { return null; } }
+function _baSave(s) { try { localStorage.setItem(_baKey(), JSON.stringify(s)); } catch (e) {} }
+
+// Permission: app khulte hi poochho. Chrome kabhi-kabhi bina click ke prompt
+// nahi dikhata, isliye pehle click par dobara poochh lete hain.
+function _baAskPermission() {
+  try {
+    if (!('Notification' in window) || Notification.permission !== 'default') return;
+    const p = Notification.requestPermission();
+    if (p && p.catch) p.catch(() => {});
+  } catch (e) {}
+}
+// Ring: browser bina click ke awaaz nahi chalne deta, isliye pehle click par
+// AudioContext taiyaar kar lete hain
+function _baUnlock() {
+  try {
+    if (!_baAudio) { const AC = window.AudioContext || window.webkitAudioContext; if (AC) _baAudio = new AC(); }
+    if (_baAudio && _baAudio.state === 'suspended') _baAudio.resume();
+  } catch (e) {}
+}
+function _baRing() {
+  // Do tab khule hon to ek hi baar baje
+  try {
+    const last = parseInt(localStorage.getItem('raabta_alerts_ring') || '0', 10);
+    if (Date.now() - last < 4000) return;
+    localStorage.setItem('raabta_alerts_ring', String(Date.now()));
+  } catch (e) {}
+  try {
+    _baUnlock();
+    const ctx = _baAudio; if (!ctx) return;
+    const t0 = ctx.currentTime + 0.02;
+    // Ding-dong do baar
+    [[880, 0], [660, 0.22], [880, 0.6], [660, 0.82]].forEach(([f, d]) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'sine'; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t0 + d);
+      g.gain.exponentialRampToValueAtTime(0.35, t0 + d + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + d + 0.38);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(t0 + d); o.stop(t0 + d + 0.4);
+    });
+  } catch (e) {}
+}
+
+function _baText(it) {
+  const by = it.byName ? ' · by ' + it.byName : '';
+  if (it.kind === 'delegation') return { title: '📋 New Delegation Task', body: (it.description || '—') + ' — Due ' + fmtDate(it.due_date) + by, page: 'alltasks' };
+  if (it.kind === 'checklist') return { title: '✅ New Checklist Task', body: (it.description || '—') + (it.count > 1 ? ' — ' + it.count + ' tasks' : '') + ' — from ' + fmtDate(it.first_due) + by, page: 'alltasks' };
+  if (it.kind === 'approval') return { title: '🔔 Approval Request', body: (it.byName || 'Someone') + ': ' + (it.description || '—') + (it.action_type === 'report' ? ' (Done — approve karo)' : it.action_type === 'revised' ? ' (Revise request)' : ''), page: 'approvals' };
+  if (it.kind === 'transfer') return { title: '🔀 Transfer Request', body: (it.description || '—') + ' — ' + (it.fromName || '?') + ' → ' + (it.toName || '?'), page: 'approvals' };
+  if (it.kind === 'transfer-in') return { title: '🔀 Task Transferred to You', body: (it.description || '—') + (it.fromName ? ' — from ' + it.fromName : ''), page: 'alltasks' };
+  return { title: 'Raabta Task Manager', body: it.description || '', page: 'dashboard' };
+}
+function _baGo(page) {
+  try { window.focus(); } catch (e) {}
+  try { navigate(page, document.querySelector('.nav-item[onclick*="\'' + page + '\'"]')); } catch (e) {}
+}
+function _baNotify(title, body, page, tag) {
+  let shown = false;
+  try {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      const n = new Notification(title, { body: body, icon: '/raabta-logo.png', tag: tag });
+      n.onclick = () => { _baGo(page); n.close(); };
+      shown = true;
+    }
+  } catch (e) { shown = false; }
+  // Permission nahi mili to app ke andar hi dikha do
+  if (!shown && typeof showToast === 'function') showToast(title + ' — ' + body);
+}
+function _baShow(items) {
+  if (!items.length) return;
+  _baRing();
+  if (items.length > 3) {
+    const kinds = { delegation: 0, checklist: 0, approval: 0, transfer: 0, 'transfer-in': 0 };
+    items.forEach(it => { kinds[it.kind] = (kinds[it.kind] || 0) + 1; });
+    const parts = [];
+    if (kinds.delegation) parts.push(kinds.delegation + ' delegation');
+    if (kinds.checklist) parts.push(kinds.checklist + ' checklist');
+    if (kinds['transfer-in']) parts.push(kinds['transfer-in'] + ' transferred');
+    if (kinds.approval) parts.push(kinds.approval + ' approval');
+    if (kinds.transfer) parts.push(kinds.transfer + ' transfer request');
+    const page = (kinds.approval || kinds.transfer) && !(kinds.delegation || kinds.checklist || kinds['transfer-in']) ? 'approvals' : 'alltasks';
+    _baNotify('🔔 ' + items.length + ' new updates', parts.join(', '), page, 'raabta-batch-' + Date.now());
+    return;
+  }
+  items.forEach(it => { const t = _baText(it); _baNotify(t.title, t.body, t.page, 'raabta-' + it.kind + '-' + it.id); });
+}
+
+async function browserAlertsCheck() {
+  if (!ME || !ME.id || _baBusy) return;
+  _baBusy = true;
+  try {
+    const st = _baLoad();
+    let q = '';
+    if (st && st.max) {
+      q = '?del=' + (st.max.del || 0) + '&chl=' + (st.max.chl || 0) + '&apr=' + (st.max.apr || 0) + '&trf=' + (st.max.trf || 0) +
+          '&tin=' + encodeURIComponent((st.tin || []).join(','));
+    }
+    // api() GET ko cache karta hai -- yahan har baar taaza jawab chahiye, warna
+    // URL same rehne par purana jawab milta aur naya task pakda hi nahi jaata
+    const r = await _apiFetch('/api/my-alerts' + q, 'GET', null, 0);
+    if (!r || r.error || !r.max) return;
+    // Doosre tab ne beech me aage badha diya ho to wahi rakho (ghanti dobara nahi)
+    const now = _baLoad();
+    if (st && now && now.max && st.max && JSON.stringify(now.max) !== JSON.stringify(st.max)) return;
+    const seen = new Set((st && st.tin) || []);
+    (r.tin || []).forEach(id => seen.add(String(id)));
+    _baSave({ max: r.max, tin: [...seen].slice(-100) });
+    const items = Array.isArray(r.items) ? r.items : [];
+    if (st && items.length) {
+      _baShow(items);
+      if (items.some(it => it.kind === 'approval') && typeof loadApprovalBadge === 'function') loadApprovalBadge();
+      if (items.some(it => it.kind === 'transfer') && typeof loadTransferBadge === 'function') loadTransferBadge();
+    }
+  } catch (e) { /* chup-chaap -- agli baar phir */ }
+  finally { _baBusy = false; }
+}
+
+function browserAlertsStart() {
+  if (_baTimer) return;
+  _baAskPermission();
+  const once = () => { _baAskPermission(); _baUnlock(); document.removeEventListener('click', once, true); document.removeEventListener('keydown', once, true); };
+  document.addEventListener('click', once, true);
+  document.addEventListener('keydown', once, true);
+  browserAlertsCheck();
+  _baTimer = setInterval(browserAlertsCheck, _BA_POLL_MS);
+  // Tab par wapas aate hi turant dekho (background me Chrome timer dheema kar deta hai)
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) browserAlertsCheck(); });
+}
+// ══ BROWSER_ALERTS_END ══
 
 // ── Checklist notification bell (per-user, tasks due within 2 days) ──
 let _notifOpen = false;
