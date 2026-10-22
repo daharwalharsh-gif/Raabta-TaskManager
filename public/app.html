@@ -2464,7 +2464,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
 
           <!-- Sirf OUT par: Yes = jaisa pehle tha (naam ke saath), No = seedha Total OUT -->
           <div id="goldKarigarBlock" style="display:none">
-            <label class="gold-lbl">Karigar ko diya?</label>
+            <label class="gold-lbl">Stock Send?</label>
             <div style="display:flex;gap:8px;margin-bottom:6px">
               <button type="button" class="gold-type on" id="goldKarYes" onclick="goldSetKarigar('yes')">Yes</button>
               <button type="button" class="gold-type" id="goldKarNo" onclick="goldSetKarigar('no')">No</button>
@@ -9182,7 +9182,7 @@ function renderGold() {
     '<td data-lbl="Type"><span class="gold-chip ' + (r.type === 'OUT' ? 'out' : 'in') + '">' + r.type + '</span>' +
       // "No" chuna tha -- entry ke neeche likha dikhe
       (r.type === 'OUT' && r.toKarigar === 'no'
-        ? '<div style="font-size:10px;font-weight:600;color:#64748b;margin-top:4px;line-height:1.3;white-space:nowrap">Karigar ko diya: No<br><span style="font-weight:500;color:#94a3b8">balance se nahi ghata</span></div>'
+        ? '<div style="font-size:10px;font-weight:600;color:#64748b;margin-top:4px;line-height:1.3;white-space:nowrap">Stock Send: No<br><span style="font-weight:500;color:#94a3b8">balance se nahi ghata</span></div>'
         : '') + '</td>' +
     '<td data-lbl="Weight" style="white-space:nowrap;text-align:right;font-weight:700;color:' +
       (r.type === 'OUT' ? '#dc2626' : '#16a34a') + '">' + goldG(r.weight) + '</td>' +
