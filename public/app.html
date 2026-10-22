@@ -1451,6 +1451,8 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
         </div>
         <button class="btn btn-outline" id="delegateByMeBtn" onclick="openDelegateByMeModal()"
           style="color:#10b981;border-color:#a7f3d0">📤 Delegate by Me</button>
+        <button class="btn btn-outline" id="delPdfBtn" onclick="pendingDelegationPdf()" style="color:#b91c1c;border-color:#fecaca;display:none"
+          title="Pending delegation task ki PDF (search / doer filter laga ho to wahi)">📄 Pending PDF</button>
         <button class="btn btn-outline" id="transferModeBtn" onclick="openNewTransferModal()"
           style="color:#059669;border-color:#c4b5fd">🔀 Transfer</button>
         <button class="btn btn-primary" id="tasksAssignBtn" onclick="openDelegate()" style="display:none">+ Assign Task</button>
@@ -4687,6 +4689,10 @@ async function loadAllTasks() {
   const accBtn = document.getElementById('allChecklistCsvBtn');
   if (accBtn) accBtn.style.display = isAdmin ? '' : 'none';
 
+  // Pending PDF — sirf Delegation tab par (sab roles; server pehle hi apne hisaab se task bhejta hai)
+  const pdfBtn = document.getElementById('delPdfBtn');
+  if (pdfBtn) pdfBtn.style.display = (tasksType === 'delegation') ? '' : 'none';
+
   // Delete ALL Checklist — sirf admin ko, sirf Checklist tab par
   const delAllBtn = document.getElementById('deleteAllChecklistBtn');
   if (delAllBtn) delAllBtn.style.display = (isAdmin && tasksType === 'checklist') ? '' : 'none';
@@ -4779,6 +4785,162 @@ function clearTasksDateFilter() {
 }
 
 function filterTasks() { allTasksPage = 1; renderTasksTable(); }
+
+// ══ DEL_PENDING_PDF_START ══
+// Harsh (22 Oct): All Tasks me PDF ka button -- sirf PENDING delegation task,
+// taaki ek nazar me check ho sake. Maintenance ki PDF jaisa: report naye tab
+// me khulti hai aur browser ka "Save as PDF" chalta hai (koi library nahi).
+// Page par jo search / doer / date filter laga hai, wahi PDF par bhi lagta hai.
+function pendingDelegationPdf() {
+  if (tasksType !== 'delegation') { showToast('Pehle Delegation tab kholo', 'error'); return; }
+  const search = (document.getElementById('taskSearch')?.value || '').toLowerCase().trim();
+  const userFilterVal = document.getElementById('tasksUserFilter')?.value || 'all';
+  const doerSel = document.getElementById('hrExportDoer');
+  const doerFilterVal = doerSel?.value || '';
+  const dateFrom = document.getElementById('tasksDateFrom')?.value || '';
+  const dateTo = document.getElementById('tasksDateTo')?.value || '';
+  const todayStr = aajKiDate();
+  const dOf = t => dashDateKey(normDate(t.due_date || ''));
+
+  const tasks = (allTasksData || []).filter(t => {
+    if (t.status !== 'pending') return false;
+    const matchSearch = !search ||
+      (t.description || '').toLowerCase().includes(search) ||
+      (t.assignedToName || '').toLowerCase().includes(search) ||
+      (t.assignedByName || '').toLowerCase().includes(search) ||
+      (t.due_date || '').includes(search) ||
+      (t.assigned_on || '').includes(search) ||
+      (t.remarks || '').toLowerCase().includes(search) ||
+      (t.priority || '').toLowerCase().includes(search);
+    const matchUser = userFilterVal === 'all' || String(t.assignedToId) === String(userFilterVal);
+    const matchDoer = !doerFilterVal || String(t.assignedToId) === String(doerFilterVal);
+    const d = dOf(t);
+    const matchFrom = !dateFrom || (d && d >= dateFrom);
+    const matchTo = !dateTo || (d && d <= dateTo);
+    return matchSearch && matchUser && matchDoer && matchFrom && matchTo;
+  });
+  if (!tasks.length) { showToast('Koi pending delegation task nahi mila', 'error'); return; }
+
+  // Purane (late) sabse upar, phir aaj, phir aage wale. Group by Doer ON ho to doer-wise.
+  const sorted = tasks.slice().sort((a, b) => {
+    if (_tasksGroupBy) {
+      const c = String(a.assignedToName || '').localeCompare(String(b.assignedToName || ''));
+      if (c) return c;
+    }
+    const da = dOf(a) || '9999-99-99', db = dOf(b) || '9999-99-99';
+    return da.localeCompare(db);
+  });
+  const isLate = t => { const d = dOf(t); return !!d && d < todayStr; };
+  const daysLate = t => {
+    const d = dOf(t); if (!d) return 0;
+    return Math.round((new Date(todayStr + 'T00:00:00') - new Date(d + 'T00:00:00')) / 86400000);
+  };
+  const late = sorted.filter(isLate).length;
+  const today = sorted.filter(t => dOf(t) === todayStr).length;
+  const waiting = sorted.filter(t => t.waiting_approval == 1).length;
+
+  // Doer-wise ginti
+  const byDoer = {};
+  sorted.forEach(t => {
+    const k = t.assignedToName || '—';
+    if (!byDoer[k]) byDoer[k] = { n: 0, late: 0 };
+    byDoer[k].n++; if (isLate(t)) byDoer[k].late++;
+  });
+  const doerRows = Object.keys(byDoer).sort((a, b) => byDoer[b].n - byDoer[a].n || a.localeCompare(b)).map(k =>
+    '<tr><td>' + maintEsc(k) + '</td><td class="num">' + byDoer[k].n + '</td>' +
+    '<td class="num' + (byDoer[k].late ? ' red' : '') + '">' + byDoer[k].late + '</td></tr>').join('');
+
+  const pr = p => { const x = String(p || 'low').toLowerCase(); return '<span class="pr ' + x + '">' + maintEsc(x.charAt(0).toUpperCase() + x.slice(1)) + '</span>'; };
+  const stat = t => {
+    if (t.waiting_approval == 1) return '<span class="st wait">Waiting approval</span>';
+    const d = dOf(t);
+    if (!d) return '<span class="st">No date</span>';
+    if (d < todayStr) { const n = daysLate(t); return '<span class="st late">Late ' + n + ' day' + (n > 1 ? 's' : '') + '</span>'; }
+    if (d === todayStr) return '<span class="st today">Due today</span>';
+    return '<span class="st up">Upcoming</span>';
+  };
+  const rows = sorted.map((t, i) =>
+    '<tr class="' + (isLate(t) ? 'lt' : '') + '"><td class="num dim">' + (i + 1) + '</td>' +
+    '<td>' + maintEsc(t.description || '—') +
+      (t.remarks ? '<div class="sub">' + maintEsc(t.remarks) + '</div>' : '') + '</td>' +
+    '<td>' + maintEsc(t.assignedToName || '—') + '</td>' +
+    '<td>' + maintEsc(t.assignedByName || '—') + '</td>' +
+    '<td class="dt">' + (t.assigned_on ? maintEsc(fmtDate(t.assigned_on)) : '—') + '</td>' +
+    '<td class="dt"><b>' + (dOf(t) ? maintDate(dOf(t)) : '—') + '</b></td>' +
+    '<td>' + pr(t.priority) + '</td>' +
+    '<td>' + stat(t) + '</td></tr>').join('');
+
+  const filt = [];
+  if (search) filt.push('Search: "' + search + '"');
+  if (doerFilterVal) filt.push('Doer: ' + (doerSel?.selectedOptions[0]?.textContent || ''));
+  if (userFilterVal !== 'all') filt.push('Employee: ' + (document.getElementById('tasksUserFilter')?.selectedOptions[0]?.textContent || ''));
+  if (dateFrom || dateTo) filt.push('Due: ' + (dateFrom ? maintDate(dateFrom) : '…') + ' to ' + (dateTo ? maintDate(dateTo) : '…'));
+
+  const html =
+'<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/>' +
+'<title>Pending Delegation Tasks — ' + maintDate(todayStr) + '</title>' +
+'<style>' +
+'*{margin:0;padding:0;box-sizing:border-box;}' +
+'body{font-family:-apple-system,"Segoe UI",Inter,Arial,sans-serif;color:#1e293b;background:#f1f5f9;padding:24px;}' +
+'.sheet{max-width:1080px;margin:0 auto;background:#fff;padding:26px 28px;border-radius:12px;}' +
+'.bar{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #0f172a;padding-bottom:12px;margin-bottom:18px;}' +
+'h1{font-size:19px;letter-spacing:.3px;}' +
+'.per{font-size:12px;color:#475569;margin-top:3px;}' +
+'.gen{font-size:11px;color:#94a3b8;text-align:right;}' +
+'.cards{display:flex;gap:10px;margin-bottom:18px;}' +
+'.card{flex:1;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;}' +
+'.card .lbl{font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:#64748b;}' +
+'.card .n{font-size:22px;font-weight:700;margin-top:4px;}' +
+'.c1 .n{color:#0f172a;}.c2{background:#fef2f2;}.c2 .n{color:#dc2626;}.c3{background:#fffbeb;}.c3 .n{color:#b45309;}.c4{background:#f5f3ff;}.c4 .n{color:#6d28d9;}' +
+'h2{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:#334155;margin:18px 0 8px;padding-bottom:5px;border-bottom:1px solid #e2e8f0;}' +
+'table{width:100%;border-collapse:collapse;font-size:11px;}' +
+'th{text-align:left;background:#f8fafc;color:#64748b;font-size:9.5px;letter-spacing:.5px;text-transform:uppercase;padding:7px 7px;border-bottom:1px solid #e2e8f0;}' +
+'td{padding:7px 7px;border-bottom:1px solid #f1f5f9;vertical-align:top;}' +
+'tr.lt td{background:#fff7f7;}' +
+'.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}.dim{color:#94a3b8;}.red{color:#dc2626;font-weight:700;}' +
+'.dt{white-space:nowrap;}' +
+'.sub{font-size:9.5px;color:#94a3b8;margin-top:2px;}' +
+'.doers{width:auto;min-width:320px;}' +
+'.pr{font-size:9.5px;font-weight:700;padding:1px 7px;border-radius:8px;background:#f1f5f9;color:#475569;white-space:nowrap;}' +
+'.pr.high{background:#ffedd5;color:#c2410c;}.pr.urgent{background:#fee2e2;color:#b91c1c;}.pr.medium{background:#e0f2fe;color:#0369a1;}' +
+'.st{font-size:9.5px;font-weight:700;padding:1px 7px;border-radius:8px;background:#f1f5f9;color:#475569;white-space:nowrap;}' +
+'.st.late{background:#fee2e2;color:#b91c1c;}.st.today{background:#fef3c7;color:#92400e;}.st.up{background:#dcfce7;color:#15803d;}.st.wait{background:#ede9fe;color:#6d28d9;}' +
+'.tools{max-width:1080px;margin:0 auto 14px;display:flex;gap:8px;justify-content:flex-end;}' +
+'.tools button{font-family:inherit;font-size:13px;font-weight:600;padding:8px 16px;border-radius:8px;border:1px solid #cbd5e1;background:#fff;color:#334155;cursor:pointer;}' +
+'.tools .go{background:#0f172a;color:#fff;border-color:#0f172a;}' +
+'@media print{body{background:#fff;padding:0;}.tools{display:none;}.sheet{max-width:none;padding:0;border-radius:0;}' +
+'  thead{display:table-header-group;}tr{page-break-inside:avoid;}}' +
+'@page{size:A4 landscape;margin:12mm;}' +
+'</style></head><body>' +
+'<div class="tools"><button class="go" onclick="window.print()">Save as PDF / Print</button>' +
+'  <button onclick="window.close()">Close</button></div>' +
+'<div class="sheet">' +
+'  <div class="bar"><div><h1>Pending Delegation Tasks</h1>' +
+'    <div class="per">' + (filt.length ? maintEsc(filt.join(' · ')) : 'All pending delegation tasks') + '</div></div>' +
+'    <div class="gen">Generated ' + maintDate(todayStr) + '<br/>by ' + maintEsc((ME && ME.name) || '') + '</div></div>' +
+'  <div class="cards">' +
+'    <div class="card c1"><div class="lbl">Total Pending</div><div class="n">' + sorted.length + '</div></div>' +
+'    <div class="card c2"><div class="lbl">Late (overdue)</div><div class="n">' + late + '</div></div>' +
+'    <div class="card c3"><div class="lbl">Due Today</div><div class="n">' + today + '</div></div>' +
+'    <div class="card c4"><div class="lbl">Waiting Approval</div><div class="n">' + waiting + '</div></div>' +
+'  </div>' +
+(Object.keys(byDoer).length > 1
+  ? '  <h2>Doer-wise</h2><table class="doers"><thead><tr><th>Doer</th><th style="text-align:right">Pending</th><th style="text-align:right">Late</th></tr></thead><tbody>' + doerRows + '</tbody></table>'
+  : '') +
+'  <h2>Tasks</h2>' +
+'  <table><thead><tr><th style="text-align:right">#</th><th>Description</th><th>Doer</th><th>Assigned By</th><th>Assigned On</th><th>Due Date</th><th>Priority</th><th>Status</th></tr></thead>' +
+'    <tbody>' + rows + '</tbody></table>' +
+'</div>' +
+'<scr' + 'ipt>window.onload=function(){setTimeout(function(){window.print();},350);};</scr' + 'ipt>' +
+'</body></html>';
+
+  const w = window.open('', '_blank');
+  if (!w) { showToast('PDF ke liye is site par popup allow kar do', 'error'); return; }
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+}
+// ══ DEL_PENDING_PDF_END ══
 
 function filterTaskStatus(status, el) {
   taskStatusFilter = status;
