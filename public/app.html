@@ -30,6 +30,275 @@ textarea.gold-inp{resize:vertical;}
 .gold-chip{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;}
 .gold-chip.in{background:#dcfce7;color:#15803d;}
 .gold-chip.out{background:#fee2e2;color:#b91c1c;}
+/* ── HR Reporting = Employee Onboarding FMS ── */
+.ob-head{align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:14px;}
+.ob-sub{font-size:12px;color:#64748b;margin-top:3px;}
+.ob-actions{display:flex;gap:8px;flex-wrap:wrap;}
+.ob-kpis.overview-cards{grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:16px;}
+.ob-kpis .ov-card{padding:16px 18px;}
+.ob-kpis .ov-card .number{font-size:32px;}
+.ob-kpis .ov-card.obk-blue{background:linear-gradient(145deg,#eff6ff,#fff);box-shadow:0 4px 22px rgba(47,102,179,0.16),0 1px 4px rgba(0,0,0,0.04);}
+.ob-kpis .ov-card.obk-blue .label{color:#2f66b3;}
+.ob-kpis .ov-card.obk-blue .number{color:#2f66b3;}
+.ob-ksub{font-size:11px;color:#64748b;margin-top:2px;}
+.ob-tabs{display:inline-flex;margin-bottom:14px;flex-wrap:wrap;}
+.ob-tabs .tab{font-size:13px;padding:7px 14px;}
+.ob-tcount{display:inline-block;min-width:18px;padding:0 5px;border-radius:9px;background:#ef4444;color:#fff;font-size:10px;line-height:17px;text-align:center;margin-left:3px;}
+/* Step-wise Pipeline */
+.ob-pipe{background:#fff;border:1px solid #e7e5e0;border-radius:16px;margin-bottom:16px;overflow:hidden;}
+.ob-pipe-head{display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid #f0eee9;}
+.ob-pipe-title{font-size:15px;font-weight:800;color:#1c1917;flex:1;display:flex;align-items:center;gap:8px;}
+.ob-pipe-hint{font-size:12px;color:#78716c;}
+.ob-arrow{width:34px;height:34px;border-radius:50%;border:1px solid #e7e5e0;background:#fff;cursor:pointer;font-size:16px;color:#44403c;display:flex;align-items:center;justify-content:center;}
+.ob-arrow:hover{background:#fafaf9;border-color:#d6d3d1;}
+.ob-pipe-track{display:flex;gap:12px;overflow-x:auto;padding:18px 20px 14px;scroll-behavior:smooth;scrollbar-width:none;}
+.ob-pipe-track::-webkit-scrollbar{display:none;}
+.ob-pcard{flex:0 0 216px;min-height:136px;border:1px solid #e7e5e0;border-radius:12px;padding:14px 14px 12px;cursor:pointer;display:flex;flex-direction:column;background:#fff;transition:box-shadow .15s,transform .15s;}
+.ob-pcard:hover{box-shadow:0 6px 18px rgba(28,25,23,.08);transform:translateY(-1px);}
+.ob-pcard .k{font-size:10.5px;font-weight:800;letter-spacing:.6px;color:#78716c;}
+.ob-pcard .t{font-size:13.5px;font-weight:700;color:#1c1917;margin-top:3px;line-height:1.3;}
+.ob-pcard .n{margin-top:auto;display:flex;align-items:baseline;gap:6px;font-size:12.5px;color:#78716c;padding-top:12px;}
+.ob-pcard .n b{font-size:24px;font-weight:800;color:#1c1917;}
+.ob-pcard .n .r{margin-left:auto;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;}
+.ob-pcard .n .late{background:#fee2e2;color:#b91c1c;}
+.ob-pcard .n .pill{background:rgba(255,255,255,.18);color:#fff;}
+.ob-pcard.zero{opacity:.55;}
+.ob-pcard.zero .n b{color:#a8a29e;}
+.ob-pcard.has{background:linear-gradient(180deg,#fff 0%,#faf8f3 100%);border-left:4px solid var(--pc,#2e8b65);}
+.ob-pcard.lt{border-left-color:#dc2626;border-color:#fecaca;}
+.ob-pcard.all{background:#6b6b3a;border-color:#6b6b3a;}
+.ob-pcard.all .k,.ob-pcard.all .t,.ob-pcard.all .n,.ob-pcard.all .n b{color:#fff;}
+.ob-pcard.on{box-shadow:0 0 0 2px #1c1917;}
+.ob-pcard.all.on{box-shadow:0 0 0 2px #1c1917,0 0 0 4px #fff inset;}
+.ob-pipe-bar{height:4px;margin:0 20px 16px;border-radius:4px;background:#f0eee9;overflow:hidden;}
+.ob-pipe-bar i{display:block;height:100%;width:30%;border-radius:4px;background:linear-gradient(90deg,#6b6b3a,#c2a74c);transition:width .2s,margin-left .2s;}
+/* List */
+.ob-listcard{background:#fff;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;}
+.ob-listhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:14px 16px;border-bottom:1px solid #f1f5f9;}
+.ob-listhead h4{font-size:14px;font-weight:800;color:#0f172a;margin:0;flex:1;min-width:200px;}
+.ob-listhead h4 span{font-weight:500;color:#64748b;font-size:12px;margin-left:6px;}
+.ob-fchips{display:flex;gap:6px;flex-wrap:wrap;}
+.ob-fchip{font-family:inherit;font-size:12px;font-weight:600;color:#475569;background:#fff;border:1.5px solid #e2e8f0;border-radius:999px;padding:4px 11px;cursor:pointer;}
+.ob-fchip b{font-weight:700;color:#94a3b8;margin-left:3px;}
+.ob-fchip.on{background:#0f172a;border-color:#0f172a;color:#fff;}
+.ob-fchip.on b{color:#cbd5e1;}
+.ob-search{padding:7px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;outline:none;background:#fff;min-width:220px;}
+.ob-search:focus{border-color:#34d399;}
+.ob-twrap2{overflow-x:auto;}
+.ob-list{width:100%;border-collapse:collapse;font-size:13px;min-width:860px;}
+.ob-list th{text-align:left;font-size:10.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#94a3b8;padding:10px 12px;background:#f8fafc;border-bottom:1px solid #eef2f7;white-space:nowrap;}
+.ob-list td{padding:11px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
+.ob-list tr:last-child td{border-bottom:none;}
+.ob-list tbody tr.click{cursor:pointer;}
+.ob-list tbody tr.click:hover td{background:#fafcff;}
+.ob-list tr.lt td:first-child{box-shadow:inset 3px 0 0 #ef4444;}
+.ob-emp b{display:block;color:#0f172a;font-size:13.5px;}
+.ob-emp span{font-size:11.5px;color:#64748b;}
+.ob-dt{white-space:nowrap;font-variant-numeric:tabular-nums;}
+.ob-dt span{display:block;font-size:11px;color:#94a3b8;}
+.ob-cur{display:flex;align-items:center;gap:8px;min-width:0;}
+.ob-cur .ob-num{flex-shrink:0;}
+.ob-cur b{font-size:12.5px;color:#1e293b;font-weight:600;}
+.ob-mini{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;color:#334155;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.ob-mini .ob-pbar{width:70px;flex:none;}
+.ob-rowacts{display:flex;gap:6px;justify-content:flex-end;white-space:nowrap;}
+.ob-pbar{flex:1;height:7px;border-radius:6px;background:#f1f5f9;overflow:hidden;}
+.ob-pbar i{display:block;height:100%;background:linear-gradient(90deg,#10b981,#059669);border-radius:6px;}
+.ob-prog{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:#334155;font-variant-numeric:tabular-nums;}
+.ob-warn{color:#d97706;font-weight:600;}
+.ob-chip{display:inline-block;font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap;background:#f1f5f9;color:#475569;}
+.ob-chip.done{background:#dcfce7;color:#15803d;}
+.ob-chip.late{background:#fee2e2;color:#b91c1c;}
+.ob-chip.today{background:#fef3c7;color:#92400e;}
+.ob-chip.up{background:#e0f2fe;color:#0369a1;}
+.ob-chip.na{background:#f1f5f9;color:#94a3b8;}
+.ob-chip.wait{background:#f8fafc;color:#94a3b8;border:1px dashed #cbd5e1;}
+/* Detail */
+.ob-back{font-family:inherit;font-size:13px;font-weight:600;color:#475569;background:none;border:none;cursor:pointer;padding:0;margin-bottom:12px;}
+.ob-back:hover{color:#059669;}
+.ob-dhead{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:18px 20px;margin-bottom:16px;}
+.ob-dtop{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;}
+.ob-av{width:52px;height:52px;border-radius:14px;background:#ecfdf5;color:#047857;font-weight:800;font-size:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.ob-dname{flex:1;min-width:200px;}
+.ob-dname h3{font-size:20px;font-weight:800;color:#0f172a;margin:0;}
+.ob-dname div{font-size:13px;color:#64748b;margin-top:2px;}
+.ob-dacts{display:flex;gap:6px;flex-wrap:wrap;}
+.ob-dgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px 18px;margin-top:14px;padding-top:14px;border-top:1px solid #f1f5f9;}
+.ob-dgrid > div{font-size:13px;color:#1e293b;min-width:0;word-break:break-word;}
+.ob-dgrid .ob-dk{display:block;font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#94a3b8;margin-bottom:2px;}
+.ob-dnotes{margin-top:12px;font-size:13px;color:#475569;background:#f8fafc;border-radius:10px;padding:10px 12px;white-space:pre-wrap;}
+.ob-dprog{margin-top:14px;}
+.ob-phase{display:flex;align-items:center;justify-content:space-between;gap:10px;color:#fff;font-weight:800;font-size:13px;letter-spacing:.6px;text-transform:uppercase;padding:10px 16px;border-radius:10px;margin:18px 0 10px;}
+.ob-phase span{font-size:11px;font-weight:700;letter-spacing:.3px;text-transform:none;background:rgba(255,255,255,.2);padding:2px 9px;border-radius:999px;}
+.ob-steps{display:flex;flex-direction:column;gap:10px;}
+.ob-step{display:grid;grid-template-columns:44px minmax(0,1fr) 240px;gap:14px;align-items:start;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;}
+.ob-step.st-done{background:#f7fdf9;border-color:#bbf7d0;}
+.ob-step.st-cur{border-color:#86efac;box-shadow:0 0 0 2px #bbf7d0;}
+.ob-step.st-late{border-color:#fecaca;box-shadow:0 0 0 2px #fee2e2,inset 3px 0 0 #ef4444;}
+.ob-step.st-waiting{background:#fbfcfd;}
+.ob-step.st-waiting .ob-stitle{color:#64748b;}
+.ob-step.st-na{opacity:.55;}
+.ob-num{width:38px;height:38px;border-radius:10px;color:#fff;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center;}
+.ob-num.sm{width:30px;height:30px;font-size:12.5px;border-radius:8px;}
+.ob-step.st-waiting .ob-num{filter:grayscale(.6);opacity:.55;}
+.ob-stitle{font-size:14.5px;font-weight:700;color:#0f172a;}
+.ob-smeta{font-size:12px;color:#64748b;margin-top:3px;}
+.ob-smeta span{margin:0 6px;color:#cbd5e1;}
+.ob-snote{font-size:12px;font-weight:600;color:#334155;margin-top:5px;}
+.ob-sinfo{font-size:12px;color:#0f766e;margin-top:5px;background:#f0fdfa;border-radius:8px;padding:5px 9px;display:inline-block;}
+.ob-swhen{font-size:12px;color:#475569;margin-top:6px;}
+.ob-swhen em{font-style:normal;color:#64748b;}
+.ob-sdone{font-size:12px;color:#15803d;margin-top:6px;background:#ecfdf5;border-radius:8px;padding:6px 9px;}
+.ob-sside{display:flex;flex-direction:column;gap:7px;}
+.ob-sside > label{font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#94a3b8;}
+.ob-doer{width:100%;padding:7px 9px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;background:#fff;outline:none;color:#0f172a;}
+.ob-doer:focus{border-color:#34d399;}
+.ob-doer.ob-unset{border-color:#fcd34d;background:#fffbeb;}
+.ob-doername{font-size:13px;font-weight:600;color:#0f172a;}
+.ob-sacts{display:flex;gap:6px;flex-wrap:wrap;}
+.ob-control{margin-top:18px;background:#f5f1e8;border-radius:10px;padding:11px 16px;font-size:12px;font-weight:600;color:#44403c;}
+/* My Steps */
+.ob-sec{font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#64748b;margin:6px 0 10px;}
+.ob-mrow{display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:12px;align-items:center;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px 14px;margin-bottom:8px;}
+.ob-mrow.st-late{border-color:#fecaca;box-shadow:inset 3px 0 0 #ef4444;}
+.ob-mrow.st-today{border-color:#fde68a;box-shadow:inset 3px 0 0 #f59e0b;}
+.ob-mrow.st-done,.ob-mrow.st-waiting{opacity:.75;}
+.ob-mside{display:flex;flex-direction:column;align-items:flex-end;gap:6px;}
+.ob-mplan{font-size:13px;font-weight:700;color:#0f172a;font-variant-numeric:tabular-nums;}
+/* Tracking */
+.ob-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:#64748b;margin-bottom:10px;}
+.ob-legend i{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px;vertical-align:-1px;}
+.ob-twrap{overflow-x:auto;background:#fff;border:1px solid #e2e8f0;border-radius:12px;}
+.ob-track{border-collapse:collapse;min-width:980px;width:100%;font-size:12px;}
+.ob-track th{padding:8px 6px;font-size:10.5px;font-weight:700;color:#64748b;text-align:center;border-bottom:1px solid #e2e8f0;background:#f8fafc;white-space:nowrap;}
+.ob-track th.ob-tph{color:#fff;font-size:10px;letter-spacing:.4px;text-transform:uppercase;}
+.ob-track td{padding:9px 6px;border-bottom:1px solid #f1f5f9;text-align:center;white-space:nowrap;}
+.ob-track tbody tr{cursor:pointer;}
+.ob-track tbody tr:hover td{background:#f8fafc;}
+.ob-track .ob-tname{text-align:left;padding-left:14px;min-width:150px;}
+.ob-track td.ob-tname b{display:block;font-size:13px;color:#0f172a;}
+.ob-track td span{display:block;font-size:11px;color:#94a3b8;}
+.ob-track .ob-tprog{font-weight:700;color:#334155;font-variant-numeric:tabular-nums;}
+.ob-track .ob-tprog em{display:block;font-style:normal;font-size:10.5px;color:#dc2626;}
+.ob-tdot i{display:inline-block;width:14px;height:14px;border-radius:50%;background:#e2e8f0;}
+.ob-legend i.d-done,.ob-tdot i.d-done{background:#10b981;}
+.ob-legend i.d-late,.ob-tdot i.d-late{background:#ef4444;}
+.ob-legend i.d-today,.ob-tdot i.d-today{background:#f59e0b;}
+.ob-legend i.d-upcoming,.ob-tdot i.d-upcoming{background:#38bdf8;}
+.ob-legend i.d-waiting,.ob-tdot i.d-waiting{background:#e2e8f0;}
+.ob-legend i.d-na,.ob-tdot i.d-na{background:repeating-linear-gradient(45deg,#e2e8f0 0 3px,#fff 3px 6px);border:1px solid #e2e8f0;}
+.ob-tdot i.cur{box-shadow:0 0 0 3px #fff,0 0 0 5px currentColor;}
+.ob-tdot i.d-late.cur{color:#fca5a5;}
+.ob-tdot i.d-today.cur{color:#fcd34d;}
+.ob-tdot i.d-upcoming.cur{color:#7dd3fc;}
+/* Workflow */
+.ob-wintro{font-size:13px;color:#475569;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px 16px;margin-bottom:4px;}
+.ob-wloc{display:flex;flex-direction:column;gap:6px;}
+.ob-wloc > div{display:grid;grid-template-columns:58px 1fr;gap:6px;align-items:center;font-size:11px;font-weight:700;color:#64748b;}
+/* Employee master form */
+.ob-form{display:grid;grid-template-columns:1fr 1fr;gap:0 16px;}
+.ob-form .form-group label{text-transform:none;letter-spacing:0;font-size:13px;font-weight:700;color:#1e293b;}
+.ob-req{color:#e11d48;}
+.ob-other{margin-top:8px;}
+.ob-check{display:flex !important;align-items:center;gap:7px;margin-top:8px;font-weight:500 !important;font-size:13px !important;color:#334155 !important;cursor:pointer;}
+.ob-check input{width:16px !important;height:16px;padding:0 !important;margin:0;}
+.ob-hint{font-size:12px;color:#64748b;background:#f8fafc;border-radius:8px;padding:9px 12px;margin-bottom:6px;}
+.ob-create{background:linear-gradient(90deg,#9333ea,#ec4899);color:#fff;border:none;}
+.ob-create:hover{filter:brightness(1.06);}
+.ob-donewhat{background:#f8fafc;border-radius:10px;padding:10px 12px;margin-bottom:14px;}
+.ob-donewhat b{display:block;font-size:14px;color:#0f172a;}
+.ob-donewhat span{font-size:12px;color:#64748b;}
+.ob-admin{max-height:56vh;overflow-y:auto;border:1px solid #e2e8f0;border-radius:12px;}
+.ob-arow{display:grid;grid-template-columns:34px minmax(0,1fr) 92px 240px;gap:12px;align-items:center;padding:9px 12px;border-bottom:1px solid #f1f5f9;}
+.ob-ahead{display:grid;grid-template-columns:34px minmax(0,1fr) 92px 240px;gap:12px;padding:8px 12px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font-size:10.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#64748b;position:sticky;top:0;z-index:2;}
+.ob-atat{display:flex;align-items:center;gap:5px;font-size:11px;color:#64748b;}
+.ob-atat input{width:56px;padding:7px 6px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;text-align:center;outline:none;}
+.ob-atat input:focus{border-color:#34d399;}
+.ob-atat input.set{border-color:#86efac;background:#f0fdf4;font-weight:700;}
+.ob-tatb{display:inline-block;font-size:10.5px;font-weight:700;color:#0f766e;background:#ccfbf1;border-radius:999px;padding:1px 8px;margin-left:6px;}
+.ob-arow:last-child{border-bottom:none;}
+.ob-arow .ob-num{width:30px;height:30px;font-size:12.5px;border-radius:8px;}
+.ob-arow .t{font-size:13.5px;font-weight:700;color:#0f172a;}
+.ob-arow .o{font-size:11.5px;color:#94a3b8;margin-top:1px;}
+.ob-arow .ob-wloc > div{grid-template-columns:52px 1fr;}
+.ob-aph{position:sticky;top:0;z-index:1;color:#fff;font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;padding:6px 12px;}
+@media(max-width:620px){ .ob-arow{grid-template-columns:30px minmax(0,1fr);} .ob-arow > .ob-asel{grid-column:1 / -1;} }
+/* All list ke Edit / Delete */
+.ob-iconbtn{font-family:inherit;width:30px;height:30px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;cursor:pointer;font-size:13px;display:inline-flex;align-items:center;justify-content:center;}
+.ob-iconbtn:hover{background:#f8fafc;border-color:#cbd5e1;}
+.ob-iconbtn.del{color:#dc2626;border-color:#fecaca;}
+.ob-iconbtn.del:hover{background:#fef2f2;}
+/* Person ka side panel */
+.ob-dw-ov{position:fixed;inset:0;z-index:1100;background:rgba(15,23,42,.42);display:none;justify-content:flex-end;}
+.ob-dw-ov.open{display:flex;}
+.ob-dw{width:560px;max-width:100vw;height:100%;background:#f8fafc;overflow-y:auto;box-shadow:-18px 0 50px rgba(15,23,42,.22);animation:obDwIn .22s ease-out;display:flex;flex-direction:column;}
+@keyframes obDwIn{from{transform:translateX(40px);opacity:.4;}to{transform:none;opacity:1;}}
+@media (prefers-reduced-motion: reduce){.ob-dw{animation:none;}}
+.ob-dw-top{background:linear-gradient(135deg,#0f3d33 0%,#14532d 55%,#1f6f4a 100%);color:#fff;padding:20px 22px 18px;position:relative;}
+.ob-dw-x{position:absolute;top:14px;right:14px;width:32px;height:32px;border-radius:50%;border:none;background:rgba(255,255,255,.14);color:#fff;font-size:16px;cursor:pointer;}
+.ob-dw-x:hover{background:rgba(255,255,255,.26);}
+.ob-dw-id{display:flex;align-items:center;gap:14px;padding-right:40px;}
+.ob-dw-av{width:58px;height:58px;border-radius:16px;background:rgba(255,255,255,.16);color:#fff;font-weight:800;font-size:20px;display:flex;align-items:center;justify-content:center;flex-shrink:0;border:1px solid rgba(255,255,255,.25);}
+.ob-dw-id h3{margin:0;font-size:20px;font-weight:800;line-height:1.2;}
+.ob-dw-id div div{font-size:13px;color:#bbf7d0;margin-top:3px;}
+.ob-dw-meta{display:flex;align-items:center;gap:16px;margin-top:16px;}
+.ob-ring{width:66px;height:66px;flex-shrink:0;position:relative;}
+.ob-ring svg{width:66px;height:66px;transform:rotate(-90deg);}
+.ob-ring b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;}
+.ob-dw-facts{display:flex;flex-direction:column;gap:5px;font-size:12.5px;color:#dcfce7;min-width:0;}
+.ob-dw-facts b{color:#fff;}
+.ob-dw-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;}
+.ob-dw-acts button{font-family:inherit;font-size:12.5px;font-weight:600;padding:7px 12px;border-radius:9px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);color:#fff;cursor:pointer;}
+.ob-dw-acts button:hover{background:rgba(255,255,255,.2);}
+.ob-dw-acts button.del{border-color:rgba(254,202,202,.6);color:#fecaca;}
+.ob-dw-body{padding:16px 18px 28px;display:flex;flex-direction:column;gap:14px;}
+.ob-dw-card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px 16px;}
+.ob-dw-card h5{margin:0 0 10px;font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#94a3b8;}
+.ob-dw-now{border-color:#86efac;box-shadow:0 0 0 3px #dcfce7;}
+.ob-dw-now.late{border-color:#fca5a5;box-shadow:0 0 0 3px #fee2e2;}
+.ob-dw-nowrow{display:flex;gap:12px;align-items:flex-start;}
+.ob-dw-nowrow .t{font-size:15px;font-weight:800;color:#0f172a;}
+.ob-dw-nowrow .m{font-size:12px;color:#64748b;margin-top:3px;}
+.ob-dw-nowfoot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px dashed #e2e8f0;font-size:12.5px;color:#334155;}
+.ob-dw-nowfoot .sp{flex:1;}
+.ob-dw-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;}
+.ob-dw-grid div{font-size:13px;color:#0f172a;min-width:0;word-break:break-word;}
+.ob-dw-grid span{display:block;font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#94a3b8;margin-bottom:2px;}
+.ob-tl{position:relative;}
+.ob-tl-ph{font-size:10.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;margin:12px 0 4px;display:flex;align-items:center;gap:8px;}
+.ob-tl-ph:first-child{margin-top:0;}
+.ob-tl-ph i{flex:1;height:1px;background:#eef2f7;}
+.ob-tl-row{display:grid;grid-template-columns:26px minmax(0,1fr) auto;gap:10px;align-items:center;padding:6px 0;position:relative;}
+.ob-tl-row::before{content:'';position:absolute;left:12px;top:-6px;bottom:-6px;width:2px;background:#eef2f7;z-index:0;}
+.ob-tl-dot{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;position:relative;z-index:1;background:#fff;border:2px solid #e2e8f0;color:#94a3b8;}
+.ob-tl-row.done .ob-tl-dot{background:#10b981;border-color:#10b981;color:#fff;}
+.ob-tl-row.cur .ob-tl-dot{background:#fff;border-color:#10b981;color:#047857;box-shadow:0 0 0 4px #dcfce7;}
+.ob-tl-row.late .ob-tl-dot{border-color:#ef4444;color:#b91c1c;box-shadow:0 0 0 4px #fee2e2;}
+.ob-tl-row.na .ob-tl-dot{border-style:dashed;}
+.ob-tl-row .tt{font-size:13px;font-weight:600;color:#1e293b;}
+.ob-tl-row.waiting .tt,.ob-tl-row.na .tt{color:#94a3b8;font-weight:500;}
+.ob-tl-row.na .tt{text-decoration:line-through;}
+.ob-tl-row.cur .tt,.ob-tl-row.late .tt{font-weight:800;color:#0f172a;}
+.ob-tl-row .dd{font-size:11px;color:#94a3b8;margin-top:1px;}
+.ob-tl-row .rt{text-align:right;font-size:11.5px;color:#64748b;white-space:nowrap;font-variant-numeric:tabular-nums;}
+.ob-tl-row .rt b{display:block;color:#0f172a;font-weight:700;}
+.ob-tl-row.done .rt b{color:#15803d;}
+.ob-tl-row.late .rt b{color:#dc2626;}
+@media(max-width:560px){ .ob-dw-grid{grid-template-columns:1fr;} }
+@media(max-width:900px){
+  .ob-kpis.overview-cards{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .ob-step{grid-template-columns:38px minmax(0,1fr);}
+  .ob-sside{grid-column:1 / -1;}
+  .ob-pipe-hint{display:none;}
+}
+@media(max-width:560px){
+  .ob-search{min-width:0;width:100%;}
+  .ob-form{grid-template-columns:1fr;}
+  .ob-mrow{grid-template-columns:32px minmax(0,1fr);}
+  .ob-mside{grid-column:1 / -1;flex-direction:row;align-items:center;justify-content:space-between;}
+  .ob-kpis .ov-card .number{font-size:26px;}
+  .ob-pcard{flex-basis:180px;}
+}
 /* Grid ka column apne content se chhota ho hi nahi sakta jab tak min-width:0
    na ho. Andar table 860px chaudi hai, isliye poora page daayein khisak kar
    kat raha tha -- sidebar aur topbar tak kat gaye the (Harsh, 13 Oct).
@@ -1814,76 +2083,24 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     </div>
   </div>
 
-  <!-- ── HR REPORTING (biometric attendance) ── -->
+  <!-- ── HR REPORTING = Employee Onboarding FMS (Harsh, 22 Oct) ──
+       Purana attendance (Excel upload) yahan se hata diya. Poora page JS
+       (loadOnboarding) banata hai: Pipeline / My Steps / Tracking / Workflow. -->
   <div id="page-hrreport" class="page">
-    <div class="page-header"><h2>HR Reporting</h2></div>
-
-    <!-- Upload card -->
-    <div style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;padding:16px 18px;margin-bottom:16px">
-      <div style="font-size:14px;font-weight:700;color:#1e293b;margin-bottom:10px">📥 Attendance Excel Upload</div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-        <select id="hrUpLocation" onchange="hrUpGate()" style="padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;outline:none;background:#fff">
-          <option value="">1️⃣ Select Location…</option>
-          <option value="store">🏬 Store</option>
-          <option value="office">🏢 Office</option>
-          <option value="karigar">🔨 Karigar</option>
-        </select>
-        <button class="btn btn-outline" id="hrSampleBtn" disabled onclick="hrDownloadSample()" title="Download a sample Excel in the exact upload format">⬇ Download Sample</button>
-        <input type="file" id="hrUpFile" accept=".xls,.xlsx" disabled onchange="hrUpGate()" title="Select a location first" style="font-size:13px;padding:7px;border:1.5px solid #e2e8f0;border-radius:8px;background:#fff"/>
-        <button class="btn btn-primary" id="hrUpBtn" disabled onclick="hrUpload()">⬆ Upload</button>
-        <span id="hrUpStatus" style="font-size:12px;color:#64748b"></span>
+    <div class="page-header ob-head">
+      <div>
+        <h2>HR Reporting</h2>
+        <div class="ob-sub">Employee Onboarding FMS &middot; 20 steps, ek ke baad ek</div>
       </div>
-      <div style="font-size:11px;color:#94a3b8;margin-top:8px">Step 1: select location → Step 2: choose the biometric "Exception Statistic Report" file (.xls / .xlsx) → Step 3: Upload. Re-uploading the same location &amp; date range replaces the old data — no duplicates.</div>
-    </div>
-
-    <!-- Filters -->
-    <div style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;padding:14px 18px;margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:end">
-      <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:3px">Location</div>
-        <select id="hrFltLocation" onchange="hrFetch()" style="padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;background:#fff;outline:none">
-          <option value="all">All</option><option value="store">Store</option><option value="office">Office</option><option value="karigar">Karigar</option>
-        </select></div>
-      <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:3px">Doer</div>
-        <select id="hrFltDoer" onchange="hrRender()" style="padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;background:#fff;outline:none;min-width:140px">
-          <option value="all">All</option>
-        </select></div>
-      <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:3px">Month</div>
-        <input type="month" id="hrFltMonth" onchange="hrSetMonth(this.value)" style="padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;background:#fff;outline:none"/></div>
-      <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:3px">From</div>
-        <input type="date" id="hrFltFrom" onchange="hrFetch()" style="padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;background:#fff;outline:none"/></div>
-      <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:3px">To</div>
-        <input type="date" id="hrFltTo" onchange="hrFetch()" style="padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;background:#fff;outline:none"/></div>
-      <button class="btn btn-outline btn-sm" onclick="hrThisWeek()">This Week</button>
-      <button class="btn btn-outline btn-sm" onclick="hrThisMonth()">This Month</button>
-      <button class="btn btn-outline btn-sm" onclick="hrClearFilters()" title="Show all uploaded data (no date limit)">✕ Clear Filters</button>
-      <button class="btn btn-outline btn-sm" style="color:#dc2626;border-color:#fecaca" onclick="hrDeleteRange()" title="Delete uploaded data for a date range">🗑 Delete Data</button>
-    </div>
-
-    <!-- Cards -->
-    <div class="overview-cards" style="margin-bottom:16px">
-      <div class="ov-card pending" style="cursor:pointer" onclick="hrToggleMissed()" title="Click to show only missing punch-out rows / show all">
-        <div class="label">🔴 Punch-Out Missing <span id="hrMissedTag" style="font-size:10px;color:#dc2626"></span></div>
-        <div class="number" id="hrCardMissed">—</div>
-      </div>
-      <div class="ov-card revised"><div class="label">🟠 Absent (Monday excluded)</div><div class="number" id="hrCardAbsent">—</div></div>
-      <div class="ov-card completed"><div class="label">👥 Doers · 📅 Monday = Weekly Off</div><div class="number" id="hrCardDoers">—</div></div>
-    </div>
-
-    <!-- View tabs -->
-    <div style="display:flex;gap:8px;margin-bottom:12px">
-      <div class="tab-group">
-        <div class="tab active" id="hrTabAll" onclick="hrSetView('all',this)">📋 All Records</div>
-        <div class="tab" id="hrTabMissing" onclick="hrSetView('missing',this)">🔴 Missing Punch-Out</div>
-        <div class="tab" id="hrTabSummary" onclick="hrSetView('summary',this)">📅 Monthly Attendance</div>
+      <div class="ob-actions">
+        <button class="btn btn-outline" onclick="loadOnboarding(1)">&#8635; Refresh</button>
+        <button class="btn btn-outline" id="obAdminBtn" style="display:none" onclick="obOpenStepAdmin()">&#9881;&#65039; Step Admin</button>
+        <button class="btn btn-primary" id="obNewBtn" style="display:none" onclick="obOpenJoinee()">+ Employee Entry</button>
       </div>
     </div>
-
-    <!-- Table (view ke hisaab se JS render karta hai) -->
-    <div class="flat-tasks-table" id="hrTableWrap" style="background:#fff">
-      <div id="hrTableArea" style="overflow-x:auto">
-        <div style="text-align:center;color:#94a3b8;padding:24px;font-size:13px">Upload an Excel file above, or adjust the filters</div>
-      </div>
-      <div id="hrTableFoot" style="padding:10px 14px;font-size:12px;color:#64748b;border-top:1px solid #f1f5f9"></div>
-    </div>
+    <div class="overview-cards ob-kpis" id="obKpis"></div>
+    <div class="tab-group ob-tabs" id="obTabs"></div>
+    <div id="obBody"><div class="empty">Loading…</div></div>
   </div>
 
   <!-- ── MIS REPORT ── -->
@@ -2517,46 +2734,79 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
   </div>
 </div>
 
-<!-- HR Reporting — Delete attendance data (date range) -->
-<div class="modal-overlay" id="hrDeleteModal">
-  <div class="modal" style="max-width:460px">
-    <h3 style="color:#dc2626;margin-top:0">🗑 Delete Attendance Data</h3>
-    <div class="alert error" id="hrDelErr" style="display:none"></div>
-    <div style="font-size:13px;color:#64748b;margin-bottom:16px">Choose the location and date range you want to remove. Data outside this range stays untouched.</div>
-    <div class="form-group">
-      <label>Location</label>
-      <select id="hrDelLocation" onchange="hrDelPreview()">
-        <option value="all">All locations</option>
-        <option value="store">🏬 Store</option>
-        <option value="office">🏢 Office</option>
-        <option value="karigar">🔨 Karigar</option>
-      </select>
+<!-- HR Onboarding — Employee master form (naya / edit) -->
+<div class="modal-overlay" id="obJoineeModal">
+  <div class="modal" style="width:600px;max-width:95vw">
+    <h3 id="obJoineeTitle">Employee master form (HR)</h3>
+    <div class="alert error" id="obJoineeErr"></div>
+    <div class="ob-form">
+      <div class="form-group"><label>Employee name <span class="ob-req">*</span></label>
+        <input type="text" id="obfName" placeholder="e.g. Piyush Sharma" maxlength="120"/></div>
+      <div class="form-group"><label>Designation <span class="ob-req">*</span></label>
+        <select id="obfDesigSel" onchange="obOtherToggle('obfDesig')"></select>
+        <input type="text" id="obfDesig" class="ob-other" placeholder="Designation likho" maxlength="120" style="display:none"/></div>
+      <div class="form-group"><label>Phone <span class="ob-req">*</span></label>
+        <input type="tel" id="obfPhone" placeholder="10-digit mobile" maxlength="20"/></div>
+      <div class="form-group"><label>Alternate phone</label>
+        <input type="tel" id="obfAlt" placeholder="10-digit mobile" maxlength="20"/>
+        <label class="ob-check"><input type="checkbox" id="obfAltNA" onchange="obAltToggle()"/> Not available</label></div>
+      <div class="form-group"><label>Salary <span class="ob-req">*</span></label>
+        <input type="text" id="obfSalary" inputmode="numeric" placeholder="e.g. 25000" maxlength="20"/></div>
+      <div class="form-group"><label>Location <span class="ob-req">*</span></label>
+        <select id="obfLocSel" onchange="obOtherToggle('obfLoc')"></select>
+        <input type="text" id="obfLoc" class="ob-other" placeholder="Location likho" maxlength="60" style="display:none"/></div>
+      <div class="form-group"><label>Date of birth <span class="ob-req">*</span></label>
+        <input type="date" id="obfDob"/></div>
+      <div class="form-group"><label>Date of joining <span class="ob-req">*</span></label>
+        <input type="date" id="obfJoin"/></div>
+      <div class="form-group"><label>ESIS eligible? <span class="ob-req">*</span></label>
+        <select id="obfEsis"><option value="">Select</option><option value="yes">Yes</option><option value="no">No (step 19 N/A)</option></select></div>
+      <div class="form-group"><label>Contract signed? <span class="ob-req">*</span></label>
+        <select id="obfContract"><option value="">Select</option><option value="yes">Yes</option><option value="no">No</option></select></div>
+      <div class="form-group"><label>Probation (days)</label>
+        <input type="number" id="obfProb" min="1" max="730" value="90"/></div>
+      <div class="form-group"><label>Notes</label>
+        <input type="text" id="obfNotes" placeholder="Optional" maxlength="300"/></div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-      <div class="form-group"><label>From date</label><input type="date" id="hrDelFrom" onchange="hrDelPreview()"/></div>
-      <div class="form-group"><label>To date</label><input type="date" id="hrDelTo" onchange="hrDelPreview()"/></div>
-    </div>
-    <div id="hrDelPreviewBox" style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:10px 12px;font-size:13px;color:#991b1b">Select a date range to see how many records will be deleted.</div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('hrDeleteModal')">Cancel</button>
-      <button class="btn" id="hrDelBtn" style="background:#dc2626;color:#fff" onclick="hrDeleteConfirm()">🗑 Delete</button>
+    <div class="ob-hint" id="obJoineeHint">Save karte hi 20 step ki entry banegi aur <b>Step 1</b> uske doer ke paas jayega. Har step Done hone par hi agla step khulta hai.</div>
+    <div class="modal-footer" style="justify-content:flex-end;gap:8px">
+      <button class="btn btn-outline" onclick="closeModal('obJoineeModal')">Cancel</button>
+      <button class="btn ob-create" id="obJoineeSave" onclick="obSaveJoinee()">Create employee &amp; tasks</button>
     </div>
   </div>
 </div>
 
-<!-- HR Reporting — Add a forgotten punch-out -->
-<div class="modal-overlay" id="hrPunchModal">
-  <div class="modal" style="max-width:400px">
-    <h3 style="margin-top:0">➕ Add Punch-Out</h3>
-    <div class="alert error" id="hrPunchErr" style="display:none"></div>
-    <div id="hrPunchWho" style="font-size:13px;color:#64748b;margin-bottom:14px"></div>
-    <div class="form-group">
-      <label>Punch-out time (24 hr)</label>
-      <input type="time" id="hrPunchTime" value="20:00"/>
+<!-- HR Onboarding — person par click: side panel -->
+<div class="ob-dw-ov" id="obDrawer" onclick="if(event.target===this)obCloseDrawer()">
+  <aside class="ob-dw" id="obDrawerBody" role="dialog" aria-label="Employee onboarding"></aside>
+</div>
+
+<!-- HR Onboarding — Step Admin: har step ke saamne doer -->
+<div class="modal-overlay" id="obAdminModal">
+  <div class="modal" style="width:760px;max-width:95vw">
+    <h3>&#9881;&#65039; Step Admin &mdash; har step ka Doer aur TAT</h3>
+    <div class="alert error" id="obAdminErr"></div>
+    <div class="ob-hint">Har step ke saamne doer chuno (list me na ho to <b>&#9998; Type name</b>). <b>TAT</b> = ye step pichhle step ke Done hone ke kitne din me complete hona chahiye; khali chhodo to PDF wali timeline. Step 10 aur 11 me Delhi aur Mumbai ke alag doer.</div>
+    <div class="ob-admin" id="obAdminBody"></div>
+    <label class="ob-check" style="margin:12px 0 4px"><input type="checkbox" id="obAdminApply" checked/> Chalu entries ke jo step abhi Done nahi hue, unpar bhi naya doer laga do</label>
+    <div class="modal-footer" style="justify-content:space-between">
+      <button class="btn btn-outline" onclick="closeModal('obAdminModal')">Cancel</button>
+      <button class="btn btn-primary" id="obAdminSave" onclick="obSaveStepAdmin()">Save</button>
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('hrPunchModal')">Cancel</button>
-      <button class="btn btn-green" id="hrPunchBtn" onclick="hrPunchSave()">✓ Save</button>
+  </div>
+</div>
+
+<!-- HR Onboarding — step Done -->
+<div class="modal-overlay" id="obDoneModal">
+  <div class="modal" style="max-width:440px">
+    <h3>&#10003; Mark Step Done</h3>
+    <div class="alert error" id="obDoneErr"></div>
+    <div class="ob-donewhat" id="obDoneWhat"></div>
+    <div class="form-group"><label>Note (optional)</label>
+      <textarea id="obDoneNote" rows="3" placeholder="Kya kiya, koi link ya detail…"></textarea></div>
+    <div class="modal-footer" style="justify-content:space-between">
+      <button class="btn btn-outline" onclick="closeModal('obDoneModal')">Cancel</button>
+      <button class="btn btn-green" id="obDoneBtn" onclick="obSubmitDone()">&#10003; Mark Done &amp; next step</button>
     </div>
   </div>
 </div>
@@ -3682,7 +3932,8 @@ async function init() {
     // HR Reporting — SIRF Admin + HR ko (server ka hrReport flag; purane
     // deploy me flag na aaye to admin role se fallback)
     const hrNav = document.getElementById('nav-hrreport');
-    if (hrNav) hrNav.style.display = (ME.hrReport === true || ME.role === 'admin') ? '' : 'none';
+    // Onboarding FMS: jinka koi onboarding step hai (doer) unko bhi -- apne step Done karne ke liye
+    if (hrNav) hrNav.style.display = (ME.hrReport === true || ME.role === 'admin' || ME.hrOnboard === true) ? '' : 'none';
 
     setAvatarDisplay(ME.profile_image, initials);
 
@@ -3849,7 +4100,7 @@ function navigate(page, el) {
   if (page==='fms-tasks') loadFMSTasks();
   if (page==='fms-tracking') loadFMSTracking();
   if (page==='leave') loadLeaves();
-  if (page==='hrreport') loadHRReport();
+  if (page==='hrreport') loadOnboarding();
   if (page==='crm') loadCRM();
   if (page==='mis') initMISDeptFilter();
   if (page==='records') loadRecords();
@@ -7056,433 +7307,771 @@ function ftOpenDetail(sheetRow) {
 }
 
 // ══════════════════════════════════════════════════════
-// HR REPORTING — biometric attendance Excel upload + review
+// HR REPORTING — Employee Onboarding FMS
 // ══════════════════════════════════════════════════════
-let _hrRows = [];       // last fetch ke rows
-let _hrView = 'all';    // all | missing | summary (upar wale tabs)
+// Harsh (22 Oct): "HR Reporting me pura FMS bana do" -- purana attendance
+// (Excel upload) hata diya. Workflow onboarding_workflow_flowchart.pdf ka:
+// 4 phase, 20 step, FMS jaisa EK KE BAAD EK: "Employee master form" ki entry
+// Step 1 ke doer ke paas jaati hai; wo Done kare tabhi Step 2 khulta hai.
+// Upar "Step-wise Pipeline": har step par kitne employee atke hain (late kitne),
+// card dabao to wahi list. Doer dropdown se (app user) ya haath se likha naam.
+// Admin / HR ko sab dikhta hai; baaki ko sirf apne step ("My Steps").
+let _ob = null;              // /api/onboarding ka poora jawab
+let _obView = '';            // pipeline | mine | tracking | workflow
+let _obOpenId = '';          // khula hua employee (detail)
+let _obStep = 0;             // pipeline me chuna step (0 = All)
+let _obFilter = 'active';    // All ke andar: active | completed | cancelled | all
+let _obSearch = '';
+let _obDone = null;          // { jid, no } -- Done modal
+let _obEditId = '';          // edit ho raha employee ('' = naya)
+const OB_DESIGNATIONS = ['Sales Executive', 'Store Manager', 'Accountant', 'Jewellery Designer', 'CAD Designer',
+  'Karigar', 'MIS Executive', 'HR Executive', 'Marketing Executive', 'Office Assistant'];
 
-// Monday = sabka off. Date string YYYY-MM-DD se din nikaalo (UTC-safe).
-function hrIsMonday(dateStr) {
-  const d = new Date(dateStr + 'T00:00:00Z');
-  return !isNaN(d) && d.getUTCDay() === 1;
+function obE(t) { return maintEsc(t == null ? '' : String(t)); }
+// b - a, din me (YYYY-MM-DD)
+function obDays(a, b) { return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000); }
+function obPhase(no) { return ((_ob && _ob.phases) || []).find(p => p.no === no) || { color: '#64748b', title: '' }; }
+function obDef(no) { return ((_ob && _ob.steps) || []).find(s => s.no === no) || {}; }
+function obUserName(id) { const u = ((_ob && _ob.users) || []).find(x => String(x.id) === String(id)); return u ? u.name : ''; }
+function obJoinee(id) { return ((_ob && _ob.joinees) || []).find(j => String(j.id) === String(id)); }
+function obCur(j) { return j.steps.find(s => s.current) || null; }
+function obIsComplete(j) { return j.progress.total > 0 && j.progress.done >= j.progress.total; }
+function obState(j) { return j.status === 'cancelled' ? 'cancelled' : obIsComplete(j) ? 'completed' : 'active'; }
+function obDT(s) { s = String(s || ''); return s ? maintDate(s.slice(0, 10)) + (s.length > 15 ? ' ' + s.slice(11, 16) : '') : ''; }
+function obInitials(n) { return String(n || '?').trim().split(/\s+/).map(w => w[0] || '').join('').slice(0, 2).toUpperCase() || '?'; }
+function obJoinRel(j) {
+  if (!j.joiningDate) return '';
+  const d = obDays(_ob.today, j.joiningDate);      // joining - aaj
+  if (isNaN(d)) return '';
+  if (d > 1) return 'Joins in ' + d + ' days';
+  if (d === 1) return 'Joins tomorrow';
+  if (d === 0) return 'Joins today';
+  const day = -d + 1;
+  return day <= 60 ? 'Day ' + day : 'Joined ' + (-d) + ' days ago';
 }
-// Punch-in hua par punch-out nahi — Monday ho tab bhi (aaya hai to out bhi hona chahiye)
-function hrIsMissedOut(r) { return !!r.punchIn && !r.punchOut; }
-// Poora din gayab (Monday off hai isliye Monday count nahi hota)
-function hrIsAbsent(r) { return !r.punchIn && !r.punchOut && !hrIsMonday(r.date); }
-
-function loadHRReport() {
-  // Bina date filter ke kholo — poora uploaded data dikhe. (Pehle current
-  // month apne aap lag jaata tha, jisse doosre mahine ka data "gayab" lagta
-  // tha jabki DB me hota tha.)
-  hrFetch();
+function obPlanRel(s) {
+  if (!s.plan) return '';
+  const d = obDays(_ob.today, s.plan);
+  if (d === 0) return 'today';
+  if (d > 0) return 'in ' + d + ' day' + (d > 1 ? 's' : '');
+  return (-d) + ' day' + (d < -1 ? 's' : '') + ' late';
 }
-
-// Saare filters hatao — poora data wapas dikhao
-function hrClearFilters() {
-  document.getElementById('hrFltLocation').value = 'all';
-  document.getElementById('hrFltDoer').value = 'all';
-  document.getElementById('hrFltMonth').value = '';
-  document.getElementById('hrFltFrom').value = '';
-  document.getElementById('hrFltTo').value = '';
-  hrFetch();
+function obChip(s) {
+  if (s.done) return '<span class="ob-chip done">&#10003; Done</span>';
+  if (s.na) return '<span class="ob-chip na">N/A</span>';
+  if (s.status === 'waiting') return '<span class="ob-chip wait">Waiting</span>';
+  if (s.status === 'late') return '<span class="ob-chip late">Late &middot; ' + obE(obPlanRel(s).replace(' late', '')) + '</span>';
+  if (s.status === 'today') return '<span class="ob-chip today">Due today</span>';
+  return '<span class="ob-chip up">Pending</span>';
 }
-
-// ── Delete data (proper modal, browser prompt nahi) ──
-function hrDeleteRange() {
-  const dates = _hrRows.map(r => r.date).sort();
-  document.getElementById('hrDelErr').style.display = 'none';
-  document.getElementById('hrDelLocation').value = document.getElementById('hrFltLocation').value || 'all';
-  // Default: jo abhi screen par dikh raha hai wahi range
-  document.getElementById('hrDelFrom').value = document.getElementById('hrFltFrom').value || dates[0] || '';
-  document.getElementById('hrDelTo').value = document.getElementById('hrFltTo').value || dates[dates.length - 1] || '';
-  hrDelPreview();
-  document.getElementById('hrDeleteModal').classList.add('open');
+// Doer ka dropdown: app ke users + haath se likha naam ("✎ Type name…")
+function obDoerSelect(id, manual, kindArgs, disabled) {
+  const users = (_ob.users || []);
+  let opts = '<option value="">&mdash; Select Doer &mdash;</option>';
+  if (manual) opts += '<option value="__m__" selected>&#9998; ' + obE(manual) + ' (manual)</option>';
+  opts += users.map(u => '<option value="' + obE(u.id) + '"' + (!manual && String(u.id) === String(id || '') ? ' selected' : '') + '>' +
+    obE(u.name) + (u.department ? ' (' + obE(u.department) + ')' : '') + '</option>').join('');
+  opts += '<option value="__new__">&#9998; Type name (manually)…</option>';
+  return '<select class="ob-doer' + (id || manual ? '' : ' ob-unset') + '" onchange="obDoerPicked(this,' + kindArgs + ')"' + (disabled ? ' disabled' : '') + '>' + opts + '</select>';
 }
-
-// Live preview — kitne record delete honge (rows abhi loaded data se ginte hain)
-function hrDelPreview() {
-  const loc = document.getElementById('hrDelLocation').value || 'all';
-  const f = document.getElementById('hrDelFrom').value || '';
-  const t = document.getElementById('hrDelTo').value || '';
-  const box = document.getElementById('hrDelPreviewBox');
-  const btn = document.getElementById('hrDelBtn');
-  if (!f || !t) {
-    box.innerHTML = 'Select a date range to see how many records will be deleted.';
-    btn.disabled = true; return;
+async function obDoerPicked(sel, kind, a, b) {
+  const v = sel.value;
+  let body;
+  if (v === '__m__') return;
+  if (v === '__new__') {
+    const name = (prompt('Doer ka naam likho (jiska app me account nahi hai):') || '').trim();
+    if (!name) { obRender(); return; }
+    body = { doerId: '', doerName: name };
+  } else body = { doerId: v, doerName: '' };
+  const r = kind === 'owner'
+    ? await api('/api/onboarding-owners', 'PUT', { owners: [{ step: a, location: b, doerId: body.doerId, doerName: body.doerName }] })
+    : await api('/api/onboarding/' + a + '/steps/' + b, 'PUT', body);
+  if (!r || r.error) showToast((r && r.error) || 'Could not save', 'error');
+  else {
+    const who = body.doerName || obUserName(body.doerId);
+    showToast(kind === 'owner'
+      ? '✅ Step ' + a + (b ? ' (' + b + ')' : '') + ' default doer: ' + (who || 'none') + (r.filled ? ' · ' + r.filled + ' entry me bhi bhara' : '')
+      : (who ? '✅ Doer: ' + who : 'Doer hata diya'), 'success');
   }
-  if (t < f) {
-    box.innerHTML = '⚠️ <b>To date</b> cannot be before <b>From date</b>.';
-    btn.disabled = true; return;
-  }
-  const hit = _hrRows.filter(r => (loc === 'all' || r.location === loc) && r.date >= f && r.date <= t);
-  const who = [...new Set(hit.map(r => r.name))].length;
-  const locLabel = loc === 'all' ? 'All locations' : loc.charAt(0).toUpperCase() + loc.slice(1);
-  box.innerHTML = `<b>${hit.length}</b> record(s) of <b>${who}</b> employee(s) will be deleted<br>
-    <span style="font-size:12px">${locLabel} · ${f} → ${t}</span><br>
-    <span style="font-size:12px;color:#7f1d1d">This cannot be undone.</span>`;
-  btn.disabled = false;
+  await loadOnboarding(1);
 }
 
-async function hrDeleteConfirm() {
-  const err = document.getElementById('hrDelErr');
-  const btn = document.getElementById('hrDelBtn');
-  const loc = document.getElementById('hrDelLocation').value || 'all';
-  const f = document.getElementById('hrDelFrom').value || '';
-  const t = document.getElementById('hrDelTo').value || '';
-  err.style.display = 'none';
-  if (!f || !t) { err.textContent = 'Both From and To dates are required'; err.style.display = 'block'; return; }
-  if (t < f) { err.textContent = 'To date cannot be before From date'; err.style.display = 'block'; return; }
-  btn.disabled = true; btn.textContent = '⏳ Deleting…';
-  const r = await api('/api/hr-report/delete', 'POST', { location: loc, from: f, to: t });
-  btn.disabled = false; btn.textContent = '🗑 Delete';
-  if (r && r.error) { err.textContent = r.error; err.style.display = 'block'; return; }
-  closeModal('hrDeleteModal');
-  showToast(`🗑 ${r.deleted} record(s) deleted (${f} → ${t})`);
-  hrFetch();
-}
-
-function hrSetMonth(val) {
-  if (!/^\d{4}-\d{2}$/.test(val || '')) return;
-  const [y, mo] = val.split('-').map(Number);
-  document.getElementById('hrFltFrom').value = `${val}-01`;
-  document.getElementById('hrFltTo').value = `${val}-${String(new Date(y, mo, 0).getDate()).padStart(2, '0')}`;
-  hrFetch();
-}
-function hrThisMonth() {
-  const now = new Date();
-  const v = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-  document.getElementById('hrFltMonth').value = v;
-  hrSetMonth(v);
-}
-function hrThisWeek() {
-  // Somwar se aaj tak (Monday off hai par week Monday se hi ginte hain)
-  const now = new Date();
-  const day = (now.getDay() + 6) % 7;   // Mon=0 … Sun=6
-  const mon = new Date(now); mon.setDate(now.getDate() - day);
-  const fmt = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-  document.getElementById('hrFltMonth').value = '';
-  document.getElementById('hrFltFrom').value = fmt(mon);
-  document.getElementById('hrFltTo').value = fmt(now);
-  hrFetch();
-}
-
-async function hrFetch() {
-  const loc = document.getElementById('hrFltLocation').value || 'all';
-  const from = document.getElementById('hrFltFrom').value || '';
-  const to = document.getElementById('hrFltTo').value || '';
-  const area = document.getElementById('hrTableArea');
-  area.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:24px;font-size:13px">⏳ Loading…</div>';
-  const r = await api(`/api/hr-report?location=${loc}&from=${from}&to=${to}`);
-  if (r && r.error) {
-    area.innerHTML = `<div style="text-align:center;color:#ef4444;padding:24px;font-size:13px">⚠️ ${r.error}</div>`;
+async function loadOnboarding(force) {
+  const body = document.getElementById('obBody');
+  if (body && !_ob) body.innerHTML = '<div class="empty">Loading…</div>';
+  // Taaza data chahiye (Done karte hi badalna chahiye) -- api() ka GET cache nahi
+  const r = await _apiFetch('/api/onboarding', 'GET', null, 0);
+  if (!r || r.error || !Array.isArray(r.joinees)) {
+    if (body) body.innerHTML = '<div class="empty">&#9888;&#65039; ' + obE((r && r.error) || 'Could not load onboarding') + '</div>';
     return;
   }
-  // (empty fetch bhi render hota hai — cards 0 dikhate hain)
-  _hrRows = (r && r.rows) || [];
-  // Doer dropdown — data me jo naam hain wahi (selection preserve karke)
-  const doerSel = document.getElementById('hrFltDoer');
-  const keep = doerSel.value;
-  const names = [...new Set(_hrRows.map(x => x.name))].sort((a, b) => a.localeCompare(b));
-  doerSel.innerHTML = '<option value="all">All</option>' + names.map(n => `<option value="${n}">${n}</option>`).join('');
-  if (names.includes(keep)) doerSel.value = keep;
-  hrRender();
+  _ob = r;
+  if (!_obView) _obView = r.canManage ? 'pipeline' : 'mine';
+  if (!r.canManage && (_obView === 'pipeline' || _obView === 'tracking')) _obView = 'mine';
+  if (_obOpenId && (!r.canManage || !obJoinee(_obOpenId))) _obOpenId = '';
+  const nb = document.getElementById('obNewBtn');
+  if (nb) nb.style.display = r.canManage ? '' : 'none';
+  const ab = document.getElementById('obAdminBtn');
+  if (ab) ab.style.display = r.canManage ? '' : 'none';
+  obRender();
+  // Side panel khula ho to wahi taaza data dikhaye (Done / Edit ke baad)
+  if (_obDrawerId) { if (obJoinee(_obDrawerId)) obRenderDrawer(); else obCloseDrawer(); }
 }
 
-// View tabs: All Records | Missing Punch-Out | Monthly Attendance
-function hrSetView(view, el) {
-  _hrView = view;
-  ['hrTabAll', 'hrTabMissing', 'hrTabSummary'].forEach(id => document.getElementById(id).classList.remove('active'));
-  (el || document.getElementById(view === 'all' ? 'hrTabAll' : view === 'missing' ? 'hrTabMissing' : 'hrTabSummary')).classList.add('active');
-  hrRender();
-}
-// Card click bhi Missing tab par le jaata hai (dobara click -> All)
-function hrToggleMissed() { hrSetView(_hrView === 'missing' ? 'all' : 'missing'); }
+function obSetView(v) { _obView = v; _obOpenId = ''; obRender(); }
+function obOpen(id) { if (!_ob || !_ob.canManage) return; _obOpenId = String(id); obRender(); window.scrollTo(0, 0); }
+function obBack() { _obOpenId = ''; obRender(); }
 
-// Per-doer monthly attendance summary (Monday off = na present na absent)
-function hrSummaryRows(rows) {
-  const by = {};
-  for (const r of rows) {
-    const s = by[r.name] = by[r.name] || { name: r.name, location: r.location, present: 0, absent: 0, missed: 0, lateDays: 0, lateMin: 0, monOff: 0 };
-    if (hrIsMonday(r.date) && !r.punchIn && !r.punchOut) { s.monOff++; continue; }
-    if (hrIsMissedOut(r)) { s.missed++; s.present++; }     // aaya to tha, bas out bhool gaya
-    else if (!r.punchIn && !r.punchOut) { s.absent++; }
-    else s.present++;
-    if (r.lateMin > 0) { s.lateDays++; s.lateMin += r.lateMin; }
-  }
-  return Object.values(by).sort((a, b) => a.name.localeCompare(b.name));
-}
-
-function hrRender() {
-  const doer = document.getElementById('hrFltDoer').value || 'all';
-  let rows = _hrRows.filter(r => doer === 'all' || r.name === doer);
-
-  // Cards (doer filter ke baad)
-  const missed = rows.filter(hrIsMissedOut);
-  const absent = rows.filter(hrIsAbsent);
-  document.getElementById('hrCardMissed').textContent = missed.length;
-  document.getElementById('hrCardAbsent').textContent = absent.length;
-  document.getElementById('hrCardDoers').textContent = [...new Set(rows.map(r => r.name))].length;
-  document.getElementById('hrMissedTag').textContent = _hrView === 'missing' ? '(showing only these)' : '';
-
-  const area = document.getElementById('hrTableArea');
-  const foot = document.getElementById('hrTableFoot');
-  const locBadge = l => l === 'store' ? '🏬 Store' : l === 'office' ? '🏢 Office' : '🔨 Karigar';
-
-  // ── Monthly Attendance summary view ──
-  if (_hrView === 'summary') {
-    const sum = hrSummaryRows(rows);
-    if (!sum.length) { area.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:24px;font-size:13px">No records for this filter</div>'; foot.textContent = ''; return; }
-    area.innerHTML = `<table style="min-width:820px">
-      <thead><tr><th>Name</th><th>Location</th><th>✅ Present</th><th>🟠 Absent</th><th>🔴 Punch-Out Missing</th><th>⏰ Late (days)</th><th>Late (total min)</th><th>📅 Monday Off</th></tr></thead>
-      <tbody>${sum.map(s => `<tr>
-        <td style="font-weight:600">${s.name}</td>
-        <td style="white-space:nowrap">${locBadge(s.location)}</td>
-        <td style="color:#16a34a;font-weight:700">${s.present}</td>
-        <td>${s.absent ? `<span style="color:#d97706;font-weight:700">${s.absent}</span>` : '0'}</td>
-        <td>${s.missed ? `<span style="color:#dc2626;font-weight:700">${s.missed}</span>` : '0'}</td>
-        <td>${s.lateDays || '0'}</td>
-        <td style="color:#64748b">${s.lateMin || '0'}</td>
-        <td style="color:#64748b">${s.monOff}</td>
-      </tr>`).join('')}</tbody></table>`;
-    foot.textContent = `${sum.length} doer(s) · attendance summary for the selected date range`;
-    return;
-  }
-
-  // ── All / Missing views ──
-  if (_hrView === 'missing') rows = rows.filter(hrIsMissedOut);
-  if (!rows.length) {
-    area.innerHTML = `<div style="text-align:center;color:#94a3b8;padding:24px;font-size:13px">${_hrView === 'missing' ? '🎉 No missing punch-outs in this filter' : 'No records for this filter'}</div>`;
-    foot.textContent = '';
-    return;
-  }
-  area.innerHTML = `<table style="min-width:900px">
-    <thead><tr>
-      <th>Date</th><th>Name</th><th>Location</th><th>Department</th>
-      <th>In</th><th>Out</th><th>In 2</th><th>Out 2</th>
-      <th>Late (min)</th><th>Absence (min)</th><th>Note</th>
-    </tr></thead>
-    <tbody>${rows.map(r => {
-      const mon = hrIsMonday(r.date);
-      const missedRow = hrIsMissedOut(r);
-      const absentRow = hrIsAbsent(r);
-      const rowBg = missedRow ? 'background:#fef2f2' : absentRow ? 'background:#fffbeb' : mon ? 'background:#f8fafc' : '';
-      return `<tr style="${rowBg}">
-        <td style="white-space:nowrap">${fmtDate(r.date) || r.date}${mon ? ' <span style="font-size:10px;font-weight:700;color:#64748b;background:#e2e8f0;border-radius:8px;padding:1px 6px">MON OFF</span>' : ''}</td>
-        <td style="font-weight:600">${r.name}</td>
-        <td style="white-space:nowrap">${locBadge(r.location)}</td>
-        <td style="color:#64748b">${r.department || '—'}</td>
-        <td>${r.punchIn || '<span style="color:#94a3b8">—</span>'}</td>
-        <td>${r.punchOut
-          ? r.punchOut + (r.manual ? ' <span title="Added manually" style="font-size:10px;color:#7c3aed;font-weight:700">✍️</span>' : '')
-          : (r.punchIn
-              ? `<span style="color:#dc2626;font-weight:700">MISSING</span> <button class="action-btn done" style="padding:2px 8px;font-size:11px;margin-left:4px" onclick="hrAddPunchOut(${r.id},'${String(r.name).replace(/'/g, '')}','${r.date}')">➕ Add</button>`
-              : '<span style="color:#94a3b8">—</span>')}</td>
-        <td style="color:#64748b">${r.punchIn2 || '—'}</td>
-        <td style="color:#64748b">${r.punchOut2 || '—'}</td>
-        <td>${r.lateMin ? `<span style="color:#d97706;font-weight:600">${r.lateMin}</span>` : '0'}</td>
-        <td>${r.absenceMin ? `<span style="color:#dc2626;font-weight:600">${r.absenceMin}</span>` : '0'}</td>
-        <td style="color:#64748b;font-size:12px">${r.note || '—'}</td>
-      </tr>`;
-    }).join('')}</tbody></table>`;
-  foot.textContent =
-    `${rows.length} record(s) · ${[...new Set(rows.map(r => r.name))].length} doer(s)` + (_hrView === 'missing' ? ' · showing missing punch-out only' : '');
-}
-
-// Sample Excel download — bilkul wahi format jo machine deti hai aur upload me chalta hai
-function hrDownloadSample() {
-  if (typeof XLSX === 'undefined') { showToast('Excel library not loaded — refresh the page', 'error'); return; }
-  const loc = document.getElementById('hrUpLocation').value || 'store';
-  const tab = loc.charAt(0).toUpperCase() + loc.slice(1);
-  const aoa = [
-    ['Exception Statistic Report', '', '', '', '', '', '', '', '', '', '', '', ''],
-    ['Stat.Date:', '2026-08-01 ~ 2026-08-31', '', '', '', '', '', '', '', '', '', '', ''],
-    ['ID', 'Name', 'Department', 'Date', 'First time zone', '', 'Second time zone', '', 'Late time(Min)', 'Leave early(Min)', 'Absence(Min)', 'Total(Min)', 'Note'],
-    ['', '', '', '', 'On-duty', 'Off-duty', 'On-duty', 'Off-duty', '', '', '', '', ''],
-    ['1', 'RAHUL', 'Company', '2026-08-01', '11:09', '20:00', '', '', '9', '0', '0', '9', ''],
-    ['1', 'RAHUL', 'Company', '2026-08-03', '', '', '', '', '0', '0', '540', '540', 'Monday - weekly off'],
-    ['1', 'RAHUL', 'Company', '2026-08-04', '11:05', '', '', '', '5', '0', '0', '5', 'punch-out missing example'],
-    ['2', 'PRIYA', 'Company', '2026-08-01', '10:58', '20:02', '', '', '0', '0', '0', '0', ''],
-    ['2', 'PRIYA', 'Company', '2026-08-04', '', '', '', '', '0', '0', '540', '540', 'absent example'],
-  ];
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols'] = [{wch:4},{wch:12},{wch:12},{wch:12},{wch:9},{wch:9},{wch:9},{wch:9},{wch:13},{wch:15},{wch:12},{wch:10},{wch:24}];
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, tab);
-  XLSX.writeFile(wb, `attendance-sample-${loc}.xlsx`);
-}
-
-// Upload steps ka gate: location chuno -> sample + file enable, file chuno -> Upload enable
-function hrUpGate() {
-  const loc = document.getElementById('hrUpLocation').value;
-  const fileEl = document.getElementById('hrUpFile');
-  const btn = document.getElementById('hrUpBtn');
-  const sampleBtn = document.getElementById('hrSampleBtn');
-  if (sampleBtn) sampleBtn.disabled = !loc;
-  fileEl.disabled = !loc;
-  fileEl.title = loc ? '' : 'Select a location first';
-  btn.disabled = !loc || !(fileEl.files && fileEl.files.length);
-}
-
-// ── Bhoola hua punch-out (proper modal) ──
-let _hrPunchId = null;
-function hrAddPunchOut(id, name, date) {
-  _hrPunchId = id;
-  document.getElementById('hrPunchErr').style.display = 'none';
-  document.getElementById('hrPunchWho').innerHTML = `<b>${name}</b> · ${fmtDate(date) || date}`;
-  document.getElementById('hrPunchTime').value = '20:00';
-  document.getElementById('hrPunchModal').classList.add('open');
-}
-
-async function hrPunchSave() {
-  const err = document.getElementById('hrPunchErr');
-  const btn = document.getElementById('hrPunchBtn');
-  const time = (document.getElementById('hrPunchTime').value || '').trim();
-  err.style.display = 'none';
-  if (!/^([01]?\d|2[0-3]):[0-5]\d$/.test(time)) { err.textContent = 'Enter a valid time (e.g. 20:00)'; err.style.display = 'block'; return; }
-  btn.disabled = true; btn.textContent = '⏳ Saving…';
-  const r = await api('/api/hr-report/punchout', 'POST', { id: _hrPunchId, punchOut: time });
-  btn.disabled = false; btn.textContent = '✓ Save';
-  if (r && r.error) { err.textContent = r.error; err.style.display = 'block'; return; }
-  closeModal('hrPunchModal');
-  showToast(`✅ Punch-out ${time} added`);
-  hrFetch();
-}
-
-// ── Excel upload ──
-async function hrUpload() {
-  const loc = document.getElementById('hrUpLocation').value;
-  const fileEl = document.getElementById('hrUpFile');
-  const status = document.getElementById('hrUpStatus');
-  const btn = document.getElementById('hrUpBtn');
-  const file = fileEl.files && fileEl.files[0];
-  if (!loc) { showToast('Select a location first (Store / Office / Karigar)', 'error'); return; }
-  if (!file) { showToast('Choose an Excel file (.xls / .xlsx)', 'error'); return; }
-  if (typeof XLSX === 'undefined') { showToast('Excel library not loaded — refresh the page (internet required)', 'error'); return; }
-
-  btn.disabled = true; btn.textContent = '⏳ Parsing…';
-  status.textContent = '';
-  try {
-    const buf = await file.arrayBuffer();
-    const wb = XLSX.read(buf, { type: 'array' });
-    // Location ke naam ki sheet ho to wahi lo, warna pehli
-    const match = wb.SheetNames.find(n => n.toLowerCase().includes(loc)) || wb.SheetNames[0];
-    const grid = XLSX.utils.sheet_to_json(wb.Sheets[match], { header: 1, raw: false, defval: '' });
-    const rows = hrParseGrid(grid);
-    if (!rows.length) throw new Error('No attendance rows found in this sheet — check the header (ID / Name / Date)');
-
-    btn.textContent = '⏳ Uploading…';
-    status.textContent = `${rows.length} rows parsed (sheet: ${match})…`;
-    const r = await api('/api/hr-report/upload', 'POST', { location: loc, rows });
-    if (r && r.error) throw new Error(r.error);
-    status.innerHTML = `<span style="color:#16a34a">✅ ${r.inserted} rows saved (${r.from} → ${r.to})${r.replaced ? `, ${r.replaced} old replaced` : ''}</span>`;
-    showToast(`✅ ${r.inserted} attendance rows uploaded`);
-    fileEl.value = '';
-    hrUpGate();
-    // Filter ko upload wale range/location par le jao taki data turant dikhe
-    document.getElementById('hrFltLocation').value = loc;
-    document.getElementById('hrFltMonth').value = '';
-    document.getElementById('hrFltFrom').value = r.from;
-    document.getElementById('hrFltTo').value = r.to;
-    hrFetch();
-  } catch (e) {
-    status.innerHTML = `<span style="color:#ef4444">⚠️ ${e.message}</span>`;
-    showToast(e.message, 'error');
-  } finally {
-    btn.disabled = false; btn.textContent = '⬆ Upload';
-  }
-}
-
-// Machine ke "Exception Statistic Report" grid ko rows me badlo.
-// Header row dhoondta hai (ID + Name + Date), uske neeche sub-header
-// (On-duty/Off-duty) apne aap skip ho jaata hai kyunki us row me date nahi hoti.
-function hrParseGrid(grid) {
-  let h = -1;
-  for (let i = 0; i < Math.min(20, grid.length); i++) {
-    const row = (grid[i] || []).map(c => String(c || '').trim().toLowerCase());
-    if (row.includes('id') && row.includes('name') && row.includes('date')) { h = i; break; }
-  }
-  if (h < 0) throw new Error('Header row not found — the Excel must have a row with ID / Name / Date columns');
-  const hdr = (grid[h] || []).map(c => String(c || '').trim().toLowerCase());
-  const iId = hdr.indexOf('id'), iName = hdr.indexOf('name'), iDate = hdr.indexOf('date');
-  const iDept = hdr.indexOf('department');
-  const iFirst = hdr.findIndex(c => c.startsWith('first time'));
-  const iSecond = hdr.findIndex(c => c.startsWith('second time'));
-  const iLate = hdr.findIndex(c => c.startsWith('late'));
-  const iEarly = hdr.findIndex(c => c.startsWith('leave early'));
-  const iAbs = hdr.findIndex(c => c.startsWith('absence'));
-  const iTot = hdr.findIndex(c => c.startsWith('total'));
-  const iNote = hdr.indexOf('note');
-  const inCol = iFirst >= 0 ? iFirst : iDate + 1;   // First time zone: On-duty, Off-duty
-  const in2Col = iSecond >= 0 ? iSecond : inCol + 2;
-  const num = v => parseInt(String(v || '').trim()) || 0;
-
+// Mere step (jinka doer main hoon) -- cancel wale chhod kar
+function obMySteps() {
   const out = [];
-  for (let i = h + 1; i < grid.length; i++) {
-    const row = grid[i] || [];
-    const name = String(row[iName] || '').trim();
-    const date = hrNormDate(String(row[iDate] || '').trim());
-    if (!name || !date) continue;
-    out.push({
-      empId: String(row[iId] || '').trim(), name,
-      department: iDept >= 0 ? String(row[iDept] || '').trim() : '',
-      date,
-      punchIn: hrNormTime(row[inCol]), punchOut: hrNormTime(row[inCol + 1]),
-      punchIn2: hrNormTime(row[in2Col]), punchOut2: hrNormTime(row[in2Col + 1]),
-      lateMin: iLate >= 0 ? num(row[iLate]) : 0, earlyMin: iEarly >= 0 ? num(row[iEarly]) : 0,
-      absenceMin: iAbs >= 0 ? num(row[iAbs]) : 0, totalMin: iTot >= 0 ? num(row[iTot]) : 0,
-      note: iNote >= 0 ? String(row[iNote] || '').trim() : ''
-    });
-  }
+  ((_ob && _ob.joinees) || []).forEach(j => {
+    if (j.status === 'cancelled') return;
+    j.steps.forEach(s => { if (String(s.doerId) === String(_ob.me.id)) out.push({ j, s }); });
+  });
   return out;
 }
 
-// Har tarah ki date ko YYYY-MM-DD banao (machine ISO deta hai; Excel kabhi
-// serial number ya D/M/Y bhi de deta hai)
-function hrNormDate(s) {
-  s = String(s || '').trim();
-  if (!s) return '';
-  let m = s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);           // 2026-07-01 ya 2026/7/1
-  if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
-  m = s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})$/);              // D-M-YYYY ya M/D/YYYY
-  if (m) {
-    let a = parseInt(m[1]), b = parseInt(m[2]);
-    let day = a, mon = b;
-    if (a <= 12 && b > 12) { day = b; mon = a; }                      // pakka M/D tha
-    if (mon > 12 || day > 31) return '';
-    return `${m[3]}-${String(mon).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+function obRender() {
+  if (!_ob) return;
+  // Pipeline ka scroll yaad rakho (card dabane par patti wahin rahe)
+  const tr = document.getElementById('obPipeTrack');
+  const keepScroll = tr ? tr.scrollLeft : 0;
+  obRenderKpis();
+  const myPending = obMySteps().filter(x => x.s.current).length;
+  const tabs = [];
+  if (_ob.canManage) tabs.push(['pipeline', '&#129517; Pipeline']);
+  tabs.push(['mine', '&#9989; My Steps' + (myPending ? ' <span class="ob-tcount">' + myPending + '</span>' : '')]);
+  if (_ob.canManage) tabs.push(['tracking', '&#128202; Tracking']);
+  tabs.push(['workflow', '&#9881;&#65039; Workflow']);
+  document.getElementById('obTabs').innerHTML = tabs.map(t =>
+    '<div class="tab' + (_obView === t[0] && !_obOpenId ? ' active' : '') + '" onclick="obSetView(\'' + t[0] + '\')">' + t[1] + '</div>').join('');
+  const b = document.getElementById('obBody');
+  if (_obOpenId) { b.innerHTML = obDetailHtml(obJoinee(_obOpenId)); return; }
+  if (_obView === 'pipeline') {
+    b.innerHTML = obPipelineHtml() + '<div id="obList">' + obListHtml() + '</div>';
+    const t2 = document.getElementById('obPipeTrack');
+    if (t2) { t2.scrollLeft = keepScroll; obPipeBar(); }
   }
-  m = s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{2})$/);              // D/M/YY
-  if (m) {
-    let a = parseInt(m[1]), b = parseInt(m[2]);
-    let day = a, mon = b;
-    if (a <= 12 && b > 12) { day = b; mon = a; }
-    if (mon > 12 || day > 31) return '';
-    return `20${m[3]}-${String(mon).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-  }
-  if (/^\d{5}$/.test(s)) {                                            // Excel serial date
-    const d = new Date(Math.round((parseInt(s) - 25569) * 86400 * 1000));
-    return isNaN(d) ? '' : d.toISOString().split('T')[0];
-  }
-  return '';
+  else if (_obView === 'tracking') b.innerHTML = obTrackingHtml();
+  else if (_obView === 'workflow') b.innerHTML = obWorkflowHtml();
+  else b.innerHTML = obMineHtml();
 }
 
-// Time ko HH:MM banao ('9:5' → 09:05, '20:00:30' → 20:00, Excel fraction bhi)
-function hrNormTime(v) {
-  const s = String(v == null ? '' : v).trim();
-  if (!s) return '';
-  const m = s.match(/^(\d{1,2}):(\d{1,2})(?::\d{1,2})?$/);
-  if (m) {
-    const h = parseInt(m[1]), mi = parseInt(m[2]);
-    if (h > 23 || mi > 59) return '';
-    return `${String(h).padStart(2, '0')}:${String(mi).padStart(2, '0')}`;
+function obRenderKpis() {
+  const el = document.getElementById('obKpis');
+  const card = (cls, label, n, sub) => '<div class="ov-card ' + cls + '"><div class="label">' + label + '</div>' +
+    '<div class="number">' + n + '</div>' + (sub ? '<div class="ob-ksub">' + sub + '</div>' : '') + '</div>';
+  if (_ob.canManage) {
+    const act = _ob.joinees.filter(j => obState(j) === 'active');
+    const week = act.filter(j => { const d = obDays(_ob.today, j.joiningDate); return d >= 0 && d <= 7; }).length;
+    const cur = act.map(obCur).filter(Boolean);
+    el.innerHTML =
+      card('obk-blue', '&#128101; In Onboarding', act.length, week + ' joining in next 7 days') +
+      card('pending', '&#9200; Steps Late', cur.filter(s => s.status === 'late').length, 'chalu step ki date nikal gayi') +
+      card('revised', '&#128197; Due Today', cur.filter(s => s.status === 'today').length, 'aaj karne hain') +
+      card('completed', '&#127881; Completed', _ob.joinees.filter(j => obState(j) === 'completed').length, 'saare step done');
+  } else {
+    const mine = obMySteps();
+    const pend = mine.filter(x => x.s.current);
+    el.innerHTML =
+      card('obk-blue', '&#9989; My Pending', pend.length, 'abhi aapki baari') +
+      card('pending', '&#9200; Late', pend.filter(x => x.s.status === 'late').length, '') +
+      card('revised', '&#9203; Coming Up', mine.filter(x => x.s.status === 'waiting').length, 'pichhla step hote hi aayega') +
+      card('completed', '&#10003; Done', mine.filter(x => x.s.done).length, '');
   }
-  const f = parseFloat(s);                                            // Excel time = din ka fraction
-  if (!isNaN(f) && f > 0 && f < 1) {
-    const mins = Math.round(f * 24 * 60);
-    return `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`;
+}
+
+// ── Step-wise Pipeline ──
+function obPipelineHtml() {
+  const act = _ob.joinees.filter(j => obState(j) === 'active');
+  const curOf = new Map(act.map(j => [j.id, obCur(j)]));
+  let cards = '<div class="ob-pcard all' + (_obStep === 0 ? ' on' : '') + '" onclick="obPickStep(0)">' +
+    '<div class="k">ALL</div><div class="t">All Employees &middot; Full Data</div>' +
+    '<div class="n"><b>' + _ob.joinees.length + '</b> employees <span class="r pill">' + act.length + ' pending</span></div></div>';
+  _ob.steps.forEach(def => {
+    const here = act.filter(j => { const c = curOf.get(j.id); return c && c.no === def.no; });
+    const late = here.filter(j => curOf.get(j.id).status === 'late').length;
+    const ph = obPhase(def.phase);
+    cards += '<div class="ob-pcard ' + (here.length ? 'has' : 'zero') + (late ? ' lt' : '') + (_obStep === def.no ? ' on' : '') + '" style="--pc:' + ph.color + '" ' +
+      'onclick="obPickStep(' + def.no + ')" title="' + obE(def.owner + ' · ' + def.when) + '">' +
+      '<div class="k">STEP ' + def.no + '</div><div class="t">' + obE(def.title) + '</div>' +
+      '<div class="n"><b>' + here.length + '</b> pending' + (late ? ' <span class="r late">' + late + ' late</span>' : '') + '</div></div>';
+  });
+  return '<div class="ob-pipe"><div class="ob-pipe-head"><div class="ob-pipe-title">&#10697; Step-wise Pipeline</div>' +
+    '<div class="ob-pipe-hint">Pending employees at each step &middot; click to view</div>' +
+    '<button class="ob-arrow" onclick="obPipeScroll(-1)" title="Back">&#8249;</button>' +
+    '<button class="ob-arrow" onclick="obPipeScroll(1)" title="Next">&#8250;</button></div>' +
+    '<div class="ob-pipe-track" id="obPipeTrack" onscroll="obPipeBar()">' + cards + '</div>' +
+    '<div class="ob-pipe-bar"><i id="obPipeBarFill"></i></div></div>';
+}
+function obPipeScroll(dir) { const t = document.getElementById('obPipeTrack'); if (t) t.scrollLeft += dir * 460; }
+function obPipeBar() {
+  const t = document.getElementById('obPipeTrack'), f = document.getElementById('obPipeBarFill');
+  if (!t || !f) return;
+  const w = t.scrollWidth > 0 ? Math.max(12, Math.round(t.clientWidth * 100 / t.scrollWidth)) : 100;
+  const max = Math.max(1, t.scrollWidth - t.clientWidth);
+  f.style.width = Math.min(100, w) + '%';
+  f.style.marginLeft = Math.round((100 - Math.min(100, w)) * (t.scrollLeft / max)) + '%';
+}
+function obPickStep(n) { _obStep = n; obRender(); }
+
+function obListHtml() {
+  const m = _ob.canManage;
+  if (_obStep) {
+    const def = obDef(_obStep), ph = obPhase(def.phase);
+    const rows = _ob.joinees.filter(j => obState(j) === 'active' && (obCur(j) || {}).no === _obStep)
+      .sort((a, b) => String(obCur(a).plan).localeCompare(String(obCur(b).plan)));
+    const head = '<div class="ob-listhead"><div class="ob-num sm" style="background:' + ph.color + '">' + def.no + '</div>' +
+      '<h4>' + obE(def.title) + '<span>' + rows.length + ' pending &middot; Owner: ' + obE(def.owner) + ' &middot; ' + obE(def.when) + '</span></h4></div>';
+    if (!rows.length) return '<div class="ob-listcard">' + head + '<div class="empty">Is step par abhi koi employee nahi &#127881;</div></div>';
+    return '<div class="ob-listcard">' + head + '<div class="ob-twrap2"><table class="ob-list"><thead><tr>' +
+      '<th>Employee</th><th>Location</th><th>Joining</th><th>Plan Date</th><th>Doer</th><th>Status</th><th style="text-align:right">Action</th></tr></thead><tbody>' +
+      rows.map(j => {
+        const s = obCur(j);
+        const mine = String(s.doerId) === String(_ob.me.id);
+        return '<tr class="' + (s.status === 'late' ? 'lt' : '') + '">' +
+          '<td class="ob-emp" style="cursor:pointer" onclick="obOpenDrawer(\'' + obE(j.id) + '\')"><b>' + obE(j.name) + '</b><span>' + obE(j.designation) + '</span></td>' +
+          '<td>' + obE(j.location) + '</td>' +
+          '<td class="ob-dt">' + maintDate(j.joiningDate) + '<span>' + obE(obJoinRel(j)) + '</span></td>' +
+          '<td class="ob-dt"><b>' + (s.plan ? maintDate(s.plan) : '&mdash;') + '</b><span>' + obE(obPlanRel(s)) + '</span></td>' +
+          '<td style="min-width:190px">' + (m ? obDoerSelect(s.doerId, s.manualDoer, '\'step\',\'' + obE(j.id) + '\',' + s.no) : obE(s.doerName || '—')) + '</td>' +
+          '<td>' + obChip(s) + '</td>' +
+          '<td><div class="ob-rowacts">' + ((m || mine) ? '<button class="btn btn-green btn-sm" onclick="obAskDone(\'' + obE(j.id) + '\',' + s.no + ')">&#10003; Done</button>' : '') +
+            (m ? '<button class="btn btn-outline btn-sm" onclick="obStepAction(\'' + obE(j.id) + '\',' + s.no + ',\'na\')" title="Is employee par ye step lagu nahi">N/A</button>' : '') + '</div></td></tr>';
+      }).join('') + '</tbody></table></div></div>';
   }
+  // ALL -- poora data
+  const all = _ob.joinees;
+  const cnt = k => all.filter(j => obState(j) === k).length;
+  const chips = [['active', 'Active', cnt('active')], ['completed', 'Completed', cnt('completed')],
+    ['cancelled', 'Cancelled', cnt('cancelled')], ['all', 'All', all.length]]
+    .map(c => '<button class="ob-fchip' + (_obFilter === c[0] ? ' on' : '') + '" onclick="_obFilter=\'' + c[0] + '\';obRender()">' + c[1] + ' <b>' + c[2] + '</b></button>').join('');
+  return '<div class="ob-listcard"><div class="ob-listhead"><h4>All Employees<span>poora data &middot; row dabao to poora safar</span></h4>' +
+    '<div class="ob-fchips">' + chips + '</div>' +
+    '<input type="search" class="ob-search" placeholder="&#128269; Search name, designation, location…" value="' + obE(_obSearch) + '" ' +
+    'oninput="_obSearch=this.value;document.getElementById(\'obAllRows\').innerHTML=obAllRows()" autocomplete="off"></div>' +
+    '<div class="ob-twrap2"><table class="ob-list"><thead><tr><th>Employee</th><th>Location</th><th>Joining</th><th>Current Step</th><th>Progress</th><th>Doer</th><th>Status</th><th style="text-align:right">Action</th></tr></thead>' +
+    '<tbody id="obAllRows">' + obAllRows() + '</tbody></table></div></div>';
+}
+function obAllRows() {
+  const q = _obSearch.trim().toLowerCase();
+  const list = _ob.joinees.filter(j => (_obFilter === 'all' || obState(j) === _obFilter) &&
+    (!q || [j.name, j.designation, j.location, j.phone].some(x => String(x || '').toLowerCase().includes(q))));
+  if (!list.length) {
+    return '<tr><td colspan="8"><div class="empty">' + (_ob.joinees.length ? 'Is filter me koi employee nahi'
+      : 'Abhi koi entry nahi. <b>+ Employee Entry</b> dabao &mdash; Step 1 uske doer ke paas chala jayega.') + '</div></td></tr>';
+  }
+  return list.map(j => {
+    const s = obCur(j), st = obState(j);
+    const p = j.progress, pct = p.total ? Math.round(p.done * 100 / p.total) : 0;
+    const curCell = st === 'cancelled' ? '<span class="ob-chip na">Cancelled</span>'
+      : !s ? '<span class="ob-chip done">&#127881; Completed</span>'
+      : '<div class="ob-cur"><div class="ob-num sm" style="background:' + obPhase(obDef(s.no).phase).color + '">' + s.no + '</div><b>' + obE(obDef(s.no).title) + '</b></div>';
+    return '<tr class="click' + (s && s.status === 'late' && st === 'active' ? ' lt' : '') + '" onclick="obOpenDrawer(\'' + obE(j.id) + '\')">' +
+      '<td class="ob-emp"><b>' + obE(j.name) + '</b><span>' + obE(j.designation) + '</span></td>' +
+      '<td>' + obE(j.location) + '</td>' +
+      '<td class="ob-dt">' + maintDate(j.joiningDate) + '<span>' + obE(obJoinRel(j)) + '</span></td>' +
+      '<td style="min-width:220px">' + curCell + '</td>' +
+      '<td><div class="ob-mini"><div class="ob-pbar"><i style="width:' + pct + '%"></i></div>' + p.done + '/' + p.total + '</div></td>' +
+      '<td>' + (s && st === 'active' ? (s.doerName ? obE(s.doerName) : '<span class="ob-warn">doer not set</span>') : '&mdash;') + '</td>' +
+      '<td>' + (s && st === 'active' ? obChip(s) : '') + '</td>' +
+      '<td><div class="ob-rowacts" onclick="event.stopPropagation()">' +
+        '<button class="ob-iconbtn" title="Edit" onclick="obOpenJoinee(\'' + obE(j.id) + '\')">&#9999;&#65039;</button>' +
+        '<button class="ob-iconbtn del" title="Delete" onclick="obDelete(\'' + obE(j.id) + '\')">&#128465;</button></div></td></tr>';
+  }).join('');
+}
+
+// ── Ek employee ka poora safar (phase-wise, PDF jaisa) ──
+function obStepInfo(j, no) {
+  if (no === 3) return j.altPhoneNA ? 'Alternate number: not available' : (j.altPhone ? 'Alternate: ' + j.altPhone : '');
+  if (no === 8) return 'Contract signed: ' + (j.contract === 'yes' ? 'Yes' : j.contract === 'no' ? 'No' : '—');
+  if (no === 13) return j.phone ? 'Phone: ' + j.phone : '';
+  if (no === 14) return j.dob ? 'Birthday: ' + maintDate(j.dob) : '';
+  if (no === 17) return j.isSales ? 'Sales employee' : '';
+  if (no === 19) return 'ESIS eligible: ' + (j.esis === 'yes' ? 'Yes' : j.esis === 'no' ? 'No' : '—');
   return '';
+}
+function obDetailHtml(j) {
+  if (!j) return '<div class="empty">Employee nahi mila</div>';
+  const p = j.progress, pct = p.total ? Math.round(p.done * 100 / p.total) : 0;
+  const st = obState(j), cur = obCur(j);
+  const probEnd = (j.steps.find(s => s.no === 20) || {}).plan;
+  const field = (k, v) => '<div><span class="ob-dk">' + k + '</span>' + (v || '&mdash;') + '</div>';
+  const yn = v => v === 'yes' ? 'Yes' : v === 'no' ? 'No' : '';
+  let html = '<button class="ob-back" onclick="obBack()">&larr; Pipeline</button>' +
+    '<div class="ob-dhead"><div class="ob-dtop"><div class="ob-av">' + obE(obInitials(j.name)) + '</div>' +
+      '<div class="ob-dname"><h3>' + obE(j.name) + '</h3><div>' + obE(j.designation || '—') + ' &middot; ' + obE(j.location) + '</div></div>' +
+      '<div class="ob-dacts">' +
+        '<button class="btn btn-outline btn-sm" onclick="obOpenJoinee(\'' + obE(j.id) + '\')">&#9999;&#65039; Edit</button>' +
+        (st === 'cancelled'
+          ? '<button class="btn btn-outline btn-sm" onclick="obSetStatus(\'' + obE(j.id) + '\',\'active\')">&#8634; Reactivate</button>'
+          : '<button class="btn btn-outline btn-sm" onclick="obSetStatus(\'' + obE(j.id) + '\',\'cancelled\')">&#10005; Cancel</button>') +
+        '<button class="btn btn-outline btn-sm" style="color:#dc2626;border-color:#fecaca" onclick="obDelete(\'' + obE(j.id) + '\')">&#128465; Delete</button>' +
+      '</div></div>' +
+      '<div class="ob-dgrid">' +
+        field('Date of joining', maintDate(j.joiningDate) + ' &middot; <b>' + obE(obJoinRel(j)) + '</b>') +
+        field('Phone', obE(j.phone)) +
+        field('Alternate phone', j.altPhoneNA ? 'Not available' : obE(j.altPhone)) +
+        field('Salary', obE(j.salary)) +
+        field('Date of birth', j.dob ? maintDate(j.dob) : '') +
+        field('ESIS eligible', yn(j.esis)) + field('Contract signed', yn(j.contract)) +
+        field('Probation', j.probationDays + ' days' + (probEnd ? ' (till ' + maintDate(probEnd) + ')' : '')) +
+        field('Current step', st === 'cancelled' ? '<span class="ob-chip na">Cancelled</span>' : cur ? '<b>' + cur.no + '. ' + obE(obDef(cur.no).title) + '</b>' : '<span class="ob-chip done">&#127881; Completed</span>') +
+        field('Added by', obE(j.createdBy) + (j.createdAt ? ' &middot; ' + obDT(j.createdAt) : '')) +
+      '</div>' +
+      (j.notes ? '<div class="ob-dnotes">' + obE(j.notes) + '</div>' : '') +
+      '<div class="ob-dprog ob-prog"><div class="ob-pbar"><i style="width:' + pct + '%"></i></div><span>' + p.done + '/' + p.total + ' done</span></div>' +
+    '</div>';
+  // Undo sirf aakhri Done step par
+  const lastDone = j.steps.filter(s => s.done).map(s => s.no).sort((a, b) => b - a)[0] || 0;
+  _ob.phases.forEach(ph => {
+    const ss = j.steps.filter(s => obDef(s.no).phase === ph.no);
+    if (!ss.length) return;
+    const d = ss.filter(s => s.done).length, tot = ss.filter(s => !s.na).length;
+    html += '<div class="ob-phase" style="background:' + ph.color + '">Phase ' + ph.no + ' &nbsp;|&nbsp; ' + obE(ph.title) +
+      '<span>' + d + '/' + tot + '</span></div><div class="ob-steps">' + ss.map(s => obStepHtml(j, s, lastDone)).join('') + '</div>';
+  });
+  return html + '<div class="ob-control">CONTROL: ' + obE(_ob.control || '') + '</div>';
+}
+function obStepHtml(j, s, lastDone) {
+  const def = obDef(s.no), ph = obPhase(def.phase), m = _ob.canManage;
+  const jid = obE(j.id);
+  const cls = s.done ? 'done' : s.na ? 'na' : s.status === 'waiting' ? 'waiting' : s.status === 'late' ? 'late' : 'cur';
+  const info = obStepInfo(j, s.no);
+  let acts = '';
+  if (s.current && j.status !== 'cancelled') acts += '<button class="btn btn-green btn-sm" onclick="obAskDone(\'' + jid + '\',' + s.no + ')">&#10003; Done</button>';
+  if (s.done && m && s.no === lastDone) acts += '<button class="btn btn-outline btn-sm" onclick="obStepAction(\'' + jid + '\',' + s.no + ',\'undo\')">&#8634; Undo</button>';
+  if (!s.done && m) acts += '<button class="btn btn-outline btn-sm" onclick="obStepAction(\'' + jid + '\',' + s.no + ',\'' + (s.na ? 'applicable' : 'na') + '\')">' + (s.na ? 'Make applicable' : 'N/A') + '</button>';
+  return '<div class="ob-step st-' + cls + '">' +
+    '<div class="ob-num" style="background:' + ph.color + '">' + s.no + '</div>' +
+    '<div class="ob-sbody">' +
+      '<div class="ob-stitle">' + obE(def.title) + '</div>' +
+      '<div class="ob-smeta">Owner: ' + obE(def.owner) + '<span>&middot;</span>Channel: ' + obE(def.channel) + '</div>' +
+      (def.note ? '<div class="ob-snote">' + obE(def.note) + '</div>' : '') +
+      (info ? '<div class="ob-sinfo">' + obE(info) + '</div>' : '') +
+      '<div class="ob-swhen">' + (s.tat != null ? 'TAT: <b>' + s.tat + ' day' + (s.tat === 1 ? '' : 's') + '</b> (pichhle step ke baad)' : 'When: <b>' + obE(def.when) + '</b>') +
+        (s.plan ? ' &middot; Plan <b>' + maintDate(s.plan) + '</b>' + (s.current ? ' <em>(' + obE(obPlanRel(s)) + ')</em>' : '') : '') + '</div>' +
+      (s.done ? '<div class="ob-sdone">&#10003; Done ' + obE(obDT(s.doneAt)) + (s.doneBy ? ' by <b>' + obE(s.doneBy) + '</b>' : '') + (s.note ? ' &mdash; ' + obE(s.note) : '') + '</div>' : '') +
+    '</div>' +
+    '<div class="ob-sside"><label>Doer</label>' +
+      (m && !s.done ? obDoerSelect(s.doerId, s.manualDoer, '\'step\',\'' + jid + '\',' + s.no) : '<div class="ob-doername">' + obE(s.doerName || '—') + '</div>') +
+      '<div>' + obChip(s) + '</div>' + (acts ? '<div class="ob-sacts">' + acts + '</div>' : '') + '</div>' +
+  '</div>';
+}
+
+// ── My Steps: jo step mujhe diye gaye ──
+function obMineHtml() {
+  const mine = obMySteps();
+  if (!mine.length) {
+    return '<div class="empty" style="background:#fff;border-radius:12px;border:1px solid #e2e8f0">' + (_ob.canManage
+      ? 'Aapko abhi koi step nahi diya gaya. Pipeline me step ka Doer chuno, ya Workflow me default doer set karo.'
+      : 'Abhi aapke liye koi onboarding step nahi hai &#127881;') + '</div>';
+  }
+  const byPlan = (a, b) => String(a.s.plan).localeCompare(String(b.s.plan)) || a.s.no - b.s.no;
+  const pend = mine.filter(x => x.s.current).sort(byPlan);
+  const wait = mine.filter(x => x.s.status === 'waiting').sort(byPlan);
+  const done = mine.filter(x => x.s.done).sort((a, b) => String(b.s.doneAt).localeCompare(String(a.s.doneAt))).slice(0, 15);
+  const row = (x, kind) => {
+    const def = obDef(x.s.no), ph = obPhase(def.phase);
+    const info = obStepInfo(x.j, x.s.no);
+    // Abhi kaunsa step chal raha hai (meri baari kab aayegi)
+    let waitTxt = '';
+    if (kind === 'wait') {
+      const cn = x.j.currentNo, cd = cn ? obDef(cn) : null;
+      const who = _ob.canManage ? ((x.j.steps.find(s => s.no === cn) || {}).doerName || '') : (x.j.currentDoer || '');
+      waitTxt = cd ? 'Abhi Step ' + cn + ' (' + cd.title + ')' + (who ? ' — ' + who : '') + ' par hai' : '';
+    }
+    return '<div class="ob-mrow st-' + (kind === 'done' ? 'done' : kind === 'wait' ? 'waiting' : x.s.status) + '">' +
+      '<div class="ob-num sm" style="background:' + ph.color + '">' + x.s.no + '</div>' +
+      '<div style="min-width:0"><div class="ob-stitle">' + obE(def.title) + '</div>' +
+        '<div class="ob-smeta">For <b>' + obE(x.j.name) + '</b>' + (x.j.designation ? ' (' + obE(x.j.designation) + ')' : '') +
+          '<span>&middot;</span>Joining ' + maintDate(x.j.joiningDate) + '<span>&middot;</span>' + obE(def.channel) + '</div>' +
+        (def.note ? '<div class="ob-snote">' + obE(def.note) + '</div>' : '') +
+        (info ? '<div class="ob-sinfo">' + obE(info) + '</div>' : '') +
+        (waitTxt ? '<div class="ob-smeta">&#9203; ' + obE(waitTxt) + '</div>' : '') +
+        (kind === 'done' ? '<div class="ob-sdone">&#10003; Done ' + obE(obDT(x.s.doneAt)) + (x.s.note ? ' &mdash; ' + obE(x.s.note) : '') + '</div>' : '') +
+      '</div>' +
+      '<div class="ob-mside"><div class="ob-mplan">' + (x.s.plan ? maintDate(x.s.plan) : '&mdash;') + '</div>' + obChip(x.s) +
+        (kind === 'pend' ? '<button class="btn btn-green btn-sm" onclick="obAskDone(\'' + obE(x.j.id) + '\',' + x.s.no + ')">&#10003; Done</button>' : '') + '</div>' +
+    '</div>';
+  };
+  const box = t => '<div class="empty" style="background:#fff;border-radius:12px;border:1px solid #e2e8f0">' + t + '</div>';
+  return '<div class="ob-sec">Abhi aapki baari (' + pend.length + ')</div>' +
+    (pend.length ? pend.map(x => row(x, 'pend')).join('') : box('Abhi koi step aapki baari me nahi &#127881;')) +
+    (wait.length ? '<div class="ob-sec" style="margin-top:18px">Coming up &mdash; pichhla step hote hi aayega (' + wait.length + ')</div>' + wait.map(x => row(x, 'wait')).join('') : '') +
+    (done.length ? '<div class="ob-sec" style="margin-top:18px">Recently done</div>' + done.map(x => row(x, 'done')).join('') : '');
+}
+
+// ── Tracking: har employee ki line, 20 step ke dot ──
+function obTrackingHtml() {
+  const js = _ob.joinees.filter(j => j.status !== 'cancelled');
+  if (!js.length) return '<div class="empty" style="background:#fff;border-radius:12px;border:1px solid #e2e8f0">Abhi koi entry nahi</div>';
+  const head1 = '<tr><th rowspan="2" class="ob-tname">Employee</th><th rowspan="2">Joining</th><th rowspan="2">Done</th>' +
+    _ob.phases.map(ph => '<th colspan="' + _ob.steps.filter(s => s.phase === ph.no).length + '" class="ob-tph" style="background:' + ph.color + '">P' + ph.no + ' &middot; ' + obE(ph.title) + '</th>').join('') + '</tr>';
+  const head2 = '<tr>' + _ob.steps.map(s => '<th title="' + obE(s.title) + '">' + s.no + '</th>').join('') + '</tr>';
+  const rows = js.map(j => '<tr onclick="obOpenDrawer(\'' + obE(j.id) + '\')">' +
+    '<td class="ob-tname"><b>' + obE(j.name) + '</b><span>' + obE(j.designation || j.location) + '</span></td>' +
+    '<td>' + maintDate(j.joiningDate) + '<span>' + obE(obJoinRel(j)) + '</span></td>' +
+    '<td class="ob-tprog">' + j.progress.done + '/' + j.progress.total + (j.progress.late ? '<em>late</em>' : '') + '</td>' +
+    j.steps.map(s => {
+      const def = obDef(s.no);
+      const tip = s.no + '. ' + def.title + ' — ' + (s.done ? 'Done ' + obDT(s.doneAt) + (s.doneBy ? ' by ' + s.doneBy : '')
+        : s.na ? 'N/A' : s.status === 'waiting' ? 'Waiting' : 'Pending, plan ' + maintDate(s.plan) + ' (' + obPlanRel(s) + ')') + ' · ' + (s.doerName || 'doer not set');
+      return '<td class="ob-tdot"><i class="d-' + s.status + (s.current ? ' cur' : '') + '" title="' + obE(tip) + '"></i></td>';
+    }).join('') + '</tr>').join('');
+  return '<div class="ob-legend"><span><i class="d-done"></i>Done</span><span><i class="d-upcoming"></i>Chalu step</span>' +
+    '<span><i class="d-today"></i>Aaj</span><span><i class="d-late"></i>Late</span><span><i class="d-waiting"></i>Waiting</span><span><i class="d-na"></i>N/A</span>' +
+    '<span style="margin-left:auto">Dot par mouse le jao: step, date aur doer</span></div>' +
+    '<div class="ob-twrap"><table class="ob-track"><thead>' + head1 + head2 + '</thead><tbody>' + rows + '</tbody></table></div>';
+}
+
+// ── Workflow: 20 step ka kram + har step ka default doer ──
+function obWorkflowHtml() {
+  const m = _ob.canManage;
+  const sel = (no, loc) => {
+    const o = (_ob.owners || {})[no + '|' + (loc || '')] || {};
+    return obDoerSelect(o.id || '', o.manual ? o.name : '', '\'owner\',' + no + ',\'' + obE(loc || '') + '\'');
+  };
+  let html = '<div class="ob-wintro">' + (m
+    ? 'Har step ka <b>default doer</b> yahan chuno (list me na ho to "Type name" se likh do). Nayi entry me apne aap lag jayega, aur chalu entries ke jin step me doer khali hai unme bhi bhar jayega. Kram: Step 1 Done &rarr; Step 2 khulta hai &rarr; &hellip; &rarr; Step 20.'
+    : 'Employee onboarding ka poora kram &mdash; har step pichhle step ke Done hone par khulta hai.') + '</div>';
+  _ob.phases.forEach(ph => {
+    html += '<div class="ob-phase" style="background:' + ph.color + '">Phase ' + ph.no + ' &nbsp;|&nbsp; ' + obE(ph.title) + '</div><div class="ob-steps">' +
+      _ob.steps.filter(s => s.phase === ph.no).map(def => {
+        let side = '';
+        if (m) {
+          side = def.byLocation
+            ? '<label>Default Doer</label><div class="ob-wloc">' + (_ob.locations || ['Delhi', 'Mumbai']).map(l => '<div>' + obE(l) + sel(def.no, l) + '</div>').join('') + '</div>'
+            : '<label>Default Doer</label>' + sel(def.no, '');
+        }
+        const cond = def.salesOnly ? ' &middot; sirf Sales employee' : def.esisOnly ? ' &middot; sirf ESIS eligible' : '';
+        return '<div class="ob-step"' + (m ? '' : ' style="grid-template-columns:44px minmax(0,1fr)"') + '>' +
+          '<div class="ob-num" style="background:' + ph.color + '">' + def.no + '</div>' +
+          '<div class="ob-sbody"><div class="ob-stitle">' + obE(def.title) + '</div>' +
+            '<div class="ob-smeta">Owner: ' + obE(def.owner) + '<span>&middot;</span>Channel: ' + obE(def.channel) + '</div>' +
+            (def.note ? '<div class="ob-snote">' + obE(def.note) + '</div>' : '') +
+            '<div class="ob-swhen">When: <b>' + obE(def.when) + '</b>' + cond +
+              ((_ob.tat || {})[String(def.no)] != null ? '<span class="ob-tatb">TAT ' + _ob.tat[String(def.no)] + ' days</span>' : '') + '</div></div>' +
+          (m ? '<div class="ob-sside">' + side + '</div>' : '') +
+        '</div>';
+      }).join('') + '</div>';
+  });
+  return html + '<div class="ob-control">CONTROL: ' + obE(_ob.control || '') + '</div>';
+}
+
+// ── Person par click: side panel (profile + abhi ka step + poora safar) ──
+let _obDrawerId = '';
+function obOpenDrawer(id) {
+  if (!_ob || !_ob.canManage) return;
+  _obDrawerId = String(id);
+  obRenderDrawer();
+  document.getElementById('obDrawer').classList.add('open');
+  const b = document.getElementById('obDrawerBody'); if (b) b.scrollTop = 0;
+}
+function obCloseDrawer() {
+  _obDrawerId = '';
+  const d = document.getElementById('obDrawer'); if (d) d.classList.remove('open');
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && _obDrawerId) obCloseDrawer(); });
+function obRenderDrawer() {
+  const j = obJoinee(_obDrawerId);
+  const el = document.getElementById('obDrawerBody');
+  if (!j || !el) return;
+  const p = j.progress, pct = p.total ? Math.round(p.done * 100 / p.total) : 0;
+  const st = obState(j), cur = obCur(j);
+  const jid = obE(j.id);
+  const yn = v => v === 'yes' ? 'Yes' : v === 'no' ? 'No' : '—';
+  const R = 27, C = 2 * Math.PI * R;
+  const ring = '<div class="ob-ring"><svg viewBox="0 0 66 66"><circle cx="33" cy="33" r="' + R + '" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="7"/>' +
+    '<circle cx="33" cy="33" r="' + R + '" fill="none" stroke="#86efac" stroke-width="7" stroke-linecap="round" stroke-dasharray="' + (C * pct / 100).toFixed(1) + ' ' + C.toFixed(1) + '"/></svg><b>' + pct + '%</b></div>';
+  const stTxt = st === 'cancelled' ? 'Cancelled' : st === 'completed' ? 'Completed 🎉' : (cur && cur.status === 'late' ? 'Late — ' + obPlanRel(cur) : 'On track');
+  let h = '<div class="ob-dw-top"><button class="ob-dw-x" onclick="obCloseDrawer()" title="Close">&#10005;</button>' +
+    '<div class="ob-dw-id"><div class="ob-dw-av">' + obE(obInitials(j.name)) + '</div><div><h3>' + obE(j.name) + '</h3>' +
+      '<div>' + obE(j.designation || '—') + ' &middot; ' + obE(j.location) + '</div></div></div>' +
+    '<div class="ob-dw-meta">' + ring + '<div class="ob-dw-facts">' +
+      '<div><b>' + p.done + '/' + p.total + '</b> steps done &middot; ' + obE(stTxt) + '</div>' +
+      '<div>Joining <b>' + maintDate(j.joiningDate) + '</b> &middot; ' + obE(obJoinRel(j)) + '</div>' +
+      '<div>Phone <b>' + obE(j.phone || '—') + '</b></div></div></div>' +
+    '<div class="ob-dw-acts">' +
+      '<button onclick="obOpenJoinee(\'' + jid + '\')">&#9999;&#65039; Edit</button>' +
+      '<button onclick="obCloseDrawer();obOpen(\'' + jid + '\')">&#10530; Full view &amp; doers</button>' +
+      (st === 'cancelled'
+        ? '<button onclick="obSetStatus(\'' + jid + '\',\'active\')">&#8634; Reactivate</button>'
+        : '<button onclick="obSetStatus(\'' + jid + '\',\'cancelled\')">&#10005; Cancel</button>') +
+      '<button class="del" onclick="obDelete(\'' + jid + '\')">&#128465; Delete</button></div></div>';
+  h += '<div class="ob-dw-body">';
+  // Abhi ka step
+  if (cur && st === 'active') {
+    const def = obDef(cur.no), ph = obPhase(def.phase);
+    const info = obStepInfo(j, cur.no);
+    h += '<div class="ob-dw-card ob-dw-now' + (cur.status === 'late' ? ' late' : '') + '"><h5>Abhi ka step</h5>' +
+      '<div class="ob-dw-nowrow"><div class="ob-num" style="background:' + ph.color + '">' + cur.no + '</div><div style="min-width:0">' +
+        '<div class="t">' + obE(def.title) + '</div>' +
+        '<div class="m">Owner: ' + obE(def.owner) + ' &middot; ' + obE(def.channel) + '</div>' +
+        (def.note ? '<div class="m" style="color:#334155;font-weight:600">' + obE(def.note) + '</div>' : '') +
+        (info ? '<div class="ob-sinfo">' + obE(info) + '</div>' : '') + '</div></div>' +
+      '<div class="ob-dw-nowfoot"><span>Plan <b>' + (cur.plan ? maintDate(cur.plan) : '—') + '</b></span>' + obChip(cur) +
+        '<span>Doer <b>' + (cur.doerName ? obE(cur.doerName) : '<span class="ob-warn">not set</span>') + '</b></span><span class="sp"></span>' +
+        '<button class="btn btn-green btn-sm" onclick="obAskDone(\'' + jid + '\',' + cur.no + ')">&#10003; Done</button></div></div>';
+  }
+  // Details
+  const f = (k, v) => '<div><span>' + k + '</span>' + (v || '—') + '</div>';
+  const probEnd = (j.steps.find(s => s.no === 20) || {}).plan;
+  h += '<div class="ob-dw-card"><h5>Employee details</h5><div class="ob-dw-grid">' +
+    f('Designation', obE(j.designation)) + f('Location', obE(j.location)) +
+    f('Phone', obE(j.phone)) + f('Alternate phone', j.altPhoneNA ? 'Not available' : obE(j.altPhone)) +
+    f('Salary', obE(j.salary)) + f('Date of birth', j.dob ? maintDate(j.dob) : '') +
+    f('Date of joining', maintDate(j.joiningDate)) + f('Probation', j.probationDays + ' days' + (probEnd ? ' (till ' + maintDate(probEnd) + ')' : '')) +
+    f('ESIS eligible', yn(j.esis)) + f('Contract signed', yn(j.contract)) +
+    f('Added by', obE(j.createdBy) + (j.createdAt ? ' &middot; ' + obDT(j.createdAt) : '')) +
+    (j.notes ? f('Notes', obE(j.notes)) : '') + '</div></div>';
+  // Poora safar
+  h += '<div class="ob-dw-card"><h5>Onboarding journey</h5><div class="ob-tl">';
+  _ob.phases.forEach(ph => {
+    h += '<div class="ob-tl-ph" style="color:' + ph.color + '">Phase ' + ph.no + ' &middot; ' + obE(ph.title) + '<i></i></div>';
+    j.steps.filter(s => obDef(s.no).phase === ph.no).forEach(s => {
+      const def = obDef(s.no);
+      const cls = s.done ? 'done' : s.na ? 'na' : s.status === 'waiting' ? 'waiting' : s.status === 'late' ? 'late cur' : 'cur';
+      const right = s.done ? '<b>&#10003; ' + obE(obDT(s.doneAt).slice(0, 10)) + '</b>' + obE(s.doneBy || '')
+        : s.na ? '<b>N/A</b>' : '<b>' + (s.plan ? maintDate(s.plan) : '—') + '</b>' + (s.current ? obE(obPlanRel(s)) : 'plan');
+      h += '<div class="ob-tl-row ' + cls + '"><div class="ob-tl-dot">' + (s.done ? '&#10003;' : s.no) + '</div>' +
+        '<div style="min-width:0"><div class="tt">' + obE(def.title) + '</div><div class="dd">' + obE(s.doerName || 'doer not set') + (s.note ? ' &middot; ' + obE(s.note) : '') + '</div></div>' +
+        '<div class="rt">' + right + '</div></div>';
+    });
+  });
+  h += '</div></div><div class="ob-control">CONTROL: ' + obE(_ob.control || '') + '</div></div>';
+  el.innerHTML = h;
+}
+
+// ── Step Admin: har step ke saamne doer (button se) ──
+function obAdminSelect(no, loc) {
+  const o = (_ob.owners || {})[no + '|' + (loc || '')] || {};
+  const orig = o.id ? 'u:' + o.id : (o.manual ? 'm:' + o.name : '');
+  let opts = '<option value="">&mdash; Select Doer &mdash;</option>';
+  if (o.manual) opts += '<option value="__m__" selected>&#9998; ' + obE(o.name) + ' (manual)</option>';
+  opts += (_ob.users || []).map(u => '<option value="' + obE(u.id) + '"' + (!o.manual && String(u.id) === String(o.id || '') ? ' selected' : '') + '>' +
+    obE(u.name) + (u.department ? ' (' + obE(u.department) + ')' : '') + '</option>').join('');
+  opts += '<option value="__new__">&#9998; Type name (manually)…</option>';
+  return '<select class="ob-doer' + (orig ? '' : ' ob-unset') + '" data-step="' + no + '" data-loc="' + obE(loc || '') + '" data-orig="' + obE(orig) + '" ' +
+    'data-manual="' + obE(o.manual ? o.name : '') + '" onchange="obAdminPick(this)">' + opts + '</select>';
+}
+function obOpenStepAdmin() {
+  if (!_ob || !_ob.canManage) return;
+  let html = '';
+  _ob.phases.forEach(ph => {
+    html += '<div class="ob-aph" style="background:' + ph.color + '">Phase ' + ph.no + ' &middot; ' + obE(ph.title) + '</div>';
+    _ob.steps.filter(s => s.phase === ph.no).forEach(def => {
+      const sel = def.byLocation
+        ? '<div class="ob-wloc">' + (_ob.locations || ['Delhi', 'Mumbai']).map(l => '<div>' + obE(l) + obAdminSelect(def.no, l) + '</div>').join('') + '</div>'
+        : obAdminSelect(def.no, '');
+      const tv = (_ob.tat || {})[String(def.no)];
+      html += '<div class="ob-arow"><div class="ob-num" style="background:' + ph.color + '">' + def.no + '</div>' +
+        '<div style="min-width:0"><div class="t">' + obE(def.title) + '</div><div class="o">PDF owner: ' + obE(def.owner) + ' &middot; PDF: ' + obE(def.when) + '</div></div>' +
+        '<div class="ob-atat"><input type="number" min="0" max="365" step="1" inputmode="numeric" class="' + (tv != null ? 'set' : '') + '" ' +
+          'data-step="' + def.no + '" data-orig="' + (tv != null ? tv : '') + '" value="' + (tv != null ? tv : '') + '" placeholder="PDF" ' +
+          'title="Ye step pichhle step ke Done hone ke kitne din me complete hona chahiye (khali = PDF ki timeline)" ' +
+          'oninput="this.classList.toggle(\'set\', this.value !== \'\')">days</div>' +
+        '<div class="ob-asel">' + sel + '</div></div>';
+    });
+  });
+  document.getElementById('obAdminBody').innerHTML =
+    '<div class="ob-ahead"><span>#</span><span>Step</span><span>TAT (days)</span><span>Doer</span></div>' + html;
+  document.getElementById('obAdminErr').style.display = 'none';
+  document.getElementById('obAdminModal').classList.add('open');
+}
+function obAdminPick(sel) {
+  if (sel.value === '__new__') {
+    const name = (prompt('Doer ka naam likho (jiska app me account nahi hai):') || '').trim();
+    let m = sel.querySelector('option[value="__m__"]');
+    if (!name) { sel.value = m ? '__m__' : (sel.dataset.last || ''); return; }
+    if (!m) { m = document.createElement('option'); m.value = '__m__'; sel.insertBefore(m, sel.options[1]); }
+    m.textContent = '✎ ' + name + ' (manual)';
+    sel.value = '__m__';
+    sel.dataset.manual = name;
+  } else if (sel.value !== '__m__') {
+    sel.dataset.manual = '';
+  }
+  sel.dataset.last = sel.value;
+  sel.classList.toggle('ob-unset', !sel.value);
+}
+async function obSaveStepAdmin() {
+  const err = document.getElementById('obAdminErr');
+  const owners = [];
+  document.querySelectorAll('#obAdminBody select.ob-doer').forEach(sel => {
+    const cur = sel.value === '__m__' ? 'm:' + (sel.dataset.manual || '') : (sel.value ? 'u:' + sel.value : '');
+    if (cur === sel.dataset.orig) return;                         // badla hi nahi
+    owners.push({ step: parseInt(sel.dataset.step, 10), location: sel.dataset.loc || '',
+      doerId: sel.value === '__m__' ? '' : sel.value, doerName: sel.value === '__m__' ? (sel.dataset.manual || '') : '' });
+  });
+  // TAT jo badle
+  const tats = [];
+  let tatBad = '';
+  document.querySelectorAll('#obAdminBody .ob-atat input').forEach(inp => {
+    const v = String(inp.value || '').trim();
+    if (v === String(inp.dataset.orig || '')) return;
+    const d = Number(v);
+    if (v !== '' && !(Number.isInteger(d) && d >= 0 && d <= 365)) { tatBad = 'Step ' + inp.dataset.step + ': TAT 0 se 365 din ke beech poora number daalo'; return; }
+    tats.push({ step: parseInt(inp.dataset.step, 10), days: v });
+  });
+  if (tatBad) { err.textContent = tatBad; err.style.display = 'block'; return; }
+  if (!owners.length && !tats.length) { closeModal('obAdminModal'); showToast('Kuch badla nahi', 'success'); return; }
+  const btn = document.getElementById('obAdminSave');
+  btn.disabled = true;
+  try {
+    const r = await api('/api/onboarding-owners', 'PUT', { owners: owners, tats: tats, applyAll: document.getElementById('obAdminApply').checked });
+    if (!r || r.error) throw new Error((r && r.error) || 'Could not save');
+    closeModal('obAdminModal');
+    showToast('✅ Saved' + (owners.length ? ' · ' + owners.length + ' doer' : '') + (tats.length ? ' · ' + tats.length + ' TAT' : '') + (r.filled ? ' · ' + r.filled + ' chalu entry me bhi laga' : ''), 'success');
+    await loadOnboarding(1);
+  } catch (e) {
+    err.textContent = e.message || 'Could not save';
+    err.style.display = 'block';
+  } finally { btn.disabled = false; }
+}
+
+// ── Actions ──
+function obAskDone(jid, no) {
+  const j = obJoinee(jid), def = obDef(no);
+  _obDone = { jid: String(jid), no: no };
+  const next = j ? j.steps.find(s => s.no > no && !s.na && !s.done) : null;
+  document.getElementById('obDoneWhat').innerHTML = '<b>' + no + '. ' + obE(def.title) + '</b><span>For ' + obE(j ? j.name : '') +
+    (next ? ' &middot; agla: Step ' + next.no + ' (' + obE(obDef(next.no).title) + ')' : '') + '</span>';
+  document.getElementById('obDoneNote').value = '';
+  document.getElementById('obDoneErr').style.display = 'none';
+  document.getElementById('obDoneModal').classList.add('open');
+}
+async function obSubmitDone() {
+  if (!_obDone) return;
+  const btn = document.getElementById('obDoneBtn');
+  const err = document.getElementById('obDoneErr');
+  btn.disabled = true;
+  try {
+    const r = await api('/api/onboarding/' + _obDone.jid + '/steps/' + _obDone.no, 'PUT',
+      { action: 'done', note: document.getElementById('obDoneNote').value });
+    if (!r || r.error) throw new Error((r && r.error) || 'Could not save');
+    closeModal('obDoneModal');
+    _obDone = null;
+    showToast('✅ Step done — agla step khul gaya', 'success');
+    await loadOnboarding(1);
+  } catch (e) {
+    err.textContent = e.message || 'Could not save';
+    err.style.display = 'block';
+  } finally { btn.disabled = false; }
+}
+async function obStepAction(jid, no, action) {
+  const msg = { undo: 'Is step ka Done hata dein? Step wapas chalu ho jayega.',
+    na: 'Ye step is employee par lagu nahi (N/A)? Isko chhod kar agla step khul jayega.',
+    applicable: 'Ye step phir se lagu karein?' }[action];
+  if (msg && !confirm(msg)) return;
+  const r = await api('/api/onboarding/' + jid + '/steps/' + no, 'PUT', { action: action });
+  if (!r || r.error) showToast((r && r.error) || 'Could not save', 'error');
+  await loadOnboarding(1);
+}
+// Dropdown + "Other" (haath se likho)
+function obFillPick(base, list, value) {
+  const sel = document.getElementById(base + 'Sel'), inp = document.getElementById(base);
+  const opts = [...new Set(list.concat(value ? [value] : []).map(x => String(x || '').trim()).filter(Boolean))];
+  sel.innerHTML = '<option value="">Select</option>' + opts.map(o => '<option value="' + obE(o) + '">' + obE(o) + '</option>').join('') +
+    '<option value="__other__">&#9998; Other (type manually)</option>';
+  sel.value = value || '';
+  inp.value = '';
+  inp.style.display = 'none';
+}
+function obOtherToggle(base) {
+  const sel = document.getElementById(base + 'Sel'), inp = document.getElementById(base);
+  const other = sel.value === '__other__';
+  inp.style.display = other ? '' : 'none';
+  if (other) setTimeout(() => inp.focus(), 30);
+}
+function obPickVal(base) {
+  const sel = document.getElementById(base + 'Sel');
+  return (sel.value === '__other__' ? document.getElementById(base).value : sel.value).trim();
+}
+function obAltToggle() {
+  const na = document.getElementById('obfAltNA').checked, inp = document.getElementById('obfAlt');
+  inp.disabled = na;
+  if (na) inp.value = '';
+}
+function obOpenJoinee(id) {
+  const j = id ? obJoinee(id) : null;
+  _obEditId = j ? String(j.id) : '';
+  const set = (k, v) => { const el = document.getElementById(k); if (el) el.value = v == null ? '' : v; };
+  set('obfName', j ? j.name : '');
+  obFillPick('obfDesig', OB_DESIGNATIONS.concat(_ob.designations || []), j ? j.designation : '');
+  set('obfPhone', j ? j.phone : '');
+  set('obfAlt', j ? j.altPhone : '');
+  document.getElementById('obfAltNA').checked = !!(j && j.altPhoneNA);
+  obAltToggle();
+  set('obfSalary', j ? j.salary : '');
+  obFillPick('obfLoc', (_ob.places || ['Delhi', 'Mumbai']), j ? j.location : '');
+  set('obfDob', j ? j.dob : '');
+  set('obfJoin', j ? j.joiningDate : '');
+  set('obfEsis', j ? j.esis : '');
+  set('obfContract', j ? j.contract : '');
+  set('obfProb', j ? j.probationDays : 90);
+  set('obfNotes', j ? j.notes : '');
+  document.getElementById('obJoineeTitle').textContent = j ? 'Edit employee (HR)' : 'Employee master form (HR)';
+  document.getElementById('obJoineeSave').textContent = j ? 'Save changes' : 'Create employee & tasks';
+  document.getElementById('obJoineeHint').style.display = j ? 'none' : '';
+  document.getElementById('obJoineeErr').style.display = 'none';
+  document.getElementById('obJoineeModal').classList.add('open');
+  setTimeout(() => { const n = document.getElementById('obfName'); if (n) n.focus(); }, 50);
+}
+async function obSaveJoinee() {
+  const err = document.getElementById('obJoineeErr');
+  const v = id => (document.getElementById(id).value || '').trim();
+  const digits = s => s.replace(/\D/g, '');
+  const body = {
+    name: v('obfName'), designation: obPickVal('obfDesig'), phone: v('obfPhone'),
+    altPhone: v('obfAlt'), altPhoneNA: document.getElementById('obfAltNA').checked,
+    salary: v('obfSalary'), location: obPickVal('obfLoc'), dob: v('obfDob'), joiningDate: v('obfJoin'),
+    esis: v('obfEsis'), contract: v('obfContract'), probationDays: v('obfProb'), notes: v('obfNotes')
+  };
+  const bad = !body.name ? 'Employee name daalo'
+    : !body.designation ? 'Designation chuno (ya Other chun kar likho)'
+    : digits(body.phone).length < 10 ? 'Phone sahi daalo (10 digit)'
+    : (!body.altPhoneNA && digits(body.altPhone).length < 10) ? 'Alternate phone daalo, ya "Not available" tick karo'
+    : !(parseFloat(body.salary.replace(/[^0-9.]/g, '')) > 0) ? 'Salary daalo'
+    : !body.location ? 'Location chuno (ya Other chun kar likho)'
+    : !body.dob ? 'Date of birth chuno'
+    : !body.joiningDate ? 'Date of joining chuno'
+    : body.dob >= body.joiningDate ? 'Date of birth joining se pehle honi chahiye'
+    : !body.esis ? 'ESIS eligible? chuno'
+    : !body.contract ? 'Contract signed? chuno' : '';
+  if (bad) { err.textContent = bad; err.style.display = 'block'; return; }
+  const btn = document.getElementById('obJoineeSave');
+  btn.disabled = true;
+  try {
+    const r = _obEditId
+      ? await api('/api/onboarding/' + _obEditId, 'PUT', body)
+      : await api('/api/onboarding', 'POST', body);
+    if (!r || r.error) throw new Error((r && r.error) || 'Could not save');
+    closeModal('obJoineeModal');
+    showToast(_obEditId ? '✅ Employee updated' : '✅ Entry ban gayi — Step 1 doer ke paas gaya', 'success');
+    if (!_obEditId && r.id) _obOpenId = String(r.id);
+    _obEditId = '';
+    await loadOnboarding(1);
+  } catch (e) {
+    err.textContent = e.message || 'Could not save';
+    err.style.display = 'block';
+  } finally { btn.disabled = false; }
+}
+async function obSetStatus(id, status) {
+  if (!confirm(status === 'cancelled' ? 'Is employee ki onboarding cancel karein? (data rahega, Reactivate kar sakte ho)' : 'Onboarding phir se chalu karein?')) return;
+  const r = await api('/api/onboarding/' + id, 'PUT', { status: status });
+  if (!r || r.error) showToast((r && r.error) || 'Could not save', 'error');
+  await loadOnboarding(1);
+}
+async function obDelete(id) {
+  const j = obJoinee(id);
+  if (!confirm('"' + (j ? j.name : '') + '" ki poori entry (20 step) hamesha ke liye delete karein?')) return;
+  const r = await api('/api/onboarding/' + id, 'DELETE');
+  if (!r || r.error) { showToast((r && r.error) || 'Could not delete', 'error'); return; }
+  showToast('🗑 Deleted', 'success');
+  _obOpenId = '';
+  if (String(_obDrawerId) === String(id)) obCloseDrawer();
+  await loadOnboarding(1);
 }
 
 // ══════════════════════════════════════════════════════
