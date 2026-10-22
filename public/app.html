@@ -2211,7 +2211,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       <div class="ov-card revised">
         <div class="label">Current Balance</div>
         <div class="number" id="goldBal">&mdash;</div>
-        <div style="font-size:11px;color:#64748b;margin-top:4px">in &minus; out</div>
+        <div style="font-size:11px;color:#64748b;margin-top:4px" id="goldBalSub">in &minus; out</div>
       </div>
       <div class="ov-card completed">
         <div class="label">Total IN</div>
@@ -8295,7 +8295,7 @@ function goldApplyCfg() {
   document.getElementById('goldKarYes').classList.toggle('on', !kNo);
   document.getElementById('goldKarNo').classList.toggle('on', kNo);
   document.getElementById('goldKarigarHint').textContent = kNo
-    ? 'No: naam nahi chahiye, entry seedha Total OUT me jayegi'
+    ? 'No: naam nahi chahiye. Entry sirf Total OUT me judegi, Current Balance se nahi ghategi'
     : 'Yes: jaisa pehle tha';
 
   // Naam ka khana -- Gold me sirf OUT par (Vendor), Silver me dono par
@@ -8410,7 +8410,11 @@ function renderGold() {
   document.getElementById('goldOut').textContent = goldG(d.totalOut);
   const all = d.rows || [];
   document.getElementById('goldInSub').textContent = all.filter(r => r.type === 'IN').length + ' entries';
-  document.getElementById('goldOutSub').textContent = all.filter(r => r.type === 'OUT').length + ' entries';
+  document.getElementById('goldOutSub').textContent = all.filter(r => r.type === 'OUT').length + ' entries' +
+    (d.countOutNo ? ' · ' + d.countOutNo + ' "No" (' + goldG(d.totalOutNo) + ')' : '');
+  // "No" wali OUT balance se nahi ghatti -- card par saaf likh do
+  const bs = document.getElementById('goldBalSub');
+  if (bs) bs.textContent = d.countOutNo ? 'in − out ("No" wali ' + goldG(d.totalOutNo) + ' nahi ghati)' : 'in − out';
   const balEl = document.getElementById('goldBal');
   balEl.style.color = (Number(d.balance) || 0) < 0 ? '#dc2626' : '';
 
@@ -8424,7 +8428,11 @@ function renderGold() {
   body.innerHTML = rows.map(r =>
     '<tr class="' + (r.type === 'OUT' ? 'gold-out' : '') + '">' +
     '<td data-lbl="Date" style="white-space:nowrap">' + maintDate(r.date) + '</td>' +
-    '<td data-lbl="Type"><span class="gold-chip ' + (r.type === 'OUT' ? 'out' : 'in') + '">' + r.type + '</span></td>' +
+    '<td data-lbl="Type"><span class="gold-chip ' + (r.type === 'OUT' ? 'out' : 'in') + '">' + r.type + '</span>' +
+      // "No" chuna tha -- entry ke neeche likha dikhe
+      (r.type === 'OUT' && r.toKarigar === 'no'
+        ? '<div style="font-size:10px;font-weight:600;color:#64748b;margin-top:4px;line-height:1.3;white-space:nowrap">Karigar ko diya: No<br><span style="font-weight:500;color:#94a3b8">balance se nahi ghata</span></div>'
+        : '') + '</td>' +
     '<td data-lbl="Weight" style="white-space:nowrap;text-align:right;font-weight:700;color:' +
       (r.type === 'OUT' ? '#dc2626' : '#16a34a') + '">' + goldG(r.weight) + '</td>' +
     '<td data-lbl="Karat" style="white-space:nowrap">' + (r.karat ? maintEsc(r.karat) : '—') + '</td>' +

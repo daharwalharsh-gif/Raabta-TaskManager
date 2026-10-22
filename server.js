@@ -8457,7 +8457,11 @@ app.get('/api/gold/:kind', requireAuth, async (req, res) => {
                    || String(b.createdAt).localeCompare(String(a.createdAt)));
     const totalIn = rows.filter(r => r.type === 'IN').reduce((s, r) => s + r.weight, 0);
     const totalOut = rows.filter(r => r.type === 'OUT').reduce((s, r) => s + r.weight, 0);
-    res.json({ rows, totalIn, totalOut, balance: totalIn - totalOut });
+    // "Karigar ko diya?" No wali OUT (Harsh, 22 Oct): sirf Total OUT me judti
+    // hai, Current Balance se NAHI ghatti. Balance = IN - (Yes wali OUT).
+    const noRows = rows.filter(r => r.type === 'OUT' && r.toKarigar === 'no');
+    const totalOutNo = noRows.reduce((s, r) => s + r.weight, 0);
+    res.json({ rows, totalIn, totalOut, totalOutNo, countOutNo: noRows.length, balance: totalIn - (totalOut - totalOutNo) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
