@@ -605,22 +605,41 @@ const MYSQL_SCHEMA = {
     name: "VARCHAR(150) DEFAULT ''",
     designation: "VARCHAR(150) DEFAULT ''",
     phone: "VARCHAR(40) DEFAULT ''",
+    // Step 1 "Data Inputs" (Harsh, 22 Oct): candidate ki details. Resume /
+    // portfolio / intro video ki file HR_Onboarding_Files me, link yahan.
+    email: "VARCHAR(150) DEFAULT ''",
+    ref_by: "VARCHAR(150) DEFAULT ''",            // Ref. by -- kisne refer kiya (entry form)
+    resume_link: "VARCHAR(500) DEFAULT ''",
+    portfolio_link: "VARCHAR(500) DEFAULT ''",
+    video_link: "VARCHAR(500) DEFAULT ''",
+    interview: "VARCHAR(20) DEFAULT ''",          // '' / selected / rejected (Interview with Director)
     alt_phone: "VARCHAR(40) DEFAULT ''",
     alt_phone_na: "VARCHAR(2) DEFAULT '0'",       // 1 = alternate number nahi hai
     salary: "VARCHAR(40) DEFAULT ''",
     location: "VARCHAR(80) DEFAULT 'Delhi'",      // step 10, 11 ke doer isi se
     dob: "VARCHAR(20) DEFAULT ''",                // YYYY-MM-DD (step 14 birthday)
     joining_date: "VARCHAR(20) DEFAULT ''",       // YYYY-MM-DD -- har step ki plan date isi se
-    esis: "VARCHAR(5) DEFAULT ''",                // yes / no -- no ho to step 19 N/A
-    contract: "VARCHAR(5) DEFAULT ''",            // yes / no
+    esis: "VARCHAR(60) DEFAULT ''",               // yes / no / haath se likha -- no ho to step 20 N/A
+    contract: "VARCHAR(60) DEFAULT ''",           // yes / no / haath se likha
     is_sales: "VARCHAR(5) DEFAULT 'no'",          // designation me "sales" -> step 17 lagu
     probation_days: "VARCHAR(10) DEFAULT '90'",   // step 20 = joining + itne din
-    status: "VARCHAR(20) DEFAULT 'active'",       // active / cancelled
+    status: "VARCHAR(20) DEFAULT 'active'",       // active / cancelled / rejected
     notes: "TEXT",
     created_by: "VARCHAR(20) DEFAULT ''",
     created_by_name: "VARCHAR(120) DEFAULT ''",
     created_at: "VARCHAR(40) DEFAULT ''",
     updated_at: "VARCHAR(40) DEFAULT ''"
+  },
+  // Candidate ki files (resume / portfolio / intro video) -- base64, list me nahi bhejte
+  HR_Onboarding_Files: {
+    onboarding_id: "VARCHAR(20) DEFAULT ''",
+    kind: "VARCHAR(20) DEFAULT ''",               // resume / portfolio / video
+    file_name: "VARCHAR(255) DEFAULT ''",
+    mime_type: "VARCHAR(120) DEFAULT ''",
+    file_size: "VARCHAR(20) DEFAULT '0'",
+    file_data: "LONGTEXT",
+    uploaded_by: "VARCHAR(20) DEFAULT ''",
+    created_at: "VARCHAR(40) DEFAULT ''"
   },
   // Har joinee ke 20 step -- kaun doer, Done hua ya nahi, kab, kisne
   HR_Onboarding_Steps: {
@@ -4754,7 +4773,7 @@ async function hrReportAllowed(req) {
 // ══ ONBOARDING_FMS_START ══
 // HR Reporting = Employee Onboarding FMS (Harsh, 22 Oct). Purana attendance
 // (Excel upload) screen se hata diya -- uske routes aur data waise hi pade hain.
-// Workflow "onboarding_workflow_flowchart.pdf" ka: 4 phase, 20 step.
+// Workflow "onboarding_workflow_flowchart.pdf" ka: 4 phase, 20 step (+ Step 1 Data Inputs = 21).
 // FMS jaisa SEQUENTIAL: "Employee master form" ki entry banti hai, wo Step 1
 // ke doer ke paas jaati hai; Step 1 Done hone par hi Step 2 khulta hai, aur
 // aise hi aage (N/A wale step chhod kar). Har step ki plan date joining date se:
@@ -4762,6 +4781,12 @@ async function hrReportAllowed(req) {
 //   'probation' -> joining + us employee ke probation ke din.
 // Doer: app ka user (dropdown) ya haath se likha naam (jiska account nahi --
 // uska step Admin / HR Done karte hain).
+// Harsh (22 Oct): Step 1 "Data Inputs" -- doer Done dabata hai to candidate ki
+// details bharta hai (name, mobile, email, designation, location, resume,
+// portfolio, intro video). Step 2 "Interview with Director": Selected ya
+// Rejected (Rejected = flow yahin band). Selected ke baad baaki step pehle jaise.
+// Isse purane step ek number aage khiske -- obReady() purani entries, Step Admin
+// ke doer aur TAT ko ek baar shift karta hai.
 const OB_PHASES = [
   { no: 1, title: 'Before Joining', color: '#2e8b65' },
   { no: 2, title: 'Day 1 — Induction & Setup', color: '#2f66b3' },
@@ -4769,27 +4794,30 @@ const OB_PHASES = [
   { no: 4, title: 'First Week & Probation', color: '#7b5ab6' }
 ];
 const OB_STEPS = [
-  { no: 1, phase: 1, title: 'Interview', owner: 'Director', channel: 'Google Meet', when: '7 days before joining', off: -7 },
-  { no: 2, phase: 1, title: 'Collect documents', owner: 'HR Team', channel: 'Email; CC Director, Logistics Head, EA and Marketing Head', when: '7 days before joining', off: -7 },
-  { no: 3, phase: 1, title: 'Reference check + alternate contact numbers', owner: 'HR Team', channel: 'Email + update Google Sheets', when: '5 days before joining', off: -5 },
-  { no: 4, phase: 1, title: 'Send offer letter', owner: 'HR Team', channel: 'Email', when: '2 days before joining', off: -2 },
-  { no: 5, phase: 1, title: 'Create official email account', owner: 'EA', channel: 'Email', when: '3 days before joining', off: -3 },
-  { no: 6, phase: 1, title: 'Share systems introduction + training videos', owner: 'MIS Executive', channel: 'Official email only', when: '3 days before joining', off: -3 },
-  { no: 7, phase: 2, title: 'Induction meeting', owner: 'HR Team', channel: 'Google Meet', note: 'Cover policies, attendance, rewards, organisation chart, grievance, reimbursement, rules and bond/NDA', when: 'Day 1', off: 0 },
-  { no: 8, phase: 2, title: 'Sign offer letter + onboarding documents', owner: 'HR Team', channel: 'In person; scan/email signed copies', when: 'Day 1', off: 0 },
-  { no: 9, phase: 2, title: 'Create employee profile + add name to all forms', owner: 'MIS', channel: 'Onboarding system', note: 'Include all forms and Mumbai forms; verify the employee name and access', when: 'Day 1', off: 0 },
-  { no: 10, phase: 2, title: 'Enroll fingerprint attendance', owner: 'Naresh (Delhi) / Mumbai process owner', channel: 'In person / training video', when: 'Day 1', off: 0, byLocation: true },
-  { no: 11, phase: 2, title: 'Introduce team + office/store tour', owner: 'Bajji (Delhi) / Anisha (Mumbai)', channel: 'Physical tour', when: 'Day 1', off: 0, byLocation: true },
-  { no: 12, phase: 2, title: 'Handover assets', owner: 'Ashok SN', channel: 'In person with acknowledgement', note: 'Assets: stationery, laptop, workspace and phone, as applicable', when: 'Day 1', off: 0 },
-  { no: 13, phase: 2, title: 'Add to Happy Group + relevant WhatsApp groups', owner: 'EA / HR', channel: 'WhatsApp', note: 'Include Director group(s) and relevant role/location groups; confirm access', when: 'Day 1', off: 0 },
-  { no: 14, phase: 2, title: 'Add birthday to calendar', owner: 'EA', channel: 'Calendar', when: 'Day 1', off: 0 },
-  { no: 15, phase: 2, title: 'Install/access Delegation + Checklist Dashboard', owner: 'MIS', channel: 'Onboarding system / employee device', note: 'Verify login, permissions and dashboard visibility', when: 'Day 1', off: 0 },
-  { no: 16, phase: 3, title: 'Transfer MIS tasks', owner: 'MIS', channel: 'Transfer from existing user to new user', when: 'Within 3 days of joining', off: 3 },
-  { no: 17, phase: 3, title: 'Update website appointment section (sales employees)', owner: 'MIS', channel: 'Email to support@apixelhouse.com', when: 'Within 5 days of joining', off: 5, salesOnly: true },
-  { no: 18, phase: 3, title: 'Meeting with CEO', owner: 'Director / CEO', channel: 'Physical or virtual', when: 'Within 3 days of joining', off: 3 },
-  { no: 19, phase: 4, title: 'Enroll for ESIS / PCC', owner: 'HR Team', channel: 'In person', when: 'Within 1 week of joining', off: 7, esisOnly: true },
-  { no: 20, phase: 4, title: 'Issue and collect joining letter', owner: 'HR Team', channel: 'Email', when: 'After probation', off: 'probation' }
+  { no: 1, phase: 1, title: 'Data Inputs (candidate details)', owner: 'HR Team', channel: 'Onboarding system', note: 'Done par bharna hai: name, mobile number, email, designation, location, resume, portfolio, intro video', when: '7 days before joining', off: -7, dataInputs: true },
+  { no: 2, phase: 1, title: 'Interview with Director', owner: 'Director', channel: 'Google Meet', note: 'Candidate ka resume, portfolio aur intro video dekh kar interview — Selected ya Rejected', when: '7 days before joining', off: -7, interview: true },
+  { no: 3, phase: 1, title: 'Collect documents', owner: 'HR Team', channel: 'Email; CC Director, Logistics Head, EA and Marketing Head', when: '7 days before joining', off: -7 },
+  { no: 4, phase: 1, title: 'Reference check + alternate contact numbers', owner: 'HR Team', channel: 'Email + update Google Sheets', when: '5 days before joining', off: -5 },
+  { no: 5, phase: 1, title: 'Send offer letter', owner: 'HR Team', channel: 'Email', when: '2 days before joining', off: -2 },
+  { no: 6, phase: 1, title: 'Create official email account', owner: 'EA', channel: 'Email', when: '3 days before joining', off: -3 },
+  { no: 7, phase: 1, title: 'Share systems introduction + training videos', owner: 'MIS Executive', channel: 'Official email only', when: '3 days before joining', off: -3 },
+  { no: 8, phase: 2, title: 'Induction meeting', owner: 'HR Team', channel: 'Google Meet', note: 'Cover policies, attendance, rewards, organisation chart, grievance, reimbursement, rules and bond/NDA', when: 'Day 1', off: 0 },
+  { no: 9, phase: 2, title: 'Sign offer letter + onboarding documents', owner: 'HR Team', channel: 'In person; scan/email signed copies', when: 'Day 1', off: 0 },
+  { no: 10, phase: 2, title: 'Create employee profile + add name to all forms', owner: 'MIS', channel: 'Onboarding system', note: 'Include all forms and Mumbai forms; verify the employee name and access', when: 'Day 1', off: 0 },
+  { no: 11, phase: 2, title: 'Enroll fingerprint attendance', owner: 'Naresh (Delhi) / Mumbai process owner', channel: 'In person / training video', when: 'Day 1', off: 0, byLocation: true },
+  { no: 12, phase: 2, title: 'Introduce team + office/store tour', owner: 'Bajji (Delhi) / Anisha (Mumbai)', channel: 'Physical tour', when: 'Day 1', off: 0, byLocation: true },
+  { no: 13, phase: 2, title: 'Handover assets', owner: 'Ashok SN', channel: 'In person with acknowledgement', note: 'Assets: stationery, laptop, workspace and phone, as applicable', when: 'Day 1', off: 0 },
+  { no: 14, phase: 2, title: 'Add to Happy Group + relevant WhatsApp groups', owner: 'EA / HR', channel: 'WhatsApp', note: 'Include Director group(s) and relevant role/location groups; confirm access', when: 'Day 1', off: 0 },
+  { no: 15, phase: 2, title: 'Add birthday to calendar', owner: 'EA', channel: 'Calendar', when: 'Day 1', off: 0 },
+  { no: 16, phase: 2, title: 'Install/access Delegation + Checklist Dashboard', owner: 'MIS', channel: 'Onboarding system / employee device', note: 'Verify login, permissions and dashboard visibility', when: 'Day 1', off: 0 },
+  { no: 17, phase: 3, title: 'Transfer MIS tasks', owner: 'MIS', channel: 'Transfer from existing user to new user', when: 'Within 3 days of joining', off: 3 },
+  { no: 18, phase: 3, title: 'Update website appointment section (sales employees)', owner: 'MIS', channel: 'Email to support@apixelhouse.com', when: 'Within 5 days of joining', off: 5, salesOnly: true },
+  { no: 19, phase: 3, title: 'Meeting with CEO', owner: 'Director / CEO', channel: 'Physical or virtual', when: 'Within 3 days of joining', off: 3 },
+  { no: 20, phase: 4, title: 'Enroll for ESIS / PCC', owner: 'HR Team', channel: 'In person', when: 'Within 1 week of joining', off: 7, esisOnly: true },
+  { no: 21, phase: 4, title: 'Issue and collect joining letter', owner: 'HR Team', channel: 'Email', when: 'After probation', off: 'probation' }
 ];
+const OB_DI_NO = OB_STEPS.find(d => d.dataInputs).no;     // Step 1 -- Data Inputs
+const OB_IV_NO = OB_STEPS.find(d => d.interview).no;      // Step 2 -- Interview with Director
 const OB_LOCATIONS = ['Delhi', 'Mumbai'];
 const OB_CONTROL = 'HR tracks completion • MIS verifies system access • Employee confirms receipt and access';
 
@@ -4797,21 +4825,22 @@ function obNowIST() { return new Date(Date.now() + 330 * 60000).toISOString().re
 function obTodayIST() { return new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10); }
 function obAddDays(iso, n) { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
 function obPlan(def, j) {
-  if (!isRealDate(j.joining_date)) return '';
+  if (def.off == null || !isRealDate(j.joining_date)) return '';
   const off = def.off === 'probation' ? (parseInt(j.probation_days, 10) || 90) : def.off;
   return obAddDays(j.joining_date, off);
 }
-// Ye step is joinee par lagu hai? (17 sirf Sales, 19 sirf ESIS eligible)
+// Ye step is joinee par lagu hai? (18 sirf Sales; 20 ESIS -- sirf "No" par N/A,
+// haath se likha jawab ho to step rehta hai)
 function obApplies(def, j) {
   if (def.salesOnly && String(j.is_sales || '').toLowerCase() !== 'yes') return false;
-  if (def.esisOnly && String(j.esis || '').toLowerCase() !== 'yes') return false;
+  if (def.esisOnly && String(j.esis || '').toLowerCase() === 'no') return false;
   return true;
 }
 async function obWho(req) {
   const me = await db.findOne('Users', { id: String(req.session.userId) });
   return { me, uid: String(req.session.userId), canManage: !!me && isHrReportUser(req.session.role, me.email, me.notification_email) };
 }
-// Step ka default doer: location wale step (10, 11) ke liye us location ka
+// Step ka default doer: location wale step (11, 12) ke liye us location ka
 function obOwnerFor(owners, no, loc) {
   const o = owners.find(x => String(x.step_no) === String(no) && String(x.location || '') === String(loc || '') && (x.doer_id || x.doer_name));
   return o ? { doer_id: String(o.doer_id || ''), doer_name: o.doer_id ? '' : String(o.doer_name || '') } : { doer_id: '', doer_name: '' };
@@ -4832,7 +4861,8 @@ const obDigits = v => String(v == null ? '' : v).replace(/\D/g, '');
 // Employee master form -- naya ya edit (edit me jo nahi bheja wo purana rehta hai)
 function obClean(b, old) {
   const v = (k, col, max) => String(b[k] != null ? b[k] : (old ? old[col] || '' : '')).trim().slice(0, max);
-  const yn = (k, col) => { const x = String(b[k] != null ? b[k] : (old ? old[col] || '' : '')).toLowerCase(); return x === 'yes' ? 'yes' : x === 'no' ? 'no' : ''; };
+  // Yes / No -- ya haath se likha jawab (dropdown ka "Other")
+  const yn = (k, col) => { const x = String(b[k] != null ? b[k] : (old ? old[col] || '' : '')).trim().slice(0, 60); const l = x.toLowerCase(); return l === 'yes' ? 'yes' : l === 'no' ? 'no' : x; };
   const naIn = b.altPhoneNA != null ? b.altPhoneNA : (old ? old.alt_phone_na === '1' : false);
   const altNA = naIn === true || String(naIn) === '1' || String(naIn).toLowerCase() === 'true';
   const prob = parseInt(b.probationDays != null ? b.probationDays : (old ? old.probation_days : 90), 10);
@@ -4840,6 +4870,11 @@ function obClean(b, old) {
     name: v('name', 'name', 120),
     designation: v('designation', 'designation', 120),
     phone: v('phone', 'phone', 30),
+    email: v('email', 'email', 150).toLowerCase(),
+    ref_by: v('refBy', 'ref_by', 150),
+    resume_link: v('resumeLink', 'resume_link', 500),
+    portfolio_link: v('portfolioLink', 'portfolio_link', 500),
+    video_link: v('videoLink', 'video_link', 500),
     alt_phone: altNA ? '' : v('altPhone', 'alt_phone', 30),
     alt_phone_na: altNA ? '1' : '0',
     salary: v('salary', 'salary', 30),
@@ -4854,7 +4889,19 @@ function obClean(b, old) {
   f.is_sales = /sales/i.test(f.designation) ? 'yes' : 'no';
   return f;
 }
-function obCheck(f) {
+const obIsUrl = v => /^https?:\/\/[^\s]+$/i.test(String(v || ''));
+const obEmailOk = v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || ''));
+// Resume / portfolio / video ka link ho to http(s) wala hi
+function obLinkBad(f) {
+  if (f.resume_link && !obIsUrl(f.resume_link)) return 'Resume link sahi daalo (https://...)';
+  if (f.portfolio_link && !obIsUrl(f.portfolio_link)) return 'Portfolio link sahi daalo (https://...)';
+  if (f.video_link && !obIsUrl(f.video_link)) return 'Intro video link sahi daalo (https://...)';
+  return '';
+}
+// Employee master form (entry / edit). Harsh (22 Oct): salary aur date of joining
+// form se hata diye (purani entry me jo hai wo rehta hai), email aur Ref. by aaye.
+// Email nayi entry me zaroori; purani entry (bina email) edit ho sakti hai.
+function obCheck(f, isNew) {
   if (!f.name) return 'Employee name daalo';
   if (!f.designation) return 'Designation chuno ya likho';
   const pd = obDigits(f.phone);
@@ -4864,22 +4911,148 @@ function obCheck(f) {
     if (!ad) return 'Alternate phone daalo, ya "Not available" tick karo';
     if (ad.length < 10 || ad.length > 13) return 'Alternate phone sahi daalo (10 digit)';
   }
-  if (!(parseFloat(String(f.salary).replace(/[^0-9.]/g, '')) > 0)) return 'Salary daalo';
+  if (isNew && !f.email) return 'Email daalo';
+  if (f.email && !obEmailOk(f.email)) return 'Email sahi daalo';
   if (!f.location) return 'Location chuno ya likho';
   if (!f.dob) return 'Date of birth sahi daalo';
-  if (!f.joining_date) return 'Date of joining sahi daalo';
-  if (f.dob >= f.joining_date) return 'Date of birth joining se pehle honi chahiye';
-  if (!f.esis) return 'ESIS eligible? -- Yes / No chuno';
-  if (!f.contract) return 'Contract signed? -- Yes / No chuno';
-  return '';
+  if (f.joining_date && f.dob >= f.joining_date) return 'Date of birth joining se pehle honi chahiye';
+  if (!f.esis) return 'ESIS eligible? -- chuno ya likho';
+  if (!f.contract) return 'Contract signed? -- chuno ya likho';
+  return obLinkBad(f);
+}
+// Step 1 "Data Inputs" -- Done ke waqt candidate ki details
+function obCheckInputs(f) {
+  if (!f.name) return 'Name daalo';
+  const pd = obDigits(f.phone);
+  if (pd.length < 10 || pd.length > 13) return 'Mobile number sahi daalo (10 digit)';
+  if (!f.email) return 'Email daalo';
+  if (!obEmailOk(f.email)) return 'Email sahi daalo';
+  if (!f.designation) return 'Designation chuno ya likho';
+  if (!f.location) return 'Location chuno ya likho';
+  return obLinkBad(f);
+}
+// Interview ka nateeja -- purani entry jisme Interview Done tha = selected
+function obInterview(j, ivRow) {
+  if (j.interview) return String(j.interview);
+  return ivRow && String(ivRow.done) === '1' ? 'selected' : '';
+}
+// Designation / location / ESIS badle to chalu entry ke pending step: Sales
+// (18) / ESIS (20) lagu ya N/A, location wale step (11, 12) ka doer
+async function obSyncSteps(jOld, f, now) {
+  const steps = await db.findWhere('HR_Onboarding_Steps', { onboarding_id: String(jOld.id) });
+  const owners = await db.findAll('HR_Onboarding_Owners');
+  for (const s of steps) {
+    const def = OB_STEPS.find(d => String(d.no) === String(s.step_no));
+    if (!def || String(s.done) === '1') continue;
+    const su = {};
+    if (def.salesOnly || def.esisOnly) { const na = obApplies(def, f) ? '0' : '1'; if (String(s.na) !== na) su.na = na; }
+    if (def.byLocation && f.location !== jOld.location) {
+      const o = obOwnerFor(owners, def.no, f.location);
+      if ((o.doer_id || o.doer_name) && (o.doer_id !== String(s.doer_id || '') || o.doer_name !== String(s.doer_name || ''))) {
+        su.doer_id = o.doer_id; su.doer_name = o.doer_name;
+      }
+    }
+    if (Object.keys(su).length) { su.updated_at = now; await db.update('HR_Onboarding_Steps', String(s.id), su); }
+  }
+}
+// Is user ka in step me se koi doer hai?
+async function obIsDoer(jid, uid, nos) {
+  return (await db.findWhere('HR_Onboarding_Steps', { onboarding_id: String(jid) }))
+    .some(s => nos.map(String).includes(String(s.step_no)) && String(s.doer_id || '') === String(uid));
+}
+// Candidate ki files: resume / portfolio / intro video (ya inki jagah link)
+const OB_FILE_KINDS = {
+  resume:    { label: 'Resume', maxMb: 5, exts: ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'webp'] },
+  portfolio: { label: 'Portfolio', maxMb: 10, exts: ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'jpg', 'jpeg', 'png', 'webp'] },
+  video:     { label: 'Intro video', maxMb: 15, exts: ['mp4', 'mov', 'webm', 'mkv', '3gp', 'avi', 'm4v'] }
+};
+// Files ki list bina data ke (data bhaari hai -- sirf khol ne par)
+async function obFileMeta(jid) {
+  if (db && db.pool) {
+    const [r] = jid
+      ? await db.pool.query('SELECT id, onboarding_id, kind, file_name, mime_type, file_size FROM `HR_Onboarding_Files` WHERE onboarding_id = ?', [String(jid)])
+      : await db.pool.query('SELECT id, onboarding_id, kind, file_name, mime_type, file_size FROM `HR_Onboarding_Files`');
+    return r;
+  }
+  return (await db.findAll('HR_Onboarding_Files')).filter(x => !jid || String(x.onboarding_id) === String(jid))
+    .map(x => ({ id: x.id, onboarding_id: x.onboarding_id, kind: x.kind, file_name: x.file_name, mime_type: x.mime_type, file_size: x.file_size }));
+}
+// Step 1 "Data Inputs" aane se purane step ek number aage khiske (Interview 1 -> 2,
+// ... Joining letter 20 -> 21). Pehle se bani entries ke step aur Step Admin ke
+// doer / TAT EK BAAR shift (App_State marker). Purani entry me koi step Done ho
+// chuka ho to uska Data Inputs N/A, warna wo Data Inputs se shuru hoti hai.
+const OB_SHIFT_MARKER = 'onboarding_data_inputs_step1_v1';
+let _obShift = null;
+function obReady() {
+  if (!_obShift) _obShift = obWidenCols().then(obShiftOnce).catch(e => { _obShift = null; throw e; });
+  return _obShift;
+}
+// ESIS / Contract me ab haath se likha jawab bhi aata hai -- purani table me ye
+// VARCHAR(5) (sirf yes/no) the, ek baar 60 kar do
+async function obWidenCols() {
+  if (!db.pool) return;
+  const [cols] = await db.pool.query("SELECT COLUMN_NAME AS c, CHARACTER_MAXIMUM_LENGTH AS len FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'HR_Onboarding' AND COLUMN_NAME IN ('esis', 'contract')");
+  for (const x of cols) {
+    if ((parseInt(x.len, 10) || 0) < 60) await db.pool.query('ALTER TABLE `HR_Onboarding` MODIFY `' + x.c + "` VARCHAR(60) DEFAULT ''");
+  }
+}
+async function obShiftOnce() {
+  await ensureAppStateTab(db);
+  if ((await db.findWhere('App_State', { key_name: OB_SHIFT_MARKER })).length) return;
+  const now = obNowIST();
+  let joinees = await db.findAll('HR_Onboarding');
+  let steps = await db.findAll('HR_Onboarding_Steps');
+  const anyDone = j => steps.some(s => String(s.onboarding_id) === String(j.id) && String(s.done) === '1');
+  const newRow = j => ({ onboarding_id: String(j.id), step_no: String(OB_DI_NO), doer_id: '', doer_name: '', done: '0', done_at: '', done_by: '', done_by_name: '',
+    note: anyDone(j) ? 'Purani entry -- Data Inputs step baad me juda' : '', na: anyDone(j) ? '1' : '0', updated_at: now });
+  if (db.pool) {
+    // Lock: do process ek saath start hon to bhi shift ek hi baar. Transaction:
+    // beech me ruke to kuch bhi aadha na khiske.
+    const conn = await db.pool.getConnection();
+    try {
+      await conn.query("SELECT GET_LOCK('raabta_ob_shift', 30)");
+      const [mk] = await conn.query('SELECT id FROM `App_State` WHERE key_name = ?', [OB_SHIFT_MARKER]);
+      if (mk.length) return;
+      [joinees] = await conn.query('SELECT id FROM `HR_Onboarding`');
+      [steps] = await conn.query('SELECT onboarding_id, done FROM `HR_Onboarding_Steps`');
+      await conn.beginTransaction();
+      for (const t of ['HR_Onboarding_Steps', 'HR_Onboarding_Owners']) {
+        await conn.query('UPDATE `' + t + "` SET step_no = CAST(CAST(step_no AS UNSIGNED) + 1 AS CHAR) WHERE step_no REGEXP '^[0-9]+$'");
+      }
+      for (const j of joinees) {
+        const r = newRow(j);
+        await conn.query('INSERT INTO `HR_Onboarding_Steps` (' + Object.keys(r).join(', ') + ') VALUES (' + Object.keys(r).map(() => '?').join(', ') + ')', Object.values(r));
+      }
+      await conn.query('INSERT INTO `App_State` (key_name, value, updated_at) VALUES (?, ?, ?)', [OB_SHIFT_MARKER, joinees.length + ' entry shift', now]);
+      await conn.commit();
+    } catch (e) { try { await conn.rollback(); } catch (_) {} throw e; }
+    finally { try { await conn.query("SELECT RELEASE_LOCK('raabta_ob_shift')"); } catch (_) {} conn.release(); }
+    ['HR_Onboarding_Steps', 'HR_Onboarding_Owners', 'App_State'].forEach(t => db._invalidate(t));
+  } else {
+    for (const s of steps) if (/^\d+$/.test(String(s.step_no))) await db.update('HR_Onboarding_Steps', String(s.id), { step_no: String(parseInt(s.step_no, 10) + 1) });
+    for (const o of await db.findAll('HR_Onboarding_Owners')) if (/^\d+$/.test(String(o.step_no))) await db.update('HR_Onboarding_Owners', String(o.id), { step_no: String(parseInt(o.step_no, 10) + 1) });
+    if (joinees.length) await db.batchInsert('HR_Onboarding_Steps', joinees.map(newRow));
+    await db.insert('App_State', { key_name: OB_SHIFT_MARKER, value: joinees.length + ' entry shift', updated_at: now });
+  }
+  console.log('  \u2705 onboarding: Step 1 Data Inputs -- ' + joinees.length + ' purani entry ke step shift');
+}
+// Har onboarding route se pehle (shift ho chuki ho)
+async function obMw(req, res, next) {
+  try { await obReady(); next(); }
+  catch (e) { res.status(500).json({ error: 'Onboarding update nahi ho paya: ' + e.message }); }
+}
+async function obDeleteFiles(jid, kind) {
+  const rows = (await db.findWhere('HR_Onboarding_Files', { onboarding_id: String(jid) })).filter(x => !kind || x.kind === kind);
+  if (rows.length) await db.batchDeleteByIds('HR_Onboarding_Files', rows.map(x => x.id));
+  return rows.length;
 }
 
-app.get('/api/onboarding', requireAuth, async (req, res) => {
+app.get('/api/onboarding', requireAuth, obMw, async (req, res) => {
   try {
     const { me, uid, canManage } = await obWho(req);
-    const [joinees, steps, owners, users] = await Promise.all([
+    const [joinees, steps, owners, users, files] = await Promise.all([
       db.findAll('HR_Onboarding'), db.findAll('HR_Onboarding_Steps'),
-      db.findAll('HR_Onboarding_Owners'), db.findAll('Users')
+      db.findAll('HR_Onboarding_Owners'), db.findAll('Users'), obFileMeta()
     ]);
     const nameOf = id => (users.find(u => String(u.id) === String(id)) || {}).name || '';
     const today = obTodayIST();
@@ -4915,17 +5088,29 @@ app.get('/api/onboarding', requireAuth, async (req, res) => {
       });
       // Sequential: pehla step jo na Done hai na N/A -- wahi "chalu" (current)
       const cur = st.find(s => !s.done && !s.na) || null;
+      const rejected = (j.status || 'active') === 'rejected';
       st.forEach(s => {
         if (s.done) s.status = 'done';
         else if (s.na) s.status = 'na';
+        else if (s === cur && rejected) s.status = 'rejected';
         else if (s === cur) s.status = !s.plan ? 'upcoming' : s.plan < today ? 'late' : s.plan === today ? 'today' : 'upcoming';
         else s.status = 'waiting';
         s.current = s === cur;
       });
       const counted = st.filter(s => !s.na);
+      const diRow = rows.find(x => String(x.step_no) === String(OB_DI_NO));
+      const ivRow = rows.find(x => String(x.step_no) === String(OB_IV_NO));
+      // Resume / portfolio / video: Admin-HR, Data Inputs aur Interview ke doer ko
+      const seeDocs = canManage || [diRow, ivRow].some(r => r && String(r.doer_id || '') === uid);
+      const docs = {};
+      Object.keys(OB_FILE_KINDS).forEach(k => {
+        const fl = files.find(x => String(x.onboarding_id) === String(j.id) && x.kind === k);
+        docs[k] = seeDocs ? { link: j[k + '_link'] || '', file: fl ? { name: fl.file_name || '', type: fl.mime_type || '', size: parseInt(fl.file_size, 10) || 0 } : null } : null;
+      });
       return {
         id: String(j.id), name: j.name || '', designation: j.designation || '',
-        phone: j.phone || '', altPhone: j.alt_phone || '', altPhoneNA: String(j.alt_phone_na) === '1',
+        phone: j.phone || '', email: j.email || '', refBy: j.ref_by || '', docs, interview: obInterview(j, ivRow),
+        altPhone: j.alt_phone || '', altPhoneNA: String(j.alt_phone_na) === '1',
         salary: canManage ? (j.salary || '') : '', location: j.location || '', dob: j.dob || '',
         joiningDate: j.joining_date || '', esis: j.esis || '', contract: j.contract || '',
         isSales: String(j.is_sales || '').toLowerCase() === 'yes',
@@ -4938,7 +5123,7 @@ app.get('/api/onboarding', requireAuth, async (req, res) => {
     // Doer ko sirf woh joinee jinme uska koi step hai -- aur sirf apne step
     // (saath me "abhi kaunsa step chal raha hai" taaki pata rahe kab uski baari)
     if (!canManage) {
-      list = list.filter(j => j.status !== 'cancelled' && j.steps.some(s => s.doerId === uid)).map(j => {
+      list = list.filter(j => j.status !== 'cancelled' && j.status !== 'rejected' && j.steps.some(s => s.doerId === uid)).map(j => {
         const cur = j.steps.find(s => s.current);
         return Object.assign({}, j, {
           currentDoer: cur ? cur.doerName : '',
@@ -4962,22 +5147,23 @@ app.get('/api/onboarding', requireAuth, async (req, res) => {
       users: canManage ? users.map(u => ({ id: String(u.id), name: u.name || '', department: u.department || '' }))
         .sort((a, b) => a.name.localeCompare(b.name)) : [],
       designations: canManage ? uniq(joinees.map(j => j.designation)) : [],
+      refs: canManage ? uniq(joinees.map(j => j.ref_by)) : [],
       places: canManage ? uniq(OB_LOCATIONS.concat(joinees.map(j => j.location))) : OB_LOCATIONS,
       joinees: list
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/onboarding', requireAuth, async (req, res) => {
+app.post('/api/onboarding', requireAuth, obMw, async (req, res) => {
   try {
     const { me, uid, canManage } = await obWho(req);
     if (!canManage) return res.status(403).json({ error: 'Sirf Admin / HR naya employee jod sakte hain' });
     const f = obClean(req.body || {});
-    const bad = obCheck(f);
+    const bad = obCheck(f, true);
     if (bad) return res.status(400).json({ error: bad });
     const now = obNowIST();
     const j = await db.insert('HR_Onboarding', Object.assign({}, f, {
-      status: 'active', created_by: uid, created_by_name: (me && me.name) || '', created_at: now, updated_at: now
+      status: 'active', interview: '', created_by: uid, created_by_name: (me && me.name) || '', created_at: now, updated_at: now
     }));
     const owners = await db.findAll('HR_Onboarding_Owners');
     const rows = OB_STEPS.map(def => {
@@ -4993,7 +5179,7 @@ app.post('/api/onboarding', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put('/api/onboarding/:id', requireAuth, async (req, res) => {
+app.put('/api/onboarding/:id', requireAuth, obMw, async (req, res) => {
   try {
     const { canManage } = await obWho(req);
     if (!canManage) return res.status(403).json({ error: 'Not allowed' });
@@ -5002,43 +5188,32 @@ app.put('/api/onboarding/:id', requireAuth, async (req, res) => {
     const b = req.body || {};
     const now = obNowIST();
     const upd = { updated_at: now };
+    let reopen = false;
     if (b.status != null) {
       if (!['active', 'cancelled'].includes(String(b.status))) return res.status(400).json({ error: 'Galat status' });
       upd.status = String(b.status);
+      // Rejected candidate ko phir chalu kiya -> Interview (Step 2) wapas pending
+      if (upd.status === 'active' && j.status === 'rejected') { upd.interview = ''; reopen = true; }
     }
-    const keys = ['name', 'designation', 'phone', 'altPhone', 'altPhoneNA', 'salary', 'location', 'dob', 'joiningDate', 'esis', 'contract', 'probationDays', 'notes'];
+    const keys = ['name', 'designation', 'phone', 'email', 'refBy', 'resumeLink', 'portfolioLink', 'videoLink', 'altPhone', 'altPhoneNA', 'salary', 'location', 'dob', 'joiningDate', 'esis', 'contract', 'probationDays', 'notes'];
     let f = null;
     if (keys.some(k => b[k] != null)) {
       f = obClean(b, j);
-      const bad = obCheck(f);
+      const bad = obCheck(f, false);
       if (bad) return res.status(400).json({ error: bad });
       Object.assign(upd, f);
     }
     await db.update('HR_Onboarding', String(j.id), upd);
-    if (f) {
-      const steps = await db.findWhere('HR_Onboarding_Steps', { onboarding_id: String(j.id) });
-      const owners = await db.findAll('HR_Onboarding_Owners');
-      for (const s of steps) {
-        const def = OB_STEPS.find(d => String(d.no) === String(s.step_no));
-        if (!def || String(s.done) === '1') continue;
-        const su = {};
-        // Sales / ESIS badla -> step 17 / 19 lagu ya N/A
-        if (def.salesOnly || def.esisOnly) { const na = obApplies(def, f) ? '0' : '1'; if (String(s.na) !== na) su.na = na; }
-        // Location badli -> location wale step (10, 11) ka doer nayi location ka default
-        if (def.byLocation && f.location !== j.location) {
-          const o = obOwnerFor(owners, def.no, f.location);
-          if ((o.doer_id || o.doer_name) && (o.doer_id !== String(s.doer_id || '') || o.doer_name !== String(s.doer_name || ''))) {
-            su.doer_id = o.doer_id; su.doer_name = o.doer_name;
-          }
-        }
-        if (Object.keys(su).length) { su.updated_at = now; await db.update('HR_Onboarding_Steps', String(s.id), su); }
-      }
+    if (reopen) {
+      const iv = (await db.findWhere('HR_Onboarding_Steps', { onboarding_id: String(j.id), step_no: String(OB_IV_NO) }))[0];
+      if (iv && String(iv.done) !== '1') await db.update('HR_Onboarding_Steps', String(iv.id), { done_at: '', done_by: '', done_by_name: '', note: '', updated_at: now });
     }
+    if (f) await obSyncSteps(j, f, now);
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.delete('/api/onboarding/:id', requireAuth, async (req, res) => {
+app.delete('/api/onboarding/:id', requireAuth, obMw, async (req, res) => {
   try {
     const { canManage } = await obWho(req);
     if (!canManage) return res.status(403).json({ error: 'Not allowed' });
@@ -5046,12 +5221,13 @@ app.delete('/api/onboarding/:id', requireAuth, async (req, res) => {
     if (!j) return res.status(404).json({ error: 'Employee nahi mila' });
     const steps = await db.findWhere('HR_Onboarding_Steps', { onboarding_id: String(j.id) });
     if (steps.length) await db.batchDeleteByIds('HR_Onboarding_Steps', steps.map(s => s.id));
+    await obDeleteFiles(j.id);
     await db.delete('HR_Onboarding', String(j.id));
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put('/api/onboarding/:id/steps/:no', requireAuth, async (req, res) => {
+app.put('/api/onboarding/:id/steps/:no', requireAuth, obMw, async (req, res) => {
   try {
     const { me, uid, canManage } = await obWho(req);
     const j = await db.findOne('HR_Onboarding', { id: String(req.params.id) });
@@ -5079,16 +5255,42 @@ app.put('/api/onboarding/:id/steps/:no', requireAuth, async (req, res) => {
       upd.doer_id = did;
       upd.doer_name = did ? '' : dname;
     }
-    const action = String(b.action || '');
-    if (action === 'done') {
+    let action = String(b.action || '');
+    // Interview with Director: Done = Selected
+    if (def.interview && action === 'done') action = 'selected';
+    if (action === 'selected' && !def.interview) action = 'done';
+    let jUpd = null, diData = null;
+    if (action === 'done' || action === 'selected' || action === 'rejected') {
+      if (action === 'rejected' && !def.interview) return res.status(400).json({ error: 'Reject sirf Interview step par hota hai' });
       if (!canManage && String(row.doer_id) !== uid) return res.status(403).json({ error: 'Ye step aapka nahi hai' });
       if ((j.status || 'active') === 'cancelled') return res.status(400).json({ error: 'Ye onboarding cancel ho chuki hai' });
+      if ((j.status || 'active') === 'rejected') return res.status(400).json({ error: 'Ye candidate Rejected hai' });
       if (String(row.na) === '1') return res.status(400).json({ error: 'Ye step is employee par lagu nahi (N/A)' });
       if (String(row.done) === '1') return res.status(400).json({ error: 'Ye step pehle hi Done hai' });
       if (!curDef || curDef.no !== def.no) {
         return res.status(400).json({ error: 'Pehle Step ' + (curDef ? curDef.no + ' (' + curDef.title + ')' : '') + ' Done hona chahiye' });
       }
-      Object.assign(upd, { done: '1', done_at: now, done_by: uid, done_by_name: (me && me.name) || '', note: String(b.note || '').trim().slice(0, 1000) });
+      // Step 1 Data Inputs: Done ke saath candidate ki details (resume file ya link zaroori)
+      if (def.dataInputs) {
+        const f = obClean({ name: b.name, phone: b.phone, email: b.email, designation: b.designation, location: b.location,
+          resumeLink: b.resumeLink, portfolioLink: b.portfolioLink, videoLink: b.videoLink }, j);
+        const bad = obCheckInputs(f);
+        if (bad) return res.status(400).json({ error: bad });
+        if (!f.resume_link && !(await obFileMeta(j.id)).some(x => x.kind === 'resume')) {
+          return res.status(400).json({ error: 'Resume ki file chuno ya link daalo' });
+        }
+        diData = { name: f.name, phone: f.phone, email: f.email, designation: f.designation, location: f.location, is_sales: f.is_sales,
+          resume_link: f.resume_link, portfolio_link: f.portfolio_link, video_link: f.video_link, updated_at: now };
+      }
+      const note = String(b.note || '').trim().slice(0, 1000);
+      if (action === 'rejected') {
+        // Step Done nahi hota -- entry "rejected", flow yahin rukta hai
+        Object.assign(upd, { done_at: now, done_by: uid, done_by_name: (me && me.name) || '', note });
+        jUpd = { status: 'rejected', interview: 'rejected', updated_at: now };
+      } else {
+        Object.assign(upd, { done: '1', done_at: now, done_by: uid, done_by_name: (me && me.name) || '', note });
+        if (def.interview) jUpd = { interview: 'selected', updated_at: now };
+      }
     } else if (action === 'undo') {
       if (!canManage) return res.status(403).json({ error: 'Not allowed' });
       if (String(row.done) !== '1') return res.status(400).json({ error: 'Ye step Done hi nahi hai' });
@@ -5096,6 +5298,7 @@ app.put('/api/onboarding/:id/steps/:no', requireAuth, async (req, res) => {
       const later = all.some(s => parseInt(s.step_no, 10) > def.no && String(s.done) === '1');
       if (later) return res.status(400).json({ error: 'Pehle aage wale step Undo karo (aakhri Done step se shuru)' });
       Object.assign(upd, { done: '0', done_at: '', done_by: '', done_by_name: '', note: '' });
+      if (def.interview) jUpd = { interview: '', updated_at: now };
     } else if (action === 'na' || action === 'applicable') {
       if (!canManage) return res.status(403).json({ error: 'Not allowed' });
       if (String(row.done) === '1') return res.status(400).json({ error: 'Pehle Undo karo' });
@@ -5105,13 +5308,66 @@ app.put('/api/onboarding/:id/steps/:no', requireAuth, async (req, res) => {
     }
     if (Object.keys(upd).length === 1) return res.status(400).json({ error: 'Kuch badla nahi' });
     await db.update('HR_Onboarding_Steps', String(row.id), upd);
+    if (jUpd) await db.update('HR_Onboarding', String(j.id), jUpd);
+    if (diData) {
+      await db.update('HR_Onboarding', String(j.id), diData);
+      await obSyncSteps(j, Object.assign({}, j, diData), now);
+    }
     res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Candidate ki file (resume / portfolio / intro video) -- ek kind ki ek file,
+// nayi aaye to purani hat jaati hai. Admin / HR ya Step 1 (Data Inputs) ka doer.
+app.post('/api/onboarding/:id/files', requireAuth, obMw, async (req, res) => {
+  try {
+    const { uid, canManage } = await obWho(req);
+    const j = await db.findOne('HR_Onboarding', { id: String(req.params.id) });
+    if (!j) return res.status(404).json({ error: 'Employee nahi mila' });
+    if (!canManage && !(await obIsDoer(j.id, uid, [OB_DI_NO]))) return res.status(403).json({ error: 'Not allowed' });
+    const { kind, fileName, mimeType, dataUrl } = req.body || {};
+    const spec = OB_FILE_KINDS[kind];
+    if (!spec) return res.status(400).json({ error: 'File type galat hai' });
+    if (!dataUrl || typeof dataUrl !== 'string' || dataUrl.indexOf(',') < 0) return res.status(400).json({ error: 'File missing' });
+    const name = String(fileName || 'file').slice(0, 200);
+    const ext = (name.split('.').pop() || '').toLowerCase();
+    const mime = String(mimeType || '').slice(0, 120);
+    const okType = spec.exts.includes(ext) || (kind === 'video' && mime.startsWith('video/'));
+    if (!okType) return res.status(400).json({ error: spec.label + ': ye file type nahi chalega (' + spec.exts.join(', ') + ')' });
+    const bytes = Math.floor(dataUrl.slice(dataUrl.indexOf(',') + 1).length * 3 / 4);
+    if (bytes > spec.maxMb * 1024 * 1024) return res.status(400).json({ error: spec.label + ' bahut badi hai (max ' + spec.maxMb + ' MB) -- link daal do' });
+    await obDeleteFiles(j.id, kind);
+    await db.insert('HR_Onboarding_Files', {
+      onboarding_id: String(j.id), kind, file_name: name, mime_type: mime, file_size: String(bytes),
+      file_data: dataUrl, uploaded_by: uid, created_at: obNowIST()
+    });
+    res.json({ success: true, size: bytes });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+// File kholna: Admin / HR, ya Data Inputs / Interview ka doer
+app.get('/api/onboarding/:id/files/:kind', requireAuth, obMw, async (req, res) => {
+  try {
+    const { uid, canManage } = await obWho(req);
+    const jid = String(req.params.id);
+    if (!canManage && !(await obIsDoer(jid, uid, [OB_DI_NO, OB_IV_NO]))) return res.status(403).json({ error: 'Not allowed' });
+    const row = (await db.findWhere('HR_Onboarding_Files', { onboarding_id: jid })).find(x => x.kind === String(req.params.kind));
+    if (!row || !row.file_data) return res.status(404).json({ error: 'File nahi mili' });
+    res.json({ name: row.file_name || 'file', type: row.mime_type || '', data: row.file_data });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.delete('/api/onboarding/:id/files/:kind', requireAuth, obMw, async (req, res) => {
+  try {
+    const { uid, canManage } = await obWho(req);
+    if (!canManage && !(await obIsDoer(req.params.id, uid, [OB_DI_NO]))) return res.status(403).json({ error: 'Not allowed' });
+    if (!OB_FILE_KINDS[req.params.kind]) return res.status(400).json({ error: 'File type galat hai' });
+    const gone = await obDeleteFiles(String(req.params.id), String(req.params.kind));
+    res.json({ success: true, deleted: gone });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // Workflow tab: har step ka default doer. Naye employee me apne aap lagta hai,
 // aur chalu entries ke jin pending step me doer khali hai unme bhi bhar deta hai.
-app.put('/api/onboarding-owners', requireAuth, async (req, res) => {
+app.put('/api/onboarding-owners', requireAuth, obMw, async (req, res) => {
   try {
     const { canManage } = await obWho(req);
     if (!canManage) return res.status(403).json({ error: 'Not allowed' });
@@ -5149,7 +5405,7 @@ app.put('/api/onboarding-owners', requireAuth, async (req, res) => {
       if (!did && !dname) continue;
       // Chalu entries: is step me doer khali ho to bhar do (chuna hua doer nahi badalta).
       // applyAll ho to jo step abhi Done nahi hua usme bhi naya doer.
-      const joinees = (await db.findAll('HR_Onboarding')).filter(j => (j.status || 'active') !== 'cancelled' && (!loc || j.location === loc));
+      const joinees = (await db.findAll('HR_Onboarding')).filter(j => !['cancelled', 'rejected'].includes(j.status || 'active') && (!loc || j.location === loc));
       for (const j of joinees) {
         const s = (await db.findWhere('HR_Onboarding_Steps', { onboarding_id: String(j.id), step_no: String(def.no) }))[0];
         const khali = s && !s.doer_id && !s.doer_name;
