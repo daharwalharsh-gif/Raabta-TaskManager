@@ -635,6 +635,7 @@ const MYSQL_SCHEMA = {
     karat: "VARCHAR(30) DEFAULT ''",            // 24 Karat waghairah
     rate: "VARCHAR(30) DEFAULT ''",             // per gram
     vendor: "VARCHAR(200) DEFAULT ''",          // sirf OUT wali entry me
+    to_karigar: "VARCHAR(5) DEFAULT ''",        // OUT: yes = karigar ko diya, no = seedha Total OUT
     remarks: "TEXT",
     image_name: "VARCHAR(255) DEFAULT ''",
     image_type: "VARCHAR(120) DEFAULT ''",
@@ -653,6 +654,7 @@ const MYSQL_SCHEMA = {
     karat: "VARCHAR(30) DEFAULT ''",            // Purity -- 92.5 ya 999
     rate: "VARCHAR(30) DEFAULT ''",             // Silver me nahi poochhte, jagah rakhi hai
     vendor: "VARCHAR(200) DEFAULT ''",          // IN = Vendor, OUT = Karigar
+    to_karigar: "VARCHAR(5) DEFAULT ''",        // OUT: yes = karigar ko diya, no = seedha Total OUT
     remarks: "TEXT",
     image_name: "VARCHAR(255) DEFAULT ''",
     image_type: "VARCHAR(120) DEFAULT ''",
@@ -668,6 +670,7 @@ const MYSQL_SCHEMA = {
     karat: "VARCHAR(30) DEFAULT ''",            // 24 Karat waghairah
     rate: "VARCHAR(30) DEFAULT ''",             // per gram
     vendor: "VARCHAR(200) DEFAULT ''",          // sirf OUT wali entry me
+    to_karigar: "VARCHAR(5) DEFAULT ''",        // OUT: yes = karigar ko diya, no = seedha Total OUT
     remarks: "TEXT",
     image_name: "VARCHAR(255) DEFAULT ''",
     image_type: "VARCHAR(120) DEFAULT ''",
@@ -8198,6 +8201,7 @@ async function castSilverIssue(d, inR) {
   let total = 0, count = 0;
   rows.forEach(r => {
     if (String(r.entry_type || '').toUpperCase() !== 'OUT') return;
+    if (String(r.to_karigar || '').toLowerCase() === 'no') return;   // karigar ko nahi diya
     if (!/bappi/i.test(String(r.vendor || ''))) return;
     if (!inR(String(r.entry_date || '').slice(0, 10))) return;
     total += castNum(r.weight); count++;
@@ -8428,6 +8432,8 @@ function goldRowOut(r) {
     karat: r.karat || '',
     rate: r.rate === '' || r.rate == null ? '' : goldNum(r.rate),
     vendor: r.vendor || '',
+    // OUT par "Karigar ko diya?" -- purani entry me khali (= jaisa pehle tha, yes)
+    toKarigar: String(r.to_karigar || '').toLowerCase() === 'no' ? 'no' : (String(r.entry_type || '').toUpperCase() === 'OUT' ? 'yes' : ''),
     remarks: r.remarks || '',
     hasImage: !!(r.image_data && String(r.image_data).length > 10),
     imageName: r.image_name || '',
@@ -8475,7 +8481,11 @@ function goldFields(body, kind) {
   const type = (String(body.type || 'IN').toUpperCase() === 'OUT') ? 'OUT' : 'IN';
   // Gold/Wire: naam sirf OUT me (Vendor). Silver: dono me (IN = Vendor,
   // OUT = Karigar) -- isliye wahan IN ka naam girana galat hoga.
-  const naamChahiye = (String(kind) === 'silver') || (type === 'OUT');
+  // OUT me "Karigar ko diya?" (Harsh, 22 Oct): Yes = jaisa pehle tha (naam ke
+  // saath). No = seedha Total OUT, naam nahi rakhte. Purana page (jisme ye
+  // sawaal nahi) kuch na bheje to Yes -- yaani pehle jaisa hi.
+  const toKarigar = type === 'OUT' ? (String(body.toKarigar || '').toLowerCase() === 'no' ? 'no' : 'yes') : '';
+  const naamChahiye = ((String(kind) === 'silver') || (type === 'OUT')) && toKarigar !== 'no';
   return {
     entry_type: type,
     entry_date: String(body.date || '').trim(),
@@ -8483,6 +8493,7 @@ function goldFields(body, kind) {
     karat: String(body.karat || '').trim().slice(0, 28),
     rate: String(body.rate || '').trim() === '' ? '' : String(goldNum(body.rate)),
     vendor: naamChahiye ? String(body.vendor || '').trim().slice(0, 190) : '',
+    to_karigar: toKarigar,
     remarks: String(body.remarks || '').trim()
   };
 }

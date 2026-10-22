@@ -23,6 +23,8 @@ textarea.gold-inp{resize:vertical;}
 .gold-type.on{color:#fff;border-color:transparent;}
 #goldTypeIn.on{background:#16a34a;}
 #goldTypeOut.on{background:#ef4444;}
+#goldKarYes.on{background:#0f766e;}
+#goldKarNo.on{background:#475569;}
 .gold-filt{padding:6px 9px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:12px;
   font-family:'Inter',sans-serif;outline:none;background:#fff;}
 .gold-chip{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;}
@@ -2239,6 +2241,16 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
           <div style="display:flex;gap:8px;margin-bottom:12px">
             <button type="button" class="gold-type on" id="goldTypeIn" onclick="goldSetType('IN')">IN</button>
             <button type="button" class="gold-type" id="goldTypeOut" onclick="goldSetType('OUT')">OUT</button>
+          </div>
+
+          <!-- Sirf OUT par: Yes = jaisa pehle tha (naam ke saath), No = seedha Total OUT -->
+          <div id="goldKarigarBlock" style="display:none">
+            <label class="gold-lbl">Karigar ko diya?</label>
+            <div style="display:flex;gap:8px;margin-bottom:6px">
+              <button type="button" class="gold-type on" id="goldKarYes" onclick="goldSetKarigar('yes')">Yes</button>
+              <button type="button" class="gold-type" id="goldKarNo" onclick="goldSetKarigar('no')">No</button>
+            </div>
+            <div id="goldKarigarHint" style="font-size:11px;color:#94a3b8;margin-bottom:12px"></div>
           </div>
 
           <label class="gold-lbl">Date</label>
@@ -8227,6 +8239,7 @@ function maintPdf() {
 let _goldKind = 'stock';
 let _goldData = { rows: [], totalIn: 0, totalOut: 0, balance: 0 };
 let _goldType = 'IN';
+let _goldKarigar = 'yes';       // OUT par "Karigar ko diya?" -- yes / no
 let _goldEditId = '';
 let _goldImg = { name: '', type: '', data: '' };
 
@@ -8275,8 +8288,18 @@ function goldApplyCfg() {
   document.getElementById('goldRemarkLbl').textContent = c.remark[t];
   document.getElementById('goldThVendor').textContent = c.naamCol;
 
+  // OUT par "Karigar ko diya?" -- No = seedha Total OUT, naam ka khana nahi
+  const isOut = t === 'OUT';
+  const kNo = isOut && _goldKarigar === 'no';
+  document.getElementById('goldKarigarBlock').style.display = isOut ? '' : 'none';
+  document.getElementById('goldKarYes').classList.toggle('on', !kNo);
+  document.getElementById('goldKarNo').classList.toggle('on', kNo);
+  document.getElementById('goldKarigarHint').textContent = kNo
+    ? 'No: naam nahi chahiye, entry seedha Total OUT me jayegi'
+    : 'Yes: jaisa pehle tha';
+
   // Naam ka khana -- Gold me sirf OUT par (Vendor), Silver me dono par
-  const lbl = c.naamLbl[t];
+  const lbl = kNo ? '' : c.naamLbl[t];
   document.getElementById('goldVendorBlock').style.display = lbl ? '' : 'none';
   if (lbl) {
     document.getElementById('goldVendorLbl').textContent = lbl;
@@ -8408,7 +8431,9 @@ function renderGold() {
     '<td data-lbl="Rate" class="gold-c-rate" style="white-space:nowrap;text-align:right">' +
       (r.rate === '' || r.rate == null ? '—' : maintMoney(r.rate)) + '</td>' +
     '<td data-lbl="' + (_goldKind === 'silver' ? (r.type === 'OUT' ? 'Karigar' : 'Vendor') : 'Vendor') + '">' +
-      (r.vendor ? maintEsc(r.vendor) : '—') + '</td>' +
+      (r.type === 'OUT' && r.toKarigar === 'no'
+        ? '<span style="font-size:11px;font-weight:600;color:#64748b;background:#f1f5f9;border-radius:8px;padding:2px 8px;white-space:nowrap">Direct OUT</span>'
+        : (r.vendor ? maintEsc(r.vendor) : '—')) + '</td>' +
     '<td data-lbl="Image" class="gold-c-img" style="white-space:nowrap">' + (r.hasImage
       ? '<button class="btn btn-outline" style="font-size:11px;padding:3px 8px" onclick="goldViewImage(\'' + r.id + '\')">📎 View</button>'
       : '<span style="color:#cbd5e1">—</span>') + '</td>' +
@@ -8418,6 +8443,12 @@ function renderGold() {
       '<button class="btn btn-outline" style="font-size:11px;padding:3px 8px" onclick="goldEdit(\'' + r.id + '\')" title="Edit">✏️</button> ' +
       '<button class="btn btn-outline" style="font-size:11px;padding:3px 8px;color:#dc2626;border-color:#fecaca" onclick="goldDelete(\'' + r.id + '\')" title="Delete">🗑</button>' +
     '</td></tr>').join('');
+}
+
+// OUT par "Karigar ko diya?" -- Yes / No
+function goldSetKarigar(v) {
+  _goldKarigar = (v === 'no') ? 'no' : 'yes';
+  goldApplyCfg();
 }
 
 // IN / OUT — Vendor sirf OUT me poochha jaata hai
@@ -8462,6 +8493,7 @@ function clearGoldForm() {
   set('goldRemarks', '');
   set('goldImage', '');
   const info = document.getElementById('goldImageInfo'); if (info) info.textContent = '';
+  _goldKarigar = 'yes';     // naya form hamesha "Yes" (jaisa pehle tha) se shuru
   goldSetType('IN');        // ye goldApplyCfg bhi chala deta hai
   const pl = (GOLD_CFG[_goldKind] || GOLD_CFG.stock).purity;
   set('goldKarat', pl[0]);  // us khaate ki pehli purity
@@ -8483,7 +8515,9 @@ async function saveGoldEntry() {
     weight: weight,
     karat: document.getElementById('goldKarat').value,
     rate: document.getElementById('goldRate').value,
-    vendor: document.getElementById('goldVendor').value,
+    // "Karigar ko diya?" No ho to naam nahi jaata -- seedha Total OUT
+    vendor: (_goldType === 'OUT' && _goldKarigar === 'no') ? '' : document.getElementById('goldVendor').value,
+    toKarigar: _goldType === 'OUT' ? _goldKarigar : '',
     remarks: document.getElementById('goldRemarks').value
   };
   // Nayi photo chuni ho to hi bhejte hain -- edit me na bhejo to purani bani rehti hai
@@ -8518,6 +8552,7 @@ function goldEdit(id) {
   _goldEditId = String(id);
   _goldImg = { name: '', type: '', data: '' };   // nayi photo tabhi jab chuni jaye
   goldErr('');
+  _goldKarigar = (r.toKarigar === 'no') ? 'no' : 'yes';
   goldSetType(r.type);
   document.getElementById('goldDate').value = String(r.date || '').slice(0, 10);
   document.getElementById('goldWeight').value = r.weight;
