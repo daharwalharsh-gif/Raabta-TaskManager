@@ -630,7 +630,8 @@ const MYSQL_SCHEMA = {
     created_at: "VARCHAR(40) DEFAULT ''",
     updated_at: "VARCHAR(40) DEFAULT ''"
   },
-  // Candidate ki files (resume / portfolio / intro video) -- base64, list me nahi bhejte
+  // Candidate ki files (resume / portfolio / intro video) -- list me data nahi bhejte.
+  // Nayi file tukdon me (HR_Onboarding_Chunks); purani chhoti file file_data me.
   HR_Onboarding_Files: {
     onboarding_id: "VARCHAR(20) DEFAULT ''",
     kind: "VARCHAR(20) DEFAULT ''",               // resume / portfolio / video
@@ -638,8 +639,16 @@ const MYSQL_SCHEMA = {
     mime_type: "VARCHAR(120) DEFAULT ''",
     file_size: "VARCHAR(20) DEFAULT '0'",
     file_data: "LONGTEXT",
+    complete: "VARCHAR(2) DEFAULT '1'",           // 0 = upload abhi chal rahi / adhoori chhodi
+    chunks: "VARCHAR(10) DEFAULT '0'",            // kitne tukde (0 = purani, file_data me)
     uploaded_by: "VARCHAR(20) DEFAULT ''",
     created_at: "VARCHAR(40) DEFAULT ''"
+  },
+  // Badi file ke tukde (base64, ~4 MB file ka ek tukda) -- seq 0, 1, 2...
+  HR_Onboarding_Chunks: {
+    file_id: "VARCHAR(20) DEFAULT ''",
+    seq: "VARCHAR(10) DEFAULT ''",
+    chunk_data: "LONGTEXT"
   },
   // Har joinee ke 20 step -- kaun doer, Done hua ya nahi, kab, kisne
   HR_Onboarding_Steps: {
@@ -4960,22 +4969,33 @@ async function obIsDoer(jid, uid, nos) {
   return (await db.findWhere('HR_Onboarding_Steps', { onboarding_id: String(jid) }))
     .some(s => nos.map(String).includes(String(s.step_no)) && String(s.doer_id || '') === String(uid));
 }
-// Candidate ki files: resume / portfolio / intro video (ya inki jagah link)
+// Candidate ki files: resume / portfolio / intro video (ya inki jagah link).
+// Harsh (23 Oct): "kitne bhi MB" -- file 4 MB ke tukdon me aati hai, isliye size
+// ki chhoti limit nahi; bas ek file 500 MB tak (isse badi ho to link).
 const OB_FILE_KINDS = {
-  resume:    { label: 'Resume', maxMb: 5, exts: ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'webp'] },
-  portfolio: { label: 'Portfolio', maxMb: 10, exts: ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'jpg', 'jpeg', 'png', 'webp'] },
-  video:     { label: 'Intro video', maxMb: 15, exts: ['mp4', 'mov', 'webm', 'mkv', '3gp', 'avi', 'm4v'] }
+  resume:    { label: 'Resume', exts: ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'webp'] },
+  portfolio: { label: 'Portfolio', exts: ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'jpg', 'jpeg', 'png', 'webp'] },
+  video:     { label: 'Intro video', exts: ['mp4', 'mov', 'webm', 'mkv', '3gp', 'avi', 'm4v'] }
 };
-// Files ki list bina data ke (data bhaari hai -- sirf khol ne par)
+const OB_FILE_MAX_MB = 500;
+const OB_CHUNK_B64_MAX = 8 * 1024 * 1024;        // ek tukda (base64) -- app 4 MB ke bhejta hai
+// Files ki list bina data ke (data bhaari hai -- sirf kholne par). Sirf poori upload hui.
 async function obFileMeta(jid) {
   if (db && db.pool) {
-    const [r] = jid
-      ? await db.pool.query('SELECT id, onboarding_id, kind, file_name, mime_type, file_size FROM `HR_Onboarding_Files` WHERE onboarding_id = ?', [String(jid)])
-      : await db.pool.query('SELECT id, onboarding_id, kind, file_name, mime_type, file_size FROM `HR_Onboarding_Files`');
+    const cols = 'SELECT id, onboarding_id, kind, file_name, mime_type, file_size FROM `HR_Onboarding_Files` WHERE complete <> \'0\'';
+    const [r] = jid ? await db.pool.query(cols + ' AND onboarding_id = ?', [String(jid)]) : await db.pool.query(cols);
     return r;
   }
-  return (await db.findAll('HR_Onboarding_Files')).filter(x => !jid || String(x.onboarding_id) === String(jid))
+  return (await db.findAll('HR_Onboarding_Files')).filter(x => String(x.complete) !== '0' && (!jid || String(x.onboarding_id) === String(jid)))
     .map(x => ({ id: x.id, onboarding_id: x.onboarding_id, kind: x.kind, file_name: x.file_name, mime_type: x.mime_type, file_size: x.file_size }));
+}
+// Kind / extension sahi? (ext na mile to video ke liye mime se)
+function obFileTypeBad(kind, fileName, mime) {
+  const spec = OB_FILE_KINDS[kind];
+  if (!spec) return 'File type galat hai';
+  const ext = (String(fileName || '').split('.').pop() || '').toLowerCase();
+  if (spec.exts.includes(ext) || (kind === 'video' && String(mime || '').startsWith('video/'))) return '';
+  return spec.label + ': ye file type nahi chalega (' + spec.exts.join(', ') + ')';
 }
 // Step 1 "Data Inputs" aane se purane step ek number aage khiske (Interview 1 -> 2,
 // ... Joining letter 20 -> 21). Pehle se bani entries ke step aur Step Admin ke
@@ -4995,6 +5015,9 @@ async function obWidenCols() {
   for (const x of cols) {
     if ((parseInt(x.len, 10) || 0) < 60) await db.pool.query('ALTER TABLE `HR_Onboarding` MODIFY `' + x.c + "` VARCHAR(60) DEFAULT ''");
   }
+  // Tukde file_id se dhoondhte hain -- index (ek baar)
+  const [ix] = await db.pool.query("SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'HR_Onboarding_Chunks' AND INDEX_NAME = 'idx_ob_chunk_file'");
+  if (!ix.length) await db.pool.query('CREATE INDEX idx_ob_chunk_file ON `HR_Onboarding_Chunks` (file_id)');
 }
 async function obShiftOnce() {
   await ensureAppStateTab(db);
@@ -5041,10 +5064,33 @@ async function obMw(req, res, next) {
   try { await obReady(); next(); }
   catch (e) { res.status(500).json({ error: 'Onboarding update nahi ho paya: ' + e.message }); }
 }
-async function obDeleteFiles(jid, kind) {
-  const rows = (await db.findWhere('HR_Onboarding_Files', { onboarding_id: String(jid) })).filter(x => !kind || x.kind === kind);
-  if (rows.length) await db.batchDeleteByIds('HR_Onboarding_Files', rows.map(x => x.id));
+// Entry (aur kind) ki files + unke tukde hatao. keep(x) true = wo file rehne do.
+async function obDeleteFiles(jid, kind, keep) {
+  let rows;
+  if (db.pool) [rows] = await db.pool.query('SELECT id, kind, complete FROM `HR_Onboarding_Files` WHERE onboarding_id = ?', [String(jid)]);
+  else rows = await db.findWhere('HR_Onboarding_Files', { onboarding_id: String(jid) });
+  rows = rows.filter(x => (!kind || x.kind === kind) && !(keep && keep(x)));
+  if (!rows.length) return 0;
+  const ids = rows.map(x => String(x.id));
+  if (db.pool) {
+    await db.pool.query('DELETE FROM `HR_Onboarding_Chunks` WHERE file_id IN (?)', [ids]);
+    await db.pool.query('DELETE FROM `HR_Onboarding_Files` WHERE id IN (?)', [ids]);
+    db._invalidate('HR_Onboarding_Files'); db._invalidate('HR_Onboarding_Chunks');
+  } else {
+    const ch = (await db.findAll('HR_Onboarding_Chunks')).filter(c => ids.includes(String(c.file_id)));
+    if (ch.length) await db.batchDeleteByIds('HR_Onboarding_Chunks', ch.map(c => c.id));
+    await db.batchDeleteByIds('HR_Onboarding_Files', ids);
+  }
   return rows.length;
+}
+// Ek tukda (base64) -- seq se
+async function obChunk(fileId, seq) {
+  if (db.pool) {
+    const [r] = await db.pool.query('SELECT chunk_data FROM `HR_Onboarding_Chunks` WHERE file_id = ? AND seq = ? ORDER BY id DESC LIMIT 1', [String(fileId), String(seq)]);
+    return r.length ? String(r[0].chunk_data || '') : '';
+  }
+  const c = (await db.findWhere('HR_Onboarding_Chunks', { file_id: String(fileId), seq: String(seq) })).pop();
+  return c ? String(c.chunk_data || '') : '';
 }
 
 app.get('/api/onboarding', requireAuth, obMw, async (req, res) => {
@@ -5317,43 +5363,120 @@ app.put('/api/onboarding/:id/steps/:no', requireAuth, obMw, async (req, res) => 
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Candidate ki file (resume / portfolio / intro video) -- ek kind ki ek file,
-// nayi aaye to purani hat jaati hai. Admin / HR ya Step 1 (Data Inputs) ka doer.
-app.post('/api/onboarding/:id/files', requireAuth, obMw, async (req, res) => {
+// Candidate ki file (resume / portfolio / intro video) -- ek kind ki ek file, nayi
+// poori aate hi purani hat jaati hai. Admin / HR ya Step 1 (Data Inputs) ka doer.
+// Tukdon me: start (naam, size) -> chunk (seq 0, 1, ...) -> finish.
+async function obFileReq(req, res, nos) {
+  const { uid, canManage } = await obWho(req);
+  const j = await db.findOne('HR_Onboarding', { id: String(req.params.id) });
+  if (!j) { res.status(404).json({ error: 'Employee nahi mila' }); return null; }
+  if (!canManage && !(await obIsDoer(j.id, uid, nos))) { res.status(403).json({ error: 'Not allowed' }); return null; }
+  return { uid, j };
+}
+// Upload chal rahi file ka row (isi entry ka, abhi adhoora)
+async function obUploadRow(j, fid) {
+  const f = (await obFileMetaAll(j.id)).find(x => String(x.id) === String(fid));
+  return f && String(f.complete) === '0' ? f : null;
+}
+async function obFileMetaAll(jid) {
+  if (db.pool) {
+    const [r] = await db.pool.query('SELECT id, kind, file_size, complete FROM `HR_Onboarding_Files` WHERE onboarding_id = ?', [String(jid)]);
+    return r;
+  }
+  return db.findWhere('HR_Onboarding_Files', { onboarding_id: String(jid) });
+}
+app.post('/api/onboarding/:id/files/start', requireAuth, obMw, async (req, res) => {
   try {
-    const { uid, canManage } = await obWho(req);
-    const j = await db.findOne('HR_Onboarding', { id: String(req.params.id) });
-    if (!j) return res.status(404).json({ error: 'Employee nahi mila' });
-    if (!canManage && !(await obIsDoer(j.id, uid, [OB_DI_NO]))) return res.status(403).json({ error: 'Not allowed' });
-    const { kind, fileName, mimeType, dataUrl } = req.body || {};
-    const spec = OB_FILE_KINDS[kind];
-    if (!spec) return res.status(400).json({ error: 'File type galat hai' });
-    if (!dataUrl || typeof dataUrl !== 'string' || dataUrl.indexOf(',') < 0) return res.status(400).json({ error: 'File missing' });
+    const ctx = await obFileReq(req, res, [OB_DI_NO]);
+    if (!ctx) return;
+    const { kind, fileName, mimeType, size } = req.body || {};
     const name = String(fileName || 'file').slice(0, 200);
-    const ext = (name.split('.').pop() || '').toLowerCase();
     const mime = String(mimeType || '').slice(0, 120);
-    const okType = spec.exts.includes(ext) || (kind === 'video' && mime.startsWith('video/'));
-    if (!okType) return res.status(400).json({ error: spec.label + ': ye file type nahi chalega (' + spec.exts.join(', ') + ')' });
-    const bytes = Math.floor(dataUrl.slice(dataUrl.indexOf(',') + 1).length * 3 / 4);
-    if (bytes > spec.maxMb * 1024 * 1024) return res.status(400).json({ error: spec.label + ' bahut badi hai (max ' + spec.maxMb + ' MB) -- link daal do' });
-    await obDeleteFiles(j.id, kind);
-    await db.insert('HR_Onboarding_Files', {
-      onboarding_id: String(j.id), kind, file_name: name, mime_type: mime, file_size: String(bytes),
-      file_data: dataUrl, uploaded_by: uid, created_at: obNowIST()
+    const bad = obFileTypeBad(kind, name, mime);
+    if (bad) return res.status(400).json({ error: bad });
+    const bytes = parseInt(size, 10);
+    if (!(bytes > 0)) return res.status(400).json({ error: 'File khali hai' });
+    if (bytes > OB_FILE_MAX_MB * 1024 * 1024) return res.status(400).json({ error: OB_FILE_KINDS[kind].label + ' ' + OB_FILE_MAX_MB + ' MB se badi hai -- link daal do' });
+    // Pichhli beech me chhodi upload saaf
+    await obDeleteFiles(ctx.j.id, kind, x => String(x.complete) !== '0');
+    const row = await db.insert('HR_Onboarding_Files', {
+      onboarding_id: String(ctx.j.id), kind, file_name: name, mime_type: mime, file_size: String(bytes),
+      file_data: '', complete: '0', chunks: '0', uploaded_by: ctx.uid, created_at: obNowIST()
     });
-    res.json({ success: true, size: bytes });
+    res.json({ success: true, fileId: String(row.id) });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
-// File kholna: Admin / HR, ya Data Inputs / Interview ka doer
+app.post('/api/onboarding/:id/files/:fid/chunk', requireAuth, obMw, async (req, res) => {
+  try {
+    const ctx = await obFileReq(req, res, [OB_DI_NO]);
+    if (!ctx) return;
+    if (!(await obUploadRow(ctx.j, req.params.fid))) return res.status(404).json({ error: 'Upload nahi mili -- dobara try karo' });
+    const seq = parseInt((req.body || {}).seq, 10);
+    const data = String((req.body || {}).data || '');
+    if (!(seq >= 0 && seq < 100000)) return res.status(400).json({ error: 'Galat tukda' });
+    if (!data || data.length > OB_CHUNK_B64_MAX || !/^[A-Za-z0-9+/]+={0,2}$/.test(data)) return res.status(400).json({ error: 'Tukda kharab hai' });
+    const fid = String(req.params.fid);
+    // Retry me wahi tukda dobara aaye to purana hatao
+    if (db.pool) await db.pool.query('DELETE FROM `HR_Onboarding_Chunks` WHERE file_id = ? AND seq = ?', [fid, String(seq)]);
+    else { const old = await db.findWhere('HR_Onboarding_Chunks', { file_id: fid, seq: String(seq) }); if (old.length) await db.batchDeleteByIds('HR_Onboarding_Chunks', old.map(c => c.id)); }
+    await db.insert('HR_Onboarding_Chunks', { file_id: fid, seq: String(seq), chunk_data: data });
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/onboarding/:id/files/:fid/finish', requireAuth, obMw, async (req, res) => {
+  try {
+    const ctx = await obFileReq(req, res, [OB_DI_NO]);
+    if (!ctx) return;
+    const f = await obUploadRow(ctx.j, req.params.fid);
+    if (!f) return res.status(404).json({ error: 'Upload nahi mili -- dobara try karo' });
+    const fid = String(f.id);
+    let parts;
+    if (db.pool) [parts] = await db.pool.query('SELECT seq, LENGTH(chunk_data) AS len FROM `HR_Onboarding_Chunks` WHERE file_id = ?', [fid]);
+    else parts = (await db.findWhere('HR_Onboarding_Chunks', { file_id: fid })).map(c => ({ seq: c.seq, len: String(c.chunk_data || '').length }));
+    const seqs = new Set(parts.map(p => parseInt(p.seq, 10)));
+    const count = seqs.size;
+    let ok = count > 0;
+    for (let i = 0; i < count; i++) if (!seqs.has(i)) ok = false;
+    // base64 -> bytes (har tukde me 2 tak padding)
+    const approx = parts.reduce((t, p) => t + Math.floor((parseInt(p.len, 10) || 0) * 3 / 4), 0);
+    if (!ok || Math.abs(approx - (parseInt(f.file_size, 10) || 0)) > 2 * count + 2) {
+      return res.status(400).json({ error: 'File poori nahi pahunchi -- dobara upload karo' });
+    }
+    if (db.pool) await db.pool.query("UPDATE `HR_Onboarding_Files` SET complete = '1', chunks = ? WHERE id = ?", [String(count), fid]);
+    else await db.update('HR_Onboarding_Files', fid, { complete: '1', chunks: String(count) });
+    db._invalidate && db._invalidate('HR_Onboarding_Files');
+    // Isi kind ki purani file hatao
+    await obDeleteFiles(ctx.j.id, f.kind, x => String(x.id) === fid);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+// File kholna: Admin / HR, ya Data Inputs / Interview ka doer. Seedha file (binary)
+// bhejte hain -- tukde ek-ek karke, taaki badi file se server ki memory na bhare.
 app.get('/api/onboarding/:id/files/:kind', requireAuth, obMw, async (req, res) => {
   try {
-    const { uid, canManage } = await obWho(req);
-    const jid = String(req.params.id);
-    if (!canManage && !(await obIsDoer(jid, uid, [OB_DI_NO, OB_IV_NO]))) return res.status(403).json({ error: 'Not allowed' });
-    const row = (await db.findWhere('HR_Onboarding_Files', { onboarding_id: jid })).find(x => x.kind === String(req.params.kind));
-    if (!row || !row.file_data) return res.status(404).json({ error: 'File nahi mili' });
-    res.json({ name: row.file_name || 'file', type: row.mime_type || '', data: row.file_data });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+    const ctx = await obFileReq(req, res, [OB_DI_NO, OB_IV_NO]);
+    if (!ctx) return;
+    const meta = (await obFileMeta(ctx.j.id)).filter(x => x.kind === String(req.params.kind))
+      .sort((a, b) => (parseInt(b.id, 10) || 0) - (parseInt(a.id, 10) || 0))[0];
+    if (!meta) return res.status(404).json({ error: 'File nahi mili' });
+    let row;
+    if (db.pool) { const [r] = await db.pool.query('SELECT file_data, chunks FROM `HR_Onboarding_Files` WHERE id = ?', [String(meta.id)]); row = r[0]; }
+    else row = await db.findOne('HR_Onboarding_Files', { id: String(meta.id) });
+    const chunks = parseInt((row || {}).chunks, 10) || 0;
+    const legacy = String((row || {}).file_data || '');
+    if (!chunks && !legacy) return res.status(404).json({ error: 'File nahi mili' });
+    res.setHeader('Content-Type', meta.mime_type || 'application/octet-stream');
+    res.setHeader('Content-Disposition', "inline; filename*=UTF-8''" + encodeURIComponent(meta.file_name || 'file'));
+    res.setHeader('Cache-Control', 'private, no-store');
+    if (!chunks) return res.end(Buffer.from(legacy.slice(legacy.indexOf(',') + 1), 'base64'));   // purani chhoti file
+    for (let i = 0; i < chunks; i++) {
+      const part = await obChunk(meta.id, i);
+      if (!res.write(Buffer.from(part, 'base64'))) await new Promise(r => res.once('drain', r));
+    }
+    res.end();
+  } catch (err) {
+    if (res.headersSent) res.end(); else res.status(500).json({ error: err.message });
+  }
 });
 app.delete('/api/onboarding/:id/files/:kind', requireAuth, obMw, async (req, res) => {
   try {

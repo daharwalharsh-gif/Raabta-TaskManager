@@ -2768,7 +2768,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
 
 <!-- HR Onboarding — Employee master form (naya / edit) -->
 <div class="modal-overlay" id="obJoineeModal">
-  <div class="modal" style="width:600px;max-width:95vw">
+  <div class="modal" style="width:640px;max-width:95vw">
     <h3 id="obJoineeTitle">Employee master form (HR)</h3>
     <div class="alert error" id="obJoineeErr"></div>
     <div class="ob-form">
@@ -2802,8 +2802,20 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
         <input type="text" id="obfRef" class="ob-other" placeholder="Kisne refer kiya, naam likho" maxlength="150" style="display:none"/></div>
       <div class="form-group"><label>Notes</label>
         <input type="text" id="obfNotes" placeholder="Optional" maxlength="300"/></div>
+      <div class="form-group ob-full"><label>Resume <span class="ob-lim">PDF / Word / image &middot; file ya link</span></label>
+        <div class="ob-filebox"><input type="file" id="obfFile_resume" accept=".pdf,.doc,.docx,image/*" onchange="obFilePick('resume')"/>
+          <input type="url" id="obfLink_resume" placeholder="ya link paste karo (Google Drive…)" maxlength="500"/></div>
+        <div class="ob-fileinfo" id="obfInfo_resume"></div></div>
+      <div class="form-group ob-full"><label>Portfolio <span class="ob-lim">PDF / PPT / image &middot; file ya link</span></label>
+        <div class="ob-filebox"><input type="file" id="obfFile_portfolio" accept=".pdf,.doc,.docx,.ppt,.pptx,image/*" onchange="obFilePick('portfolio')"/>
+          <input type="url" id="obfLink_portfolio" placeholder="ya link (Behance, Drive, website…)" maxlength="500"/></div>
+        <div class="ob-fileinfo" id="obfInfo_portfolio"></div></div>
+      <div class="form-group ob-full"><label>Intro video <span class="ob-lim">koi bhi video &middot; file ya link</span></label>
+        <div class="ob-filebox"><input type="file" id="obfFile_video" accept="video/*" onchange="obFilePick('video')"/>
+          <input type="url" id="obfLink_video" placeholder="ya link (YouTube / Google Drive…)" maxlength="500"/></div>
+        <div class="ob-fileinfo" id="obfInfo_video"></div></div>
     </div>
-    <div class="ob-hint" id="obJoineeHint">Save karte hi <b>Step 1 (Data Inputs)</b> ka popup khulega &mdash; candidate ki details (resume, portfolio, intro video&hellip;) wahin bhar do. Baad me bharni ho to Cancel; Step 1 ke Done par phir milega. Har step Done hone par hi agla step khulta hai.</div>
+    <div class="ob-hint" id="obJoineeHint"><b>Resume</b> diya to <b>Step 1 (Data Inputs)</b> apne aap Done ho jayega aur entry seedha <b>Step 2 (Interview with Director)</b> par jayegi. Resume abhi na ho to save ke baad Step 1 ka popup khulega (baad me bhi bhar sakte ho). Har step Done hone par hi agla step khulta hai.</div>
     <div class="modal-footer" style="justify-content:flex-end;gap:8px">
       <button class="btn btn-outline" onclick="closeModal('obJoineeModal')">Cancel</button>
       <button class="btn ob-create" id="obJoineeSave" onclick="obSaveJoinee()">Create employee &amp; tasks</button>
@@ -2830,15 +2842,15 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       <div class="form-group"><label>Location <span class="ob-req">*</span></label>
         <select id="obiLocSel" onchange="obOtherToggle('obiLoc')"></select>
         <input type="text" id="obiLoc" class="ob-other" placeholder="Location likho" maxlength="60" style="display:none"/></div>
-      <div class="form-group ob-full"><label>Resume <span class="ob-req">*</span> <span class="ob-lim">PDF / Word / image &middot; max 5 MB &middot; ya link</span></label>
+      <div class="form-group ob-full"><label>Resume <span class="ob-req">*</span> <span class="ob-lim">PDF / Word / image &middot; file ya link</span></label>
         <div class="ob-filebox"><input type="file" id="obiFile_resume" accept=".pdf,.doc,.docx,image/*" onchange="obFilePick('resume')"/>
           <input type="url" id="obiLink_resume" placeholder="ya link paste karo (Google Drive…)" maxlength="500"/></div>
         <div class="ob-fileinfo" id="obiInfo_resume"></div></div>
-      <div class="form-group ob-full"><label>Portfolio <span class="ob-lim">PDF / PPT / image &middot; max 10 MB &middot; ya link</span></label>
+      <div class="form-group ob-full"><label>Portfolio <span class="ob-lim">PDF / PPT / image &middot; file ya link</span></label>
         <div class="ob-filebox"><input type="file" id="obiFile_portfolio" accept=".pdf,.doc,.docx,.ppt,.pptx,image/*" onchange="obFilePick('portfolio')"/>
           <input type="url" id="obiLink_portfolio" placeholder="ya link (Behance, Drive, website…)" maxlength="500"/></div>
         <div class="ob-fileinfo" id="obiInfo_portfolio"></div></div>
-      <div class="form-group ob-full"><label>Intro video <span class="ob-lim">max 15 MB &middot; badi ho to link daalo</span></label>
+      <div class="form-group ob-full"><label>Intro video <span class="ob-lim">koi bhi video &middot; file ya link</span></label>
         <div class="ob-filebox"><input type="file" id="obiFile_video" accept="video/*" onchange="obFilePick('video')"/>
           <input type="url" id="obiLink_video" placeholder="ya link (YouTube / Google Drive…)" maxlength="500"/></div>
         <div class="ob-fileinfo" id="obiInfo_video"></div></div>
@@ -7586,10 +7598,12 @@ function obActBtns(j, s) {
   return '<button class="btn btn-green btn-sm" onclick="obAskDone(\'' + jid + '\',' + s.no + ')">&#10003; Done</button>';
 }
 const OB_FILE_UI = {
-  resume: { label: 'Resume', max: 5, icon: '&#128196;' },
-  portfolio: { label: 'Portfolio', max: 10, icon: '&#127912;' },
-  video: { label: 'Intro video', max: 15, icon: '&#127916;' }
+  resume: { label: 'Resume', icon: '&#128196;' },
+  portfolio: { label: 'Portfolio', icon: '&#127912;' },
+  video: { label: 'Intro video', icon: '&#127916;' }
 };
+// Harsh (23 Oct): "kitne bhi MB" -- file 4 MB ke tukdon me jaati hai; ek file 500 MB tak
+const OB_FILE_MAX_MB = 500, OB_CHUNK = 4 * 1024 * 1024;
 // Resume / portfolio / intro video -- file app me khulti hai, link naye tab me
 function obDocsHtml(j, edit) {
   if (!j.docs || !j.docs.resume) return '';
@@ -7619,12 +7633,15 @@ async function obViewFile(jid, kind) {
   const j = obJoinee(jid), ui = OB_FILE_UI[kind];
   const body = document.getElementById('obFileBody');
   document.getElementById('obFileTitle').textContent = ui.label + (j ? ' — ' + j.name : '');
-  body.innerHTML = '<div class="ob-fv-msg">Loading…</div>';
+  const meta = j && j.docs && j.docs[kind] && j.docs[kind].file;
+  body.innerHTML = '<div class="ob-fv-msg">Loading…' + (meta && meta.size > 5 * 1048576 ? '<br><span>' + obSize(meta.size) + ' &mdash; badi file, thoda time lagega</span>' : '') + '</div>';
   document.getElementById('obFileModal').classList.add('open');
   try {
-    const r = await _apiFetch('/api/onboarding/' + jid + '/files/' + kind, 'GET', null, 0);
-    if (!r || r.error || !r.data) throw new Error((r && r.error) || 'File nahi mili');
-    const blob = await (await fetch(r.data)).blob();
+    const tok = localStorage.getItem('authToken');
+    const resp = await fetch('/api/onboarding/' + jid + '/files/' + kind, { headers: tok ? { Authorization: 'Bearer ' + tok } : {}, credentials: 'include' });
+    if (!resp.ok) { let m = 'File nahi mili'; try { m = (await resp.json()).error || m; } catch (x) {} throw new Error(m); }
+    const blob = await resp.blob();
+    const r = { name: (meta && meta.name) || ui.label, type: resp.headers.get('Content-Type') || '' };
     if (_obFileUrl) URL.revokeObjectURL(_obFileUrl);
     _obFileUrl = URL.createObjectURL(blob);
     const t = String(r.type || blob.type || ''), nm = String(r.name || '').toLowerCase();
@@ -8189,10 +8206,13 @@ function obAltToggle() {
 // ── Step 1 "Data Inputs": Done dabate hi candidate ki details (resume /
 // portfolio / video -- file ya link). edit = Admin / HR baad me sudhaare (Done nahi badalta)
 let _obInId = '', _obInEdit = false, _obFiles = {}, _obFileDel = {}, _obReading = 0;
+// Files abhi kaun sa form le raha hai: 'obi' = Step 1 popup, 'obf' = entry form;
+// _obFileJid = jis entry ki purani file dikhani hai ('' = nayi entry)
+let _obFilePre = 'obi', _obFileJid = '';
 function obSize(b) { return b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB'; }
 function obFileInfo(kind) {
-  const el = document.getElementById('obiInfo_' + kind);
-  const j = obJoinee(_obInId);
+  const el = document.getElementById(_obFilePre + 'Info_' + kind);
+  const j = _obFileJid ? obJoinee(_obFileJid) : null;
   const old = j && j.docs && j.docs[kind] && j.docs[kind].file;
   const nf = _obFiles[kind];
   el.innerHTML = nf ? '<span class="ok">&#10003; ' + obE(nf.name) + ' &middot; ' + obSize(nf.size) + '</span> &mdash; save par upload hogi' +
@@ -8203,26 +8223,59 @@ function obFileInfo(kind) {
     : '';
 }
 function obFilePick(kind) {
-  const inp = document.getElementById('obiFile_' + kind), f = inp.files && inp.files[0], ui = OB_FILE_UI[kind];
-  const el = document.getElementById('obiInfo_' + kind);
+  const inp = document.getElementById(_obFilePre + 'File_' + kind), f = inp.files && inp.files[0], ui = OB_FILE_UI[kind];
+  const el = document.getElementById(_obFilePre + 'Info_' + kind);
   delete _obFiles[kind];
   if (!f) { obFileInfo(kind); return; }
-  if (f.size > ui.max * 1024 * 1024) {
+  if (!f.size || f.size > OB_FILE_MAX_MB * 1024 * 1024) {
     inp.value = '';
-    el.innerHTML = '<span class="bad">&#9888;&#65039; ' + obE(ui.label) + ' ' + ui.max + ' MB se badi hai &mdash; link daal do</span>';
+    el.innerHTML = '<span class="bad">&#9888;&#65039; ' + obE(ui.label) + (f.size ? ' ' + OB_FILE_MAX_MB + ' MB se badi hai &mdash; link daal do' : ': file khali hai') + '</span>';
     return;
   }
-  el.textContent = f.name + ' — reading…';
-  _obReading++;
-  const rd = new FileReader();
-  rd.onload = () => { _obReading--; _obFiles[kind] = { name: f.name, type: f.type, size: f.size, data: String(rd.result || '') }; obFileInfo(kind); };
-  rd.onerror = () => { _obReading--; el.innerHTML = '<span class="bad">&#9888;&#65039; File padh nahi paaye</span>'; };
-  rd.readAsDataURL(f);
+  _obFiles[kind] = { file: f, name: f.name, type: f.type, size: f.size };
+  obFileInfo(kind);
+}
+// Blob ka base64 (data: wala aage ka hissa hata ke)
+function obB64(blob) {
+  return new Promise((ok, no) => {
+    const rd = new FileReader();
+    rd.onload = () => { const x = String(rd.result || ''); ok(x.slice(x.indexOf(',') + 1)); };
+    rd.onerror = () => no(new Error('File padh nahi paaye'));
+    rd.readAsDataURL(blob);
+  });
+}
+// Chuni hui files upload / hatai hui hatao. Upload 4 MB ke tukdon me (badi file
+// bhi chale), button par % dikhta hai.
+async function obUploadFiles(id, btn) {
+  for (const k of Object.keys(OB_FILE_UI)) {
+    const f = _obFiles[k], lbl = OB_FILE_UI[k].label;
+    if (f) {
+      btn.textContent = lbl + ' upload shuru…';
+      const st = await api('/api/onboarding/' + id + '/files/start', 'POST', { kind: k, fileName: f.name, mimeType: f.type, size: f.size });
+      if (!st || st.error || !st.fileId) throw new Error(lbl + ': ' + ((st && st.error) || 'upload shuru nahi hui'));
+      const total = Math.ceil(f.size / OB_CHUNK);
+      for (let i = 0; i < total; i++) {
+        const data = await obB64(f.file.slice(i * OB_CHUNK, Math.min(f.size, (i + 1) * OB_CHUNK)));
+        let u = null;
+        for (let t = 0; t < 3 && !(u && u.success); t++) u = await api('/api/onboarding/' + id + '/files/' + st.fileId + '/chunk', 'POST', { seq: i, data: data });
+        if (!u || !u.success) throw new Error(lbl + ': ' + ((u && u.error) || 'upload beech me ruk gayi -- dobara try karo'));
+        btn.textContent = lbl + ' upload ' + Math.round((i + 1) * 100 / total) + '%…';
+      }
+      const fin = await api('/api/onboarding/' + id + '/files/' + st.fileId + '/finish', 'POST', {});
+      if (!fin || fin.error) throw new Error(lbl + ': ' + ((fin && fin.error) || 'upload poori nahi hui'));
+      delete _obFiles[k];
+    } else if (_obFileDel[k]) {
+      const u = await api('/api/onboarding/' + id + '/files/' + k, 'DELETE');
+      if (!u || u.error) throw new Error(OB_FILE_UI[k].label + ': ' + ((u && u.error) || 'hat nahi payi'));
+      _obFileDel[k] = false;
+    }
+  }
 }
 function obOpenInputs(jid, edit) {
   const j = obJoinee(jid);
   if (!j) return;
   _obInId = String(j.id); _obInEdit = !!edit; _obFiles = {}; _obFileDel = {};
+  _obFilePre = 'obi'; _obFileJid = _obInId;
   const set = (k, v) => { const el = document.getElementById(k); if (el) el.value = v == null ? '' : v; };
   set('obiName', j.name); set('obiPhone', j.phone); set('obiEmail', j.email); set('obiNote', '');
   obFillPick('obiDesig', OB_DESIGNATIONS.concat(_ob.designations || []), j.designation);
@@ -8247,7 +8300,7 @@ async function obSaveInputs() {
   const v = id => (document.getElementById(id).value || '').trim();
   const digits = x => x.replace(/\D/g, '');
   // Link me https:// na ho to laga do
-  const link = k => { const x = v('obiLink_' + k); return x && !/^https?:\/\//i.test(x) ? 'https://' + x : x; };
+  const link = k => { const x = v('obiLink_' + k); return x && !/^[a-z][a-z0-9+.-]*:\/\//i.test(x) ? 'https://' + x : x; };
   const j = obJoinee(_obInId);
   if (!j) return;
   const body = {
@@ -8271,20 +8324,8 @@ async function obSaveInputs() {
   btn.disabled = true;
   const id = _obInId;
   try {
-    // Pehle files (badi file alag request me), phir details + Done
-    for (const k of Object.keys(OB_FILE_UI)) {
-      const f = _obFiles[k];
-      if (f) {
-        btn.textContent = OB_FILE_UI[k].label + ' upload ho rahi hai…';
-        const u = await api('/api/onboarding/' + id + '/files', 'POST', { kind: k, fileName: f.name, mimeType: f.type, dataUrl: f.data });
-        if (!u || u.error) throw new Error(OB_FILE_UI[k].label + ': ' + ((u && u.error) || 'upload nahi hui'));
-        delete _obFiles[k];
-      } else if (_obFileDel[k]) {
-        const u = await api('/api/onboarding/' + id + '/files/' + k, 'DELETE');
-        if (!u || u.error) throw new Error(OB_FILE_UI[k].label + ': ' + ((u && u.error) || 'hat nahi payi'));
-        _obFileDel[k] = false;
-      }
-    }
+    // Pehle files, phir details + Done
+    await obUploadFiles(id, btn);
     btn.textContent = 'Saving…';
     const diNo = (_ob.steps.find(d => d.dataInputs) || {}).no || 1;
     const r = _obInEdit
@@ -8322,6 +8363,13 @@ function obOpenJoinee(id) {
   obFillPick('obfRef', (_ob.users || []).map(u => u.name).concat(_ob.refs || []).sort((a, b) => a.localeCompare(b)), j ? j.refBy : '');
   set('obfProb', j ? j.probationDays : 90);
   set('obfNotes', j ? j.notes : '');
+  // Resume / portfolio / intro video (file ya link)
+  _obFiles = {}; _obFileDel = {}; _obFilePre = 'obf'; _obFileJid = _obEditId;
+  Object.keys(OB_FILE_UI).forEach(k => {
+    set('obfLink_' + k, j && j.docs && j.docs[k] ? j.docs[k].link : '');
+    set('obfFile_' + k, '');
+    obFileInfo(k);
+  });
   document.getElementById('obJoineeTitle').textContent = j ? 'Edit employee (HR)' : 'Employee master form (HR)';
   document.getElementById('obJoineeSave').textContent = j ? 'Save changes' : 'Create employee & tasks';
   document.getElementById('obJoineeHint').style.display = j ? 'none' : '';
@@ -8333,12 +8381,15 @@ async function obSaveJoinee() {
   const err = document.getElementById('obJoineeErr');
   const v = id => (document.getElementById(id).value || '').trim();
   const digits = s => s.replace(/\D/g, '');
+  // Link me https:// na ho to laga do
+  const link = k => { const x = v('obfLink_' + k); return x && !/^[a-z][a-z0-9+.-]*:\/\//i.test(x) ? 'https://' + x : x; };
   const body = {
     name: v('obfName'), designation: obPickVal('obfDesig'), phone: v('obfPhone'),
     altPhone: v('obfAlt'), altPhoneNA: document.getElementById('obfAltNA').checked,
     email: v('obfEmail'), location: obPickVal('obfLoc'), dob: v('obfDob'),
     esis: obPickVal('obfEsis'), contract: obPickVal('obfContract'), refBy: obPickVal('obfRef'),
-    probationDays: v('obfProb'), notes: v('obfNotes')
+    probationDays: v('obfProb'), notes: v('obfNotes'),
+    resumeLink: link('resume'), portfolioLink: link('portfolio'), videoLink: link('video')
   };
   const bad = !body.name ? 'Employee name daalo'
     : !body.designation ? 'Designation chuno (ya Other chun kar likho)'
@@ -8349,27 +8400,61 @@ async function obSaveJoinee() {
     : !body.location ? 'Location chuno (ya Other chun kar likho)'
     : !body.dob ? 'Date of birth chuno'
     : !body.esis ? 'ESIS eligible? chuno (ya Other chun kar likho)'
-    : !body.contract ? 'Contract signed? chuno (ya Other chun kar likho)' : '';
+    : !body.contract ? 'Contract signed? chuno (ya Other chun kar likho)'
+    : _obReading ? 'File abhi load ho rahi hai — ek second ruko' : '';
   if (bad) { err.textContent = bad; err.style.display = 'block'; return; }
+  err.style.display = 'none';
   const btn = document.getElementById('obJoineeSave');
+  const btnTxt = btn.textContent;
+  const isNew = !_obEditId;
+  const resumeFile = !!_obFiles.resume;
+  let id = _obEditId;
   btn.disabled = true;
   try {
-    const r = _obEditId
-      ? await api('/api/onboarding/' + _obEditId, 'PUT', body)
+    const r = id
+      ? await api('/api/onboarding/' + id, 'PUT', body)
       : await api('/api/onboarding', 'POST', body);
     if (!r || r.error) throw new Error((r && r.error) || 'Could not save');
-    const isNew = !_obEditId;
-    closeModal('obJoineeModal');
-    showToast(isNew ? '✅ Entry ban gayi — ab Step 1 (Data Inputs) bharo' : '✅ Employee updated', 'success');
-    if (isNew && r.id) _obOpenId = String(r.id);
-    _obEditId = '';
-    await loadOnboarding(1);
-    // Nayi entry: Step 1 (Data Inputs) ka popup seedha -- candidate ki details abhi bhar do
-    if (isNew && r.id && obJoinee(r.id)) obOpenInputs(r.id);
+    if (!id) id = String(r.id);
+    await obUploadFiles(id, btn);
   } catch (e) {
-    err.textContent = e.message || 'Could not save';
-    err.style.display = 'block';
-  } finally { btn.disabled = false; }
+    btn.disabled = false; btn.textContent = btnTxt;
+    if (isNew && id) {
+      // Entry ban chuki, sirf file atki -- Step 1 popup me dobara daal do
+      closeModal('obJoineeModal');
+      _obEditId = ''; _obOpenId = id;
+      await loadOnboarding(1);
+      showToast('Entry ban gayi, par ' + (e.message || 'file upload nahi hui'), 'error');
+      if (obJoinee(id)) obOpenInputs(id);
+    } else {
+      err.textContent = e.message || 'Could not save';
+      err.style.display = 'block';
+    }
+    return;
+  }
+  // Nayi entry + resume (file ya link): Step 1 (Data Inputs) yahin Done -> Step 2 Interview
+  let diDone = false, diErr = '';
+  if (isNew && (body.resumeLink || resumeFile)) {
+    btn.textContent = 'Step 1 Done…';
+    const diNo = (_ob.steps.find(d => d.dataInputs) || {}).no || 1;
+    const d = await api('/api/onboarding/' + id + '/steps/' + diNo, 'PUT', {
+      action: 'done', note: 'Entry form se', name: body.name, phone: body.phone, email: body.email,
+      designation: body.designation, location: body.location,
+      resumeLink: body.resumeLink, portfolioLink: body.portfolioLink, videoLink: body.videoLink
+    });
+    if (d && !d.error) diDone = true; else diErr = (d && d.error) || 'Step 1 Done nahi hua';
+  }
+  btn.disabled = false; btn.textContent = btnTxt;
+  closeModal('obJoineeModal');
+  showToast(!isNew ? '✅ Employee updated'
+    : diDone ? '✅ Entry ban gayi — Step 1 Done, ab Step 2 (Interview with Director)'
+    : diErr ? 'Entry ban gayi, par Step 1: ' + diErr
+    : '✅ Entry ban gayi — resume baaki, Step 1 (Data Inputs) bharo', diErr ? 'error' : 'success');
+  if (isNew) _obOpenId = id;
+  _obEditId = '';
+  await loadOnboarding(1);
+  // Resume nahi diya (ya Step 1 me kuch kami): Step 1 ka popup seedha
+  if (isNew && !diDone && obJoinee(id)) obOpenInputs(id);
 }
 async function obSetStatus(id, status) {
   const j = obJoinee(id);
