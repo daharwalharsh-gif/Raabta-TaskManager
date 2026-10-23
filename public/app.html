@@ -229,7 +229,28 @@ textarea.gold-inp{resize:vertical;}
 .ob-fv-msg{text-align:center;padding:40px 10px;color:#64748b;font-size:14px;}
 .ob-fv-msg span{font-size:12px;color:#94a3b8;}
 /* Side panel (z 1100) ke upar se khulne wale onboarding popup */
-#obJoineeModal,#obInputsModal,#obDoneModal,#obAdminModal,#obFileModal{z-index:1200;}
+#obJoineeModal,#obInputsModal,#obEmpModal,#obUnlockModal,#obDoneModal,#obAdminModal,#obFileModal{z-index:1200;}
+/* Lock patti + history + Director ke liye candidate box */
+.ob-lockbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-radius:10px;padding:9px 12px;font-size:12.5px;font-weight:600;margin-top:12px;}
+.ob-lockbar.on{background:#f1f5f9;border:1px solid #cbd5e1;color:#334155;}
+.ob-lockbar.off{background:#fffbeb;border:1px solid #fde68a;color:#92400e;}
+.ob-lockbar .sp{flex:1;}
+.ob-dw-body > .ob-lockbar{margin-top:0;}
+.ob-hist{display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto;font-size:12.5px;color:#334155;}
+.ob-hrow{display:grid;grid-template-columns:78px minmax(0,1fr);gap:10px;padding-bottom:8px;border-bottom:1px dashed #eef2f7;}
+.ob-hrow:last-child{border-bottom:none;padding-bottom:0;}
+.ob-hrow b{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:#64748b;}
+.ob-hrow b.unlock{color:#b45309;} .ob-hrow b.lock{color:#334155;} .ob-hrow b.reject{color:#b91c1c;}
+.ob-hrow b.approve{color:#15803d;} .ob-hrow b.edit,.ob-hrow b.details{color:#1d4ed8;}
+.ob-hrow em{display:block;font-style:normal;font-size:11px;color:#94a3b8;margin-top:2px;}
+.ob-hrow div{word-break:break-word;}
+.ob-cand{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;margin-top:8px;font-size:12.5px;color:#334155;line-height:1.6;}
+.ob-donewhat .ob-cand b{display:inline;font-size:12.5px;}
+.ob-donewhat .ob-cand span.ob-doc{font-size:12px;color:#94a3b8;}
+.ob-sechead{display:flex;align-items:center;gap:8px;}
+.ob-sechead .sp{flex:1;}
+.ob-ulist{display:flex;flex-wrap:wrap;gap:6px 14px;padding:8px 2px;}
+.ob-ulist label{display:flex;align-items:center;gap:6px;font-size:12.5px;color:#334155;cursor:pointer;}
 @media(max-width:560px){ .ob-filebox{grid-template-columns:1fr;} }
 .ob-admin{max-height:56vh;overflow-y:auto;border:1px solid #e2e8f0;border-radius:12px;}
 .ob-arow{display:grid;grid-template-columns:34px minmax(0,1fr) 92px 240px;gap:12px;align-items:center;padding:9px 12px;border-bottom:1px solid #f1f5f9;}
@@ -2122,7 +2143,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     <div class="page-header ob-head">
       <div>
         <h2>HR Reporting</h2>
-        <div class="ob-sub">Employee Onboarding FMS &middot; 21 steps, ek ke baad ek</div>
+        <div class="ob-sub">Employee Onboarding FMS &middot; 22 steps, ek ke baad ek</div>
       </div>
       <div class="ob-actions">
         <button class="btn btn-outline" onclick="loadOnboarding(1)">&#8635; Refresh</button>
@@ -2769,7 +2790,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
 <!-- HR Onboarding — Employee master form (naya / edit) -->
 <div class="modal-overlay" id="obJoineeModal">
   <div class="modal" style="width:640px;max-width:95vw">
-    <h3 id="obJoineeTitle">Employee master form (HR)</h3>
+    <h3 id="obJoineeTitle">Step 1 &mdash; Initial Candidate Details</h3>
     <div class="alert error" id="obJoineeErr"></div>
     <div class="ob-form">
       <div class="form-group"><label>Employee name <span class="ob-req">*</span></label>
@@ -2781,27 +2802,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
         <input type="tel" id="obfPhone" placeholder="10-digit mobile" maxlength="20"/></div>
       <div class="form-group"><label>Alternate phone</label>
         <input type="tel" id="obfAlt" placeholder="10-digit mobile" maxlength="20"/>
-        <label class="ob-check"><input type="checkbox" id="obfAltNA" onchange="obAltToggle()"/> Not available</label></div>
-      <div class="form-group"><label>Email <span class="ob-req" id="obfEmailReq">*</span></label>
-        <input type="email" id="obfEmail" placeholder="name@gmail.com" maxlength="150"/></div>
-      <div class="form-group"><label>Location <span class="ob-req">*</span></label>
-        <select id="obfLocSel" onchange="obOtherToggle('obfLoc')"></select>
-        <input type="text" id="obfLoc" class="ob-other" placeholder="Location likho" maxlength="60" style="display:none"/></div>
-      <div class="form-group"><label>Date of birth <span class="ob-req">*</span></label>
-        <input type="date" id="obfDob"/></div>
-      <div class="form-group"><label>ESIS eligible? <span class="ob-req">*</span></label>
-        <select id="obfEsisSel" onchange="obOtherToggle('obfEsis')"><option value="">Select</option><option value="yes">Yes</option><option value="no">No (step 20 N/A)</option><option value="__other__">&#9998; Other (type manually)</option></select>
-        <input type="text" id="obfEsis" class="ob-other" placeholder="Likho, e.g. Pending" maxlength="60" style="display:none"/></div>
-      <div class="form-group"><label>Contract signed? <span class="ob-req">*</span></label>
-        <select id="obfContractSel" onchange="obOtherToggle('obfContract')"><option value="">Select</option><option value="yes">Yes</option><option value="no">No</option><option value="__other__">&#9998; Other (type manually)</option></select>
-        <input type="text" id="obfContract" class="ob-other" placeholder="Likho, e.g. Next week" maxlength="60" style="display:none"/></div>
-      <div class="form-group"><label>Probation (days)</label>
-        <input type="number" id="obfProb" min="1" max="730" value="90"/></div>
-      <div class="form-group"><label>Ref. by</label>
-        <select id="obfRefSel" onchange="obOtherToggle('obfRef')"></select>
-        <input type="text" id="obfRef" class="ob-other" placeholder="Kisne refer kiya, naam likho" maxlength="150" style="display:none"/></div>
-      <div class="form-group"><label>Notes</label>
-        <input type="text" id="obfNotes" placeholder="Optional" maxlength="300"/></div>
+        <label class="ob-check"><input type="checkbox" id="obfAltNA" onchange="obAltToggle('obf')"/> Not available</label></div>
       <div class="form-group ob-full"><label>Resume <span class="ob-lim">PDF / Word / image &middot; file ya link</span></label>
         <div class="ob-filebox"><input type="file" id="obfFile_resume" accept=".pdf,.doc,.docx,image/*" onchange="obFilePick('resume')"/>
           <input type="url" id="obfLink_resume" placeholder="ya link paste karo (Google Drive…)" maxlength="500"/></div>
@@ -2815,10 +2816,10 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
           <input type="url" id="obfLink_video" placeholder="ya link (YouTube / Google Drive…)" maxlength="500"/></div>
         <div class="ob-fileinfo" id="obfInfo_video"></div></div>
     </div>
-    <div class="ob-hint" id="obJoineeHint"><b>Resume</b> diya to <b>Step 1 (Data Inputs)</b> apne aap Done ho jayega aur entry seedha <b>Step 2 (Interview with Director)</b> par jayegi. Resume abhi na ho to save ke baad Step 1 ka popup khulega (baad me bhi bhar sakte ho). Har step Done hone par hi agla step khulta hai.</div>
+    <div class="ob-hint" id="obJoineeHint">Save karte hi <b>Step 1</b> complete &mdash; details <b>Step 2 (Director Review)</b> ke paas jayengi. Email, location, DOB, ESIS, contract, probation, ref. by, notes <b>Step 3</b> me bharne hain (Director ke Approve karne ke baad).</div>
     <div class="modal-footer" style="justify-content:flex-end;gap:8px">
       <button class="btn btn-outline" onclick="closeModal('obJoineeModal')">Cancel</button>
-      <button class="btn ob-create" id="obJoineeSave" onclick="obSaveJoinee()">Create employee &amp; tasks</button>
+      <button class="btn ob-create" id="obJoineeSave" onclick="obSaveJoinee()">Create &amp; send to Director</button>
     </div>
   </div>
 </div>
@@ -2826,23 +2827,21 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
 <!-- HR Onboarding — Step 1 "Data Inputs": Done par candidate ki details -->
 <div class="modal-overlay" id="obInputsModal">
   <div class="modal" style="width:640px;max-width:95vw">
-    <h3 id="obInputsTitle">&#10003; Step 1 &mdash; Data Inputs</h3>
+    <h3 id="obInputsTitle">&#10003; Step 1 &mdash; Initial Candidate Details</h3>
     <div class="alert error" id="obInputsErr"></div>
     <div class="ob-donewhat" id="obInputsWhat"></div>
     <div class="ob-form">
       <div class="form-group ob-full"><label>Name <span class="ob-req">*</span></label>
         <input type="text" id="obiName" placeholder="e.g. Piyush Sharma" maxlength="120"/></div>
-      <div class="form-group"><label>Mobile number <span class="ob-req">*</span></label>
-        <input type="tel" id="obiPhone" placeholder="10-digit mobile" maxlength="20"/></div>
-      <div class="form-group"><label>Email <span class="ob-req">*</span></label>
-        <input type="email" id="obiEmail" placeholder="name@gmail.com" maxlength="150"/></div>
       <div class="form-group"><label>Designation <span class="ob-req">*</span></label>
         <select id="obiDesigSel" onchange="obOtherToggle('obiDesig')"></select>
         <input type="text" id="obiDesig" class="ob-other" placeholder="Designation likho" maxlength="120" style="display:none"/></div>
-      <div class="form-group"><label>Location <span class="ob-req">*</span></label>
-        <select id="obiLocSel" onchange="obOtherToggle('obiLoc')"></select>
-        <input type="text" id="obiLoc" class="ob-other" placeholder="Location likho" maxlength="60" style="display:none"/></div>
-      <div class="form-group ob-full"><label>Resume <span class="ob-req">*</span> <span class="ob-lim">PDF / Word / image &middot; file ya link</span></label>
+      <div class="form-group"><label>Phone <span class="ob-req">*</span></label>
+        <input type="tel" id="obiPhone" placeholder="10-digit mobile" maxlength="20"/></div>
+      <div class="form-group"><label>Alternate phone</label>
+        <input type="tel" id="obiAlt" placeholder="10-digit mobile" maxlength="20"/>
+        <label class="ob-check"><input type="checkbox" id="obiAltNA" onchange="obAltToggle('obi')"/> Not available</label></div>
+      <div class="form-group ob-full"><label>Resume <span class="ob-lim">PDF / Word / image &middot; file ya link</span></label>
         <div class="ob-filebox"><input type="file" id="obiFile_resume" accept=".pdf,.doc,.docx,image/*" onchange="obFilePick('resume')"/>
           <input type="url" id="obiLink_resume" placeholder="ya link paste karo (Google Drive…)" maxlength="500"/></div>
         <div class="ob-fileinfo" id="obiInfo_resume"></div></div>
@@ -2860,6 +2859,58 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     <div class="modal-footer" style="justify-content:space-between">
       <button class="btn btn-outline" onclick="closeModal('obInputsModal')">Cancel</button>
       <button class="btn btn-green" id="obInputsBtn" onclick="obSaveInputs()">&#10003; Save &amp; Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- HR Onboarding — Step 3 "Remaining Employee Details" (Done / Edit) -->
+<div class="modal-overlay" id="obEmpModal">
+  <div class="modal" style="width:640px;max-width:95vw">
+    <h3 id="obEmpTitle">&#10003; Step 3 &mdash; Remaining Employee Details</h3>
+    <div class="alert error" id="obEmpErr"></div>
+    <div class="ob-donewhat" id="obEmpWhat"></div>
+    <div class="ob-form">
+      <div class="form-group"><label>Email <span class="ob-req">*</span></label>
+        <input type="email" id="obeEmail" placeholder="name@gmail.com" maxlength="150"/></div>
+      <div class="form-group"><label>Location <span class="ob-req">*</span></label>
+        <select id="obeLocSel" onchange="obOtherToggle('obeLoc')"></select>
+        <input type="text" id="obeLoc" class="ob-other" placeholder="Location likho" maxlength="60" style="display:none"/></div>
+      <div class="form-group"><label>Date of birth <span class="ob-req">*</span></label>
+        <input type="date" id="obeDob"/></div>
+      <div class="form-group"><label>ESIS eligible? <span class="ob-req">*</span></label>
+        <select id="obeEsisSel" onchange="obOtherToggle('obeEsis')"><option value="">Select</option><option value="yes">Yes</option><option value="no">No (step 21 N/A)</option><option value="__other__">&#9998; Other (type manually)</option></select>
+        <input type="text" id="obeEsis" class="ob-other" placeholder="Likho, e.g. Pending" maxlength="60" style="display:none"/></div>
+      <div class="form-group"><label>Contract signed? <span class="ob-req">*</span></label>
+        <select id="obeContractSel" onchange="obOtherToggle('obeContract')"><option value="">Select</option><option value="yes">Yes</option><option value="no">No</option><option value="__other__">&#9998; Other (type manually)</option></select>
+        <input type="text" id="obeContract" class="ob-other" placeholder="Likho, e.g. Next week" maxlength="60" style="display:none"/></div>
+      <div class="form-group"><label>Probation (days)</label>
+        <input type="number" id="obeProb" min="1" max="730" value="90"/></div>
+      <div class="form-group"><label>Ref. by</label>
+        <select id="obeRefSel" onchange="obOtherToggle('obeRef')"></select>
+        <input type="text" id="obeRef" class="ob-other" placeholder="Kisne refer kiya, naam likho" maxlength="150" style="display:none"/></div>
+      <div class="form-group"><label>Notes</label>
+        <input type="text" id="obeNotes" placeholder="Optional" maxlength="300"/></div>
+    </div>
+    <div class="ob-hint" id="obEmpHint">Save &amp; Done ke baad saari details <b>lock</b> ho jayengi &mdash; badalni ho to Admin se <b>Unlock</b> karwana hoga.</div>
+    <div class="modal-footer" style="justify-content:space-between">
+      <button class="btn btn-outline" onclick="closeModal('obEmpModal')">Cancel</button>
+      <button class="btn btn-green" id="obEmpBtn" onclick="obSaveEmp()">&#10003; Save &amp; Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- HR Onboarding — Unlock (wajah ke saath) -->
+<div class="modal-overlay" id="obUnlockModal">
+  <div class="modal" style="max-width:440px">
+    <h3>&#128275; Unlock details</h3>
+    <div class="alert error" id="obUnlockErr"></div>
+    <div class="ob-donewhat" id="obUnlockWhat"></div>
+    <div class="form-group"><label>Wajah <span class="ob-req">*</span></label>
+      <textarea id="obUnlockReason" rows="3" maxlength="250" placeholder="Kya sudhaarna hai aur kyun…"></textarea></div>
+    <div class="ob-hint">Unlock history me likha jayega. Sudhaar ke baad <b>&#128274; Lock</b> dabana.</div>
+    <div class="modal-footer" style="justify-content:space-between">
+      <button class="btn btn-outline" onclick="closeModal('obUnlockModal')">Cancel</button>
+      <button class="btn btn-primary" id="obUnlockBtn" onclick="obSubmitUnlock()">&#128275; Unlock</button>
     </div>
   </div>
 </div>
@@ -2885,8 +2936,12 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
   <div class="modal" style="width:760px;max-width:95vw">
     <h3>&#9881;&#65039; Step Admin &mdash; har step ka Doer aur TAT</h3>
     <div class="alert error" id="obAdminErr"></div>
-    <div class="ob-hint">Har step ke saamne doer chuno (list me na ho to <b>&#9998; Type name</b>). <b>TAT</b> = ye step pichhle step ke Done hone ke kitne din me complete hona chahiye; khali chhodo to PDF wali timeline. Step 11 aur 12 me Delhi aur Mumbai ke alag doer.</div>
+    <div class="ob-hint">Har step ke saamne doer chuno (list me na ho to <b>&#9998; Type name</b>). <b>TAT</b> = ye step pichhle step ke Done hone ke kitne din me complete hona chahiye; khali chhodo to PDF wali timeline. Step 12 aur 13 me Delhi aur Mumbai ke alag doer.</div>
     <div class="ob-admin" id="obAdminBody"></div>
+    <div id="obUnlockersBox" style="display:none;margin-top:12px">
+      <div class="ob-ahead" style="grid-template-columns:1fr;position:static;border-radius:8px">&#128275; Unlock ki ijazat (Admin ke alawa) &mdash; Step 3 ke baad lock hui details sirf ye khol sakte hain</div>
+      <div class="ob-ulist" id="obUnlockersList"></div>
+    </div>
     <label class="ob-check" style="margin:12px 0 4px"><input type="checkbox" id="obAdminApply" checked/> Chalu entries ke jo step abhi Done nahi hue, unpar bhi naya doer laga do</label>
     <div class="modal-footer" style="justify-content:space-between">
       <button class="btn btn-outline" onclick="closeModal('obAdminModal')">Cancel</button>
@@ -7410,10 +7465,11 @@ function ftOpenDetail(sheetRow) {
 // ══════════════════════════════════════════════════════
 // Harsh (22 Oct): "HR Reporting me pura FMS bana do" -- purana attendance
 // (Excel upload) hata diya. Workflow onboarding_workflow_flowchart.pdf ka:
-// 4 phase, 21 step, FMS jaisa EK KE BAAD EK: "Employee master form" ki entry
-// Step 1 ke doer ke paas jaati hai; wo Done kare tabhi Step 2 khulta hai.
-// Step 1 "Data Inputs": Done par candidate ki details (resume / portfolio / video).
-// Step 2 "Interview with Director": Selected ya Rejected (Rejected = flow band).
+// 4 phase, 22 step, FMS jaisa EK KE BAAD EK -- har step Done hone par hi agla khulta hai.
+// Step 1 "Initial Candidate Details" = entry form (save hote hi complete).
+// Step 2 "Director Review": remarks ke saath Approve ya Reject (Reject = flow band).
+// Step 3 "Remaining Employee Details": HR ki baaki details -- Done ke baad LOCK
+// (Admin / ijazat wale Unlock kar sakte; har edit / unlock ki history).
 // Upar "Step-wise Pipeline": har step par kitne employee atke hain (late kitne),
 // card dabao to wahi list. Doer dropdown se (app user) ya haath se likha naam.
 // Admin / HR ko sab dikhta hai; baaki ko sirf apne step ("My Steps").
@@ -7584,16 +7640,19 @@ function obRenderKpis() {
   }
 }
 
-// Chalu step ke button. Data Inputs par Done = details ka popup; Interview with
-// Director par Selected / Rejected
+// Chalu step ke button. Step 1 = details ka popup; Step 2 Director Review = Approve /
+// Reject; Step 3 = baaki details ka popup (Done ke baad lock)
 function obActBtns(j, s) {
   const jid = obE(j.id);
   if (obDef(s.no).dataInputs) {
     return '<button class="btn btn-green btn-sm" onclick="obOpenInputs(\'' + jid + '\')" title="Candidate ki details bharo, phir Done">&#10003; Done</button>';
   }
   if (obDef(s.no).interview) {
-    return '<button class="btn btn-green btn-sm" onclick="obAskDone(\'' + jid + '\',' + s.no + ',\'selected\')">&#10003; Selected</button>' +
-      '<button class="btn btn-rej btn-sm" onclick="obAskDone(\'' + jid + '\',' + s.no + ',\'rejected\')">&#10005; Rejected</button>';
+    return '<button class="btn btn-green btn-sm" onclick="obAskDone(\'' + jid + '\',' + s.no + ',\'selected\')">&#10003; Approve</button>' +
+      '<button class="btn btn-rej btn-sm" onclick="obAskDone(\'' + jid + '\',' + s.no + ',\'rejected\')">&#10005; Reject</button>';
+  }
+  if (obDef(s.no).empDetails) {
+    return '<button class="btn btn-green btn-sm" onclick="obOpenEmp(\'' + jid + '\')" title="Email, location, DOB… bharo, phir Done">&#10003; Done</button>';
   }
   return '<button class="btn btn-green btn-sm" onclick="obAskDone(\'' + jid + '\',' + s.no + ')">&#10003; Done</button>';
 }
@@ -7615,18 +7674,50 @@ function obDocsHtml(j, edit) {
     return h || '<span class="ob-doc miss">' + lbl + ': nahi</span>';
   }).join('') + (edit ? obInEditBtn(j) : '') + '</div>';
 }
-// Interview ka nateeja (Rejected ho to wajah bhi)
+// Director Review ka nateeja (Rejected ho to remarks bhi)
 function obIvHtml(j) {
-  if (j.interview === 'selected') return '<b style="color:#15803d">&#10003; Selected</b>';
+  if (j.interview === 'selected') return '<b style="color:#15803d">&#10003; Approved</b>';
   if (j.interview === 'rejected') {
     const iv = j.steps.find(s => obDef(s.no).interview) || {};
     return '<b style="color:#b91c1c">&#10005; Rejected</b>' + (iv.note ? ' &middot; ' + obE(iv.note) : '');
   }
   return 'Pending';
 }
-// Admin / HR: Data Inputs baad me sudhaarne ka button
+// Admin / HR: Step 1 ki details sudhaarne ka button (lock ho to nahi)
 function obInEditBtn(j) {
-  return _ob.canManage ? '<button type="button" class="ob-doc" style="color:#475569;background:#fff;border-color:#e2e8f0" onclick="event.stopPropagation();obOpenInputs(\'' + obE(j.id) + '\',1)">&#9999;&#65039; Edit Data Inputs</button>' : '';
+  return _ob.canManage && !j.locked ? '<button type="button" class="ob-doc" style="color:#475569;background:#fff;border-color:#e2e8f0" onclick="event.stopPropagation();obOpenJoinee(\'' + obE(j.id) + '\')">&#9999;&#65039; Edit</button>' : '';
+}
+// Step 3 ho chuka? (details tab lock hoti hain)
+function obEmpDone(j) { const s3 = j.steps.find(s => obDef(s.no).empDetails); return !!(s3 && s3.done); }
+// Lock patti: lock / unlocked + button
+function obLockHtml(j) {
+  if (!_ob.canManage && !_ob.canUnlock) return '';
+  const jid = obE(j.id);
+  if (j.locked) {
+    return '<div class="ob-lockbar on">&#128274; Locked &mdash; Step 3 complete, details badal nahi sakte<span class="sp"></span>' +
+      (_ob.canUnlock ? '<button class="btn btn-outline btn-sm" onclick="obUnlock(\'' + jid + '\')">&#128275; Unlock</button>' : '<span style="font-weight:500">Unlock: Admin se</span>') + '</div>';
+  }
+  if (!obEmpDone(j)) return '';
+  return '<div class="ob-lockbar off">&#128275; ' + (j.lockNote ? obE(j.lockNote) : 'Unlocked') + '<span class="sp"></span>' +
+    '<button class="btn btn-outline btn-sm" onclick="obLockAgain(\'' + jid + '\')">&#128274; Lock</button></div>';
+}
+// Director ke liye candidate ki Step 1 details (Approve / Reject popup me)
+function obCandHtml(j) {
+  return '<div class="ob-cand"><b>' + obE(j.designation || '—') + '</b> &middot; Phone <b>' + obE(j.phone || '—') + '</b>' +
+    ' &middot; Alternate ' + (j.altPhoneNA ? 'Not available' : '<b>' + obE(j.altPhone || '—') + '</b>') + obDocsHtml(j) + '</div>';
+}
+// History (audit) -- khulne par server se
+const OB_HIST_LBL = { create: 'Entry', edit: 'Edit', details: 'Step 3', lock: 'Lock', unlock: 'Unlock', approve: 'Approve', reject: 'Reject', step: 'Step', file: 'File', status: 'Status' };
+async function obLoadHistory(jid, elId) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const r = await _apiFetch('/api/onboarding/' + jid + '/history', 'GET', null, 0);
+  const box = document.getElementById(elId);
+  if (!box) return;
+  if (!r || r.error || !Array.isArray(r.history)) { box.innerHTML = '<span style="color:#94a3b8">History nahi mili</span>'; return; }
+  box.innerHTML = r.history.length ? r.history.map(h => '<div class="ob-hrow"><b class="' + obE(h.action) + '">' + obE(OB_HIST_LBL[h.action] || h.action) + '</b>' +
+    '<div>' + obE(h.details) + '<em>' + obE(obDT(h.at)) + (h.by ? ' &middot; ' + obE(h.by) : '') + '</em></div></div>').join('')
+    : '<span style="color:#94a3b8">Abhi koi history nahi</span>';
 }
 let _obFileUrl = '';
 async function obViewFile(jid, kind) {
@@ -7764,49 +7855,55 @@ function obAllRows() {
 
 // ── Ek employee ka poora safar (phase-wise, PDF jaisa) ──
 function obStepInfo(j, no) {
-  if (no === 4) return j.altPhoneNA ? 'Alternate number: not available' : (j.altPhone ? 'Alternate: ' + j.altPhone : '');
-  if (no === 9) return 'Contract signed: ' + (j.contract === 'yes' ? 'Yes' : j.contract === 'no' ? 'No' : (j.contract || '—'));
-  if (no === 14) return j.phone ? 'Phone: ' + j.phone : '';
-  if (no === 15) return j.dob ? 'Birthday: ' + maintDate(j.dob) : '';
-  if (no === 18) return j.isSales ? 'Sales employee' : '';
-  if (no === 20) return 'ESIS eligible: ' + (j.esis === 'yes' ? 'Yes' : j.esis === 'no' ? 'No' : (j.esis || '—'));
+  if (no === 5) return j.altPhoneNA ? 'Alternate number: not available' : (j.altPhone ? 'Alternate: ' + j.altPhone : '');
+  if (no === 10) return 'Contract signed: ' + (j.contract === 'yes' ? 'Yes' : j.contract === 'no' ? 'No' : (j.contract || '—'));
+  if (no === 15) return j.phone ? 'Phone: ' + j.phone : '';
+  if (no === 16) return j.dob ? 'Birthday: ' + maintDate(j.dob) : '';
+  if (no === 19) return j.isSales ? 'Sales employee' : '';
+  if (no === 21) return 'ESIS eligible: ' + (j.esis === 'yes' ? 'Yes' : j.esis === 'no' ? 'No' : (j.esis || '—'));
   return '';
 }
 function obDetailHtml(j) {
   if (!j) return '<div class="empty">Employee nahi mila</div>';
   const p = j.progress, pct = p.total ? Math.round(p.done * 100 / p.total) : 0;
   const st = obState(j), cur = obCur(j);
-  const probEnd = (j.steps.find(s => s.no === 21) || {}).plan;
+  const probEnd = (j.steps.find(s => s.no === 22) || {}).plan;
   const field = (k, v) => '<div><span class="ob-dk">' + k + '</span>' + (v || '&mdash;') + '</div>';
   const yn = v => v === 'yes' ? 'Yes' : v === 'no' ? 'No' : obE(v || '');
   let html = '<button class="ob-back" onclick="obBack()">&larr; Pipeline</button>' +
     '<div class="ob-dhead"><div class="ob-dtop"><div class="ob-av">' + obE(obInitials(j.name)) + '</div>' +
       '<div class="ob-dname"><h3>' + obE(j.name) + '</h3><div>' + obE(j.designation || '—') + ' &middot; ' + obE(j.location) + '</div></div>' +
       '<div class="ob-dacts">' +
-        '<button class="btn btn-outline btn-sm" onclick="obOpenJoinee(\'' + obE(j.id) + '\')">&#9999;&#65039; Edit</button>' +
+        (j.locked ? '' : '<button class="btn btn-outline btn-sm" onclick="obOpenJoinee(\'' + obE(j.id) + '\')">&#9999;&#65039; Edit</button>') +
         (st === 'cancelled' || st === 'rejected'
           ? '<button class="btn btn-outline btn-sm" onclick="obSetStatus(\'' + obE(j.id) + '\',\'active\')">&#8634; Reactivate</button>'
           : '<button class="btn btn-outline btn-sm" onclick="obSetStatus(\'' + obE(j.id) + '\',\'cancelled\')">&#10005; Cancel</button>') +
         '<button class="btn btn-outline btn-sm" style="color:#dc2626;border-color:#fecaca" onclick="obDelete(\'' + obE(j.id) + '\')">&#128465; Delete</button>' +
       '</div></div>' +
+      obLockHtml(j) +
       '<div class="ob-dgrid">' +
         field('Phone', obE(j.phone)) +
-        field('Email', obE(j.email)) +
-        field('Interview', obIvHtml(j)) +
-        field('Ref. by', obE(j.refBy)) +
-        (j.joiningDate ? field('Date of joining', maintDate(j.joiningDate) + ' &middot; <b>' + obE(obJoinRel(j)) + '</b>') : '') +
         field('Alternate phone', j.altPhoneNA ? 'Not available' : obE(j.altPhone)) +
-        (j.salary ? field('Salary', obE(j.salary)) : '') +
+        field('Director Review', obIvHtml(j)) +
+        field('Email', obE(j.email)) +
+        field('Location', obE(j.location)) +
         field('Date of birth', j.dob ? maintDate(j.dob) : '') +
         field('ESIS eligible', yn(j.esis)) + field('Contract signed', yn(j.contract)) +
+        field('Ref. by', obE(j.refBy)) +
+        (j.joiningDate ? field('Date of joining', maintDate(j.joiningDate) + ' &middot; <b>' + obE(obJoinRel(j)) + '</b>') : '') +
+        (j.salary ? field('Salary', obE(j.salary)) : '') +
         field('Probation', j.probationDays + ' days' + (probEnd ? ' (till ' + maintDate(probEnd) + ')' : '')) +
         field('Current step', st === 'cancelled' ? '<span class="ob-chip na">Cancelled</span>' : st === 'rejected' ? '<span class="ob-chip rej">&#10005; Rejected</span>' : cur ? '<b>' + cur.no + '. ' + obE(obDef(cur.no).title) + '</b>' : '<span class="ob-chip done">&#127881; Completed</span>') +
         field('Added by', obE(j.createdBy) + (j.createdAt ? ' &middot; ' + obDT(j.createdAt) : '')) +
       '</div>' +
       '<div style="margin-top:12px"><span class="ob-dk" style="display:block;font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#94a3b8">Resume &middot; Portfolio &middot; Intro video</span>' + obDocsHtml(j, 1) + '</div>' +
+      (obEmpDone(j) && !j.locked && _ob.canManage ? '<div style="margin-top:10px"><button class="btn btn-outline btn-sm" onclick="obOpenEmp(\'' + obE(j.id) + '\',1)">&#9999;&#65039; Edit Step 3 details</button></div>' : '') +
       (j.notes ? '<div class="ob-dnotes">' + obE(j.notes) + '</div>' : '') +
       '<div class="ob-dprog ob-prog"><div class="ob-pbar"><i style="width:' + pct + '%"></i></div><span>' + p.done + '/' + p.total + ' done</span></div>' +
+      '<div style="margin-top:14px"><span class="ob-dk" style="display:block;font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#94a3b8;margin-bottom:6px">History</span>' +
+        '<div class="ob-hist" id="obHistD">Loading…</div></div>' +
     '</div>';
+  setTimeout(() => obLoadHistory(j.id, 'obHistD'), 0);
   // Undo sirf aakhri Done step par
   const lastDone = j.steps.filter(s => s.done).map(s => s.no).sort((a, b) => b - a)[0] || 0;
   _ob.phases.forEach(ph => {
@@ -7836,7 +7933,7 @@ function obStepHtml(j, s, lastDone) {
       (info ? '<div class="ob-sinfo">' + obE(info) + '</div>' : '') +
       '<div class="ob-swhen">' + (s.tat != null ? 'TAT: <b>' + s.tat + ' day' + (s.tat === 1 ? '' : 's') + '</b> (pichhle step ke baad)' : 'When: <b>' + obE(def.when) + '</b>') +
         (s.plan ? ' &middot; Plan <b>' + maintDate(s.plan) + '</b>' + (s.current ? ' <em>(' + obE(obPlanRel(s)) + ')</em>' : '') : '') + '</div>' +
-      (s.done ? '<div class="ob-sdone">&#10003; ' + (def.interview ? 'Selected ' : 'Done ') + obE(obDT(s.doneAt)) + (s.doneBy ? ' by <b>' + obE(s.doneBy) + '</b>' : '') + (s.note ? ' &mdash; ' + obE(s.note) : '') + '</div>' : '') +
+      (s.done ? '<div class="ob-sdone">&#10003; ' + (def.interview ? 'Approved ' : 'Done ') + obE(obDT(s.doneAt)) + (s.doneBy ? ' by <b>' + obE(s.doneBy) + '</b>' : '') + (s.note ? ' &mdash; ' + obE(s.note) : '') + '</div>' : '') +
       (s.status === 'rejected' ? '<div class="ob-sdone" style="color:#b91c1c">&#10005; Rejected ' + obE(obDT(s.doneAt)) + (s.doneBy ? ' by <b>' + obE(s.doneBy) + '</b>' : '') + (s.note ? ' &mdash; ' + obE(s.note) : '') + '</div>' : '') +
       (def.interview || (def.dataInputs && s.done) ? obDocsHtml(j) : '') +
     '</div>' +
@@ -7872,12 +7969,12 @@ function obMineHtml() {
       '<div class="ob-num sm" style="background:' + ph.color + '">' + x.s.no + '</div>' +
       '<div style="min-width:0"><div class="ob-stitle">' + obE(def.title) + '</div>' +
         '<div class="ob-smeta">For <b>' + obE(x.j.name) + '</b>' + (x.j.designation ? ' (' + obE(x.j.designation) + ')' : '') +
-          '<span>&middot;</span>Joining ' + maintDate(x.j.joiningDate) + '<span>&middot;</span>' + obE(def.channel) + '</div>' +
+          (x.j.joiningDate ? '<span>&middot;</span>Joining ' + maintDate(x.j.joiningDate) : '') + '<span>&middot;</span>' + obE(def.channel) + '</div>' +
         (def.note ? '<div class="ob-snote">' + obE(def.note) + '</div>' : '') +
         (info ? '<div class="ob-sinfo">' + obE(info) + '</div>' : '') +
-        (def.interview && kind !== 'done' ? '<div class="ob-smeta">Mobile <b>' + obE(x.j.phone || '—') + '</b>' + (x.j.email ? '<span>&middot;</span>' + obE(x.j.email) : '') + '<span>&middot;</span>' + obE(x.j.location) + '</div>' + obDocsHtml(x.j) : '') +
+        (def.interview && kind !== 'done' ? obCandHtml(x.j) : '') +
         (waitTxt ? '<div class="ob-smeta">&#9203; ' + obE(waitTxt) + '</div>' : '') +
-        (kind === 'done' ? '<div class="ob-sdone">&#10003; ' + (def.interview ? 'Selected ' : 'Done ') + obE(obDT(x.s.doneAt)) + (x.s.note ? ' &mdash; ' + obE(x.s.note) : '') + '</div>' : '') +
+        (kind === 'done' ? '<div class="ob-sdone">&#10003; ' + (def.interview ? 'Approved ' : 'Done ') + obE(obDT(x.s.doneAt)) + (x.s.note ? ' &mdash; ' + obE(x.s.note) : '') + '</div>' : '') +
       '</div>' +
       '<div class="ob-mside"><div class="ob-mplan">' + (x.s.plan ? maintDate(x.s.plan) : '&mdash;') + '</div>' + obChip(x.s) +
         (kind === 'pend' ? obActBtns(x.j, x.s) : '') + '</div>' +
@@ -7890,7 +7987,7 @@ function obMineHtml() {
     (done.length ? '<div class="ob-sec" style="margin-top:18px">Recently done</div>' + done.map(x => row(x, 'done')).join('') : '');
 }
 
-// ── Tracking: har employee ki line, 21 step ke dot ──
+// ── Tracking: har employee ki line, 22 step ke dot ──
 function obTrackingHtml() {
   const js = _ob.joinees.filter(j => j.status !== 'cancelled' && j.status !== 'rejected');
   if (!js.length) return '<div class="empty" style="background:#fff;border-radius:12px;border:1px solid #e2e8f0">Abhi koi entry nahi</div>';
@@ -7913,7 +8010,7 @@ function obTrackingHtml() {
     '<div class="ob-twrap"><table class="ob-track"><thead>' + head1 + head2 + '</thead><tbody>' + rows + '</tbody></table></div>';
 }
 
-// ── Workflow: 21 step ka kram + har step ka default doer ──
+// ── Workflow: 22 step ka kram + har step ka default doer ──
 function obWorkflowHtml() {
   const m = _ob.canManage;
   const sel = (no, loc) => {
@@ -7921,7 +8018,7 @@ function obWorkflowHtml() {
     return obDoerSelect(o.id || '', o.manual ? o.name : '', '\'owner\',' + no + ',\'' + obE(loc || '') + '\'');
   };
   let html = '<div class="ob-wintro">' + (m
-    ? 'Har step ka <b>default doer</b> yahan chuno (list me na ho to "Type name" se likh do). Nayi entry me apne aap lag jayega, aur chalu entries ke jin step me doer khali hai unme bhi bhar jayega. Kram: Step 1 Data Inputs &rarr; Step 2 Interview with Director (Selected) &rarr; Step 3 &rarr; &hellip; &rarr; Step 21.'
+    ? 'Har step ka <b>default doer</b> yahan chuno (list me na ho to "Type name" se likh do). Nayi entry me apne aap lag jayega, aur chalu entries ke jin step me doer khali hai unme bhi bhar jayega. Kram: Step 1 Initial Candidate Details &rarr; Step 2 Director Review (Approve) &rarr; Step 3 Remaining Employee Details (phir lock) &rarr; &hellip; &rarr; Step 22.'
     : 'Employee onboarding ka poora kram &mdash; har step pichhle step ke Done hone par khulta hai.') + '</div>';
   _ob.phases.forEach(ph => {
     html += '<div class="ob-phase" style="background:' + ph.color + '">Phase ' + ph.no + ' &nbsp;|&nbsp; ' + obE(ph.title) + '</div><div class="ob-steps">' +
@@ -7972,7 +8069,7 @@ function obRenderDrawer() {
   const R = 27, C = 2 * Math.PI * R;
   const ring = '<div class="ob-ring"><svg viewBox="0 0 66 66"><circle cx="33" cy="33" r="' + R + '" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="7"/>' +
     '<circle cx="33" cy="33" r="' + R + '" fill="none" stroke="#86efac" stroke-width="7" stroke-linecap="round" stroke-dasharray="' + (C * pct / 100).toFixed(1) + ' ' + C.toFixed(1) + '"/></svg><b>' + pct + '%</b></div>';
-  const stTxt = st === 'cancelled' ? 'Cancelled' : st === 'rejected' ? 'Rejected (interview)' : st === 'completed' ? 'Completed 🎉' : (cur && cur.status === 'late' ? 'Late — ' + obPlanRel(cur) : 'On track');
+  const stTxt = st === 'cancelled' ? 'Cancelled' : st === 'rejected' ? 'Rejected (Director)' : st === 'completed' ? 'Completed 🎉' : (cur && cur.status === 'late' ? 'Late — ' + obPlanRel(cur) : 'On track');
   let h = '<div class="ob-dw-top"><button class="ob-dw-x" onclick="obCloseDrawer()" title="Close">&#10005;</button>' +
     '<div class="ob-dw-id"><div class="ob-dw-av">' + obE(obInitials(j.name)) + '</div><div><h3>' + obE(j.name) + '</h3>' +
       '<div>' + obE(j.designation || '—') + ' &middot; ' + obE(j.location) + '</div></div></div>' +
@@ -7981,13 +8078,13 @@ function obRenderDrawer() {
       (j.joiningDate ? '<div>Joining <b>' + maintDate(j.joiningDate) + '</b> &middot; ' + obE(obJoinRel(j)) + '</div>' : '') +
       '<div>Mobile <b>' + obE(j.phone || '—') + '</b></div></div></div>' +
     '<div class="ob-dw-acts">' +
-      '<button onclick="obOpenJoinee(\'' + jid + '\')">&#9999;&#65039; Edit</button>' +
+      (j.locked ? '' : '<button onclick="obOpenJoinee(\'' + jid + '\')">&#9999;&#65039; Edit</button>') +
       '<button onclick="obCloseDrawer();obOpen(\'' + jid + '\')">&#10530; Full view &amp; doers</button>' +
       (st === 'cancelled' || st === 'rejected'
         ? '<button onclick="obSetStatus(\'' + jid + '\',\'active\')">&#8634; Reactivate</button>'
         : '<button onclick="obSetStatus(\'' + jid + '\',\'cancelled\')">&#10005; Cancel</button>') +
       '<button class="del" onclick="obDelete(\'' + jid + '\')">&#128465; Delete</button></div></div>';
-  h += '<div class="ob-dw-body">';
+  h += '<div class="ob-dw-body">' + obLockHtml(j);
   // Abhi ka step
   if (cur && st === 'active') {
     const def = obDef(cur.no), ph = obPhase(def.phase);
@@ -8004,18 +8101,22 @@ function obRenderDrawer() {
   }
   // Details
   const f = (k, v) => '<div><span>' + k + '</span>' + (v || '—') + '</div>';
-  const probEnd = (j.steps.find(s => s.no === 21) || {}).plan;
-  h += '<div class="ob-dw-card ob-dw-half"><h5>Data Inputs &middot; candidate</h5><div class="ob-dw-grid">' +
-    f('Mobile', obE(j.phone)) + f('Email', obE(j.email)) +
-    f('Designation', obE(j.designation)) + f('Location', obE(j.location)) +
-    f('Interview', obIvHtml(j)) + '</div>' + obDocsHtml(j, 1) + '</div>';
-  h += '<div class="ob-dw-card ob-dw-half"><h5>Employee master form</h5><div class="ob-dw-grid">' +
+  const probEnd = (j.steps.find(s => s.no === 22) || {}).plan;
+  h += '<div class="ob-dw-card ob-dw-half"><h5>Step 1 &middot; Initial Candidate Details</h5><div class="ob-dw-grid">' +
+    f('Designation', obE(j.designation)) + f('Phone', obE(j.phone)) +
     f('Alternate phone', j.altPhoneNA ? 'Not available' : obE(j.altPhone)) +
-    f('Ref. by', obE(j.refBy)) + f('Date of birth', j.dob ? maintDate(j.dob) : '') +
-    (j.salary ? f('Salary', obE(j.salary)) : '') + (j.joiningDate ? f('Date of joining', maintDate(j.joiningDate)) : '') + f('Probation', j.probationDays + ' days' + (probEnd ? ' (till ' + maintDate(probEnd) + ')' : '')) +
-    f('ESIS eligible', yn(j.esis)) + f('Contract signed', yn(j.contract)) +
-    f('Added by', obE(j.createdBy) + (j.createdAt ? ' &middot; ' + obDT(j.createdAt) : '')) +
-    (j.notes ? f('Notes', obE(j.notes)) : '') + '</div></div>';
+    f('Director Review', obIvHtml(j)) + '</div>' + obDocsHtml(j, 1) + '</div>';
+  h += '<div class="ob-dw-card ob-dw-half"><div class="ob-sechead"><h5 style="margin:0 0 10px">Step 3 &middot; Employee Details</h5><span class="sp"></span>' +
+      (obEmpDone(j) && !j.locked && _ob.canManage ? '<button type="button" class="ob-doc" style="color:#475569;background:#fff;border-color:#e2e8f0;margin-bottom:10px" onclick="obOpenEmp(\'' + jid + '\',1)">&#9999;&#65039; Edit</button>' : '') + '</div>' +
+    (obEmpDone(j) || j.email ? '<div class="ob-dw-grid">' +
+      f('Email', obE(j.email)) + f('Location', obE(j.location)) +
+      f('Date of birth', j.dob ? maintDate(j.dob) : '') + f('Probation', j.probationDays + ' days' + (probEnd ? ' (till ' + maintDate(probEnd) + ')' : '')) +
+      f('ESIS eligible', yn(j.esis)) + f('Contract signed', yn(j.contract)) +
+      f('Ref. by', obE(j.refBy)) + (j.joiningDate ? f('Date of joining', maintDate(j.joiningDate)) : '') +
+      (j.salary ? f('Salary', obE(j.salary)) : '') + (j.notes ? f('Notes', obE(j.notes)) : '') + '</div>'
+      : '<div style="font-size:12.5px;color:#94a3b8">Director ke Approve karne ke baad Step 3 me bharni hain</div>') +
+    '<div style="font-size:11.5px;color:#94a3b8;margin-top:10px">Added by ' + obE(j.createdBy) + (j.createdAt ? ' &middot; ' + obDT(j.createdAt) : '') + '</div></div>';
+  h += '<div class="ob-dw-card"><h5>History</h5><div class="ob-hist" id="obHistW">Loading…</div></div>';
   // Poora safar
   h += '<div class="ob-dw-card"><h5>Onboarding journey</h5><div class="ob-tl">';
   _ob.phases.forEach(ph => {
@@ -8032,6 +8133,7 @@ function obRenderDrawer() {
   });
   h += '</div></div><div class="ob-control">CONTROL: ' + obE(_ob.control || '') + '</div></div>';
   el.innerHTML = h;
+  obLoadHistory(j.id, 'obHistW');
 }
 
 // ── Step Admin: har step ke saamne doer (button se) ──
@@ -8067,6 +8169,13 @@ function obOpenStepAdmin() {
   });
   document.getElementById('obAdminBody').innerHTML =
     '<div class="ob-ahead"><span>#</span><span>Step</span><span>TAT (days)</span><span>Doer</span></div>' + html;
+  const ub = document.getElementById('obUnlockersBox');
+  ub.style.display = _ob.isAdmin ? '' : 'none';
+  if (_ob.isAdmin) {
+    const on = new Set((_ob.unlockers || []).map(String));
+    document.getElementById('obUnlockersList').innerHTML = (_ob.users || []).map(u =>
+      '<label><input type="checkbox" value="' + obE(u.id) + '"' + (on.has(String(u.id)) ? ' checked' : '') + '/> ' + obE(u.name) + '</label>').join('');
+  }
   document.getElementById('obAdminErr').style.display = 'none';
   document.getElementById('obAdminModal').classList.add('open');
 }
@@ -8105,14 +8214,26 @@ async function obSaveStepAdmin() {
     tats.push({ step: parseInt(inp.dataset.step, 10), days: v });
   });
   if (tatBad) { err.textContent = tatBad; err.style.display = 'block'; return; }
-  if (!owners.length && !tats.length) { closeModal('obAdminModal'); showToast('Kuch badla nahi', 'success'); return; }
+  // Unlock ki ijazat (sirf Admin ko dikhta hai)
+  let unl = null;
+  if (_ob.isAdmin) {
+    const ids = [...document.querySelectorAll('#obUnlockersList input:checked')].map(i => i.value).sort();
+    if (ids.join(',') !== (_ob.unlockers || []).map(String).sort().join(',')) unl = ids;
+  }
+  if (!owners.length && !tats.length && !unl) { closeModal('obAdminModal'); showToast('Kuch badla nahi', 'success'); return; }
   const btn = document.getElementById('obAdminSave');
   btn.disabled = true;
   try {
-    const r = await api('/api/onboarding-owners', 'PUT', { owners: owners, tats: tats, applyAll: document.getElementById('obAdminApply').checked });
+    if (unl) {
+      const u = await api('/api/onboarding-unlockers', 'PUT', { ids: unl });
+      if (!u || u.error) throw new Error((u && u.error) || 'Unlock ki ijazat save nahi hui');
+    }
+    const r = (owners.length || tats.length)
+      ? await api('/api/onboarding-owners', 'PUT', { owners: owners, tats: tats, applyAll: document.getElementById('obAdminApply').checked })
+      : { success: true };
     if (!r || r.error) throw new Error((r && r.error) || 'Could not save');
     closeModal('obAdminModal');
-    showToast('✅ Saved' + (owners.length ? ' · ' + owners.length + ' doer' : '') + (tats.length ? ' · ' + tats.length + ' TAT' : '') + (r.filled ? ' · ' + r.filled + ' chalu entry me bhi laga' : ''), 'success');
+    showToast('✅ Saved' + (owners.length ? ' · ' + owners.length + ' doer' : '') + (tats.length ? ' · ' + tats.length + ' TAT' : '') + (unl ? ' · unlock ijazat' : '') + (r.filled ? ' · ' + r.filled + ' chalu entry me bhi laga' : ''), 'success');
     await loadOnboarding(1);
   } catch (e) {
     err.textContent = e.message || 'Could not save';
@@ -8127,16 +8248,16 @@ function obAskDone(jid, no, mode) {
   _obDone = { jid: String(jid), no: no, mode: mode };
   const next = j ? j.steps.find(s => s.no > no && !s.na && !s.done) : null;
   const nextTxt = next ? 'Step ' + next.no + ' (' + obE(obDef(next.no).title) + ')' : '';
-  document.getElementById('obDoneTitle').innerHTML = mode === 'selected' ? '&#10003; Candidate Selected'
-    : mode === 'rejected' ? '&#10005; Candidate Rejected' : '&#10003; Mark Step Done';
+  document.getElementById('obDoneTitle').innerHTML = mode === 'selected' ? '&#10003; Approve candidate'
+    : mode === 'rejected' ? '&#10005; Reject candidate' : '&#10003; Mark Step Done';
   document.getElementById('obDoneWhat').innerHTML = '<b>' + no + '. ' + obE(def.title) + '</b><span>For ' + obE(j ? j.name : '') +
     (mode === 'rejected' ? ' &middot; flow yahin rukega (baad me Reactivate ho sakta hai)'
-      : mode === 'selected' ? (nextTxt ? ' &middot; agla: ' + nextTxt : '')
-      : (nextTxt ? ' &middot; agla: ' + nextTxt : '')) + '</span>';
-  document.getElementById('obDoneNoteLbl').textContent = mode === 'rejected' ? 'Reason (optional)' : 'Note (optional)';
+      : (nextTxt ? ' &middot; agla: ' + nextTxt : '')) + '</span>' +
+    (j && (mode === 'selected' || mode === 'rejected') ? obCandHtml(j) : '');
+  document.getElementById('obDoneNoteLbl').textContent = mode === 'selected' || mode === 'rejected' ? 'Remarks (optional)' : 'Note (optional)';
   const btn = document.getElementById('obDoneBtn');
   btn.className = 'btn ' + (mode === 'rejected' ? 'btn-rej' : 'btn-green');
-  btn.innerHTML = mode === 'selected' ? '&#10003; Selected &mdash; aage badhao' : mode === 'rejected' ? '&#10005; Reject candidate' : '&#10003; Mark Done &amp; next step';
+  btn.innerHTML = mode === 'selected' ? '&#10003; Approve &rarr; Step 3' : mode === 'rejected' ? '&#10005; Reject' : '&#10003; Mark Done &amp; next step';
   document.getElementById('obDoneNote').value = '';
   document.getElementById('obDoneErr').style.display = 'none';
   document.getElementById('obDoneModal').classList.add('open');
@@ -8153,7 +8274,7 @@ async function obSubmitDone() {
     if (!r || r.error) throw new Error((r && r.error) || 'Could not save');
     closeModal('obDoneModal');
     _obDone = null;
-    showToast(d.mode === 'rejected' ? 'Candidate rejected' : d.mode === 'selected' ? '✅ Selected — agla step khul gaya'
+    showToast(d.mode === 'rejected' ? 'Candidate rejected' : d.mode === 'selected' ? '✅ Approved — ab Step 3 (Remaining Employee Details)'
       : '✅ Step done — agla step khul gaya', 'success');
     await loadOnboarding(1);
   } catch (e) {
@@ -8198,13 +8319,14 @@ function obPickVal(base) {
   const sel = document.getElementById(base + 'Sel');
   return (sel.value === '__other__' ? document.getElementById(base).value : sel.value).trim();
 }
-function obAltToggle() {
-  const na = document.getElementById('obfAltNA').checked, inp = document.getElementById('obfAlt');
+function obAltToggle(pre) {
+  pre = pre || 'obf';
+  const na = document.getElementById(pre + 'AltNA').checked, inp = document.getElementById(pre + 'Alt');
   inp.disabled = na;
   if (na) inp.value = '';
 }
-// ── Step 1 "Data Inputs": Done dabate hi candidate ki details (resume /
-// portfolio / video -- file ya link). edit = Admin / HR baad me sudhaare (Done nahi badalta)
+// ── Step 1 popup: sirf purani entry ke liye jiska Step 1 baaki hai (nayi entry ka
+// Step 1 form save hote hi complete). Details + resume / portfolio / video (file ya link)
 let _obInId = '', _obInEdit = false, _obFiles = {}, _obFileDel = {}, _obReading = 0;
 // Files abhi kaun sa form le raha hai: 'obi' = Step 1 popup, 'obf' = entry form;
 // _obFileJid = jis entry ki purani file dikhani hai ('' = nayi entry)
@@ -8277,46 +8399,42 @@ function obOpenInputs(jid, edit) {
   _obInId = String(j.id); _obInEdit = !!edit; _obFiles = {}; _obFileDel = {};
   _obFilePre = 'obi'; _obFileJid = _obInId;
   const set = (k, v) => { const el = document.getElementById(k); if (el) el.value = v == null ? '' : v; };
-  set('obiName', j.name); set('obiPhone', j.phone); set('obiEmail', j.email); set('obiNote', '');
+  set('obiName', j.name); set('obiPhone', j.phone); set('obiAlt', j.altPhone); set('obiNote', '');
+  document.getElementById('obiAltNA').checked = !!j.altPhoneNA;
+  obAltToggle('obi');
   obFillPick('obiDesig', OB_DESIGNATIONS.concat(_ob.designations || []), j.designation);
-  obFillPick('obiLoc', (_ob.places || ['Delhi', 'Mumbai']), j.location);
   Object.keys(OB_FILE_UI).forEach(k => {
     set('obiLink_' + k, j.docs && j.docs[k] ? j.docs[k].link : '');
     set('obiFile_' + k, '');
     obFileInfo(k);
   });
   const next = j.steps.find(s => s.no > 1 && !s.na && !s.done);
-  document.getElementById('obInputsTitle').innerHTML = edit ? '&#9999;&#65039; Edit Data Inputs' : '&#10003; Step 1 &mdash; Data Inputs';
-  document.getElementById('obInputsWhat').innerHTML = '<b>' + obE(j.name) + '</b><span>' + (edit ? 'Candidate ki details sudhaaro'
-    : 'Candidate ki details bharo aur Done' + (next ? ' &middot; agla: Step ' + next.no + ' (' + obE(obDef(next.no).title) + ')' : '')) + '</span>';
-  document.getElementById('obiNoteWrap').style.display = edit ? 'none' : '';
-  document.getElementById('obInputsBtn').innerHTML = edit ? 'Save' : '&#10003; Save &amp; Done';
+  document.getElementById('obInputsTitle').innerHTML = '&#10003; Step 1 &mdash; Initial Candidate Details';
+  document.getElementById('obInputsWhat').innerHTML = '<b>' + obE(j.name) + '</b><span>Details bharo aur Done' +
+    (next ? ' &middot; agla: Step ' + next.no + ' (' + obE(obDef(next.no).title) + ')' : '') + '</span>';
+  document.getElementById('obiNoteWrap').style.display = '';
+  document.getElementById('obInputsBtn').innerHTML = '&#10003; Save &amp; Done';
   document.getElementById('obInputsErr').style.display = 'none';
   document.getElementById('obInputsModal').classList.add('open');
-  setTimeout(() => { const e = document.getElementById(j.email ? 'obiName' : 'obiEmail'); if (e) e.focus(); }, 50);
+  setTimeout(() => { const e = document.getElementById('obiName'); if (e) e.focus(); }, 50);
 }
 async function obSaveInputs() {
   const err = document.getElementById('obInputsErr');
   const v = id => (document.getElementById(id).value || '').trim();
   const digits = x => x.replace(/\D/g, '');
-  // Link me https:// na ho to laga do
+  // Link me https:// na ho to laga do (koi aur scheme ho to waisa hi -- server rokega)
   const link = k => { const x = v('obiLink_' + k); return x && !/^[a-z][a-z0-9+.-]*:\/\//i.test(x) ? 'https://' + x : x; };
   const j = obJoinee(_obInId);
   if (!j) return;
   const body = {
-    name: v('obiName'), phone: v('obiPhone'), email: v('obiEmail'),
-    designation: obPickVal('obiDesig'), location: obPickVal('obiLoc'),
+    name: v('obiName'), designation: obPickVal('obiDesig'), phone: v('obiPhone'),
+    altPhone: v('obiAlt'), altPhoneNA: document.getElementById('obiAltNA').checked,
     resumeLink: link('resume'), portfolioLink: link('portfolio'), videoLink: link('video')
   };
-  const hasResume = !!(body.resumeLink || _obFiles.resume || (j.docs && j.docs.resume && j.docs.resume.file && !_obFileDel.resume));
-  const bad = !body.name ? 'Name daalo'
-    : digits(body.phone).length < 10 ? 'Mobile number sahi daalo (10 digit)'
-    : !body.email ? 'Email daalo'
-    : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email) ? 'Email sahi daalo'
+  const bad = !body.name ? 'Employee name daalo'
     : !body.designation ? 'Designation chuno (ya Other chun kar likho)'
-    : !body.location ? 'Location chuno (ya Other chun kar likho)'
-    : !hasResume ? 'Resume ki file chuno ya link daalo'
-    : _obReading ? 'File abhi load ho rahi hai — ek second ruko' : '';
+    : digits(body.phone).length < 10 ? 'Phone sahi daalo (10 digit)'
+    : (!body.altPhoneNA && digits(body.altPhone).length < 10) ? 'Alternate phone daalo, ya "Not available" tick karo' : '';
   if (bad) { err.textContent = bad; err.style.display = 'block'; return; }
   err.style.display = 'none';
   const btn = document.getElementById('obInputsBtn');
@@ -8328,12 +8446,10 @@ async function obSaveInputs() {
     await obUploadFiles(id, btn);
     btn.textContent = 'Saving…';
     const diNo = (_ob.steps.find(d => d.dataInputs) || {}).no || 1;
-    const r = _obInEdit
-      ? await api('/api/onboarding/' + id, 'PUT', body)
-      : await api('/api/onboarding/' + id + '/steps/' + diNo, 'PUT', Object.assign({ action: 'done', note: v('obiNote') }, body));
+    const r = await api('/api/onboarding/' + id + '/steps/' + diNo, 'PUT', Object.assign({ action: 'done', note: v('obiNote') }, body));
     if (!r || r.error) throw new Error((r && r.error) || 'Could not save');
     closeModal('obInputsModal');
-    showToast(_obInEdit ? '✅ Data Inputs saved' : '✅ Step 1 Done — ab Step 2 (Interview with Director)', 'success');
+    showToast('✅ Step 1 Done — ab Step 2 (Director Review)', 'success');
     await loadOnboarding(1);
   } catch (e) {
     err.textContent = e.message || 'Could not save';
@@ -8344,8 +8460,100 @@ async function obSaveInputs() {
     btn.innerHTML = btnHtml;
   }
 }
+// ── Step 3 "Remaining Employee Details": Done par bharo (phir lock); edit = Admin / HR
+// unlocked record me baad me sudhaare
+let _obEmpId = '', _obEmpEdit = false;
+function obOpenEmp(jid, edit) {
+  const j = obJoinee(jid);
+  if (!j) return;
+  if (j.locked) { showToast('Details lock hain — pehle Unlock karo', 'error'); return; }
+  _obEmpId = String(j.id); _obEmpEdit = !!edit;
+  const set = (k, v) => { const el = document.getElementById(k); if (el) el.value = v == null ? '' : v; };
+  set('obeEmail', j.email); set('obeDob', j.dob); set('obeProb', j.probationDays || 90); set('obeNotes', j.notes);
+  obFillPick('obeLoc', (_ob.places || ['Delhi', 'Mumbai']), j.location);
+  obSetPick('obeEsis', j.esis);
+  obSetPick('obeContract', j.contract);
+  obFillPick('obeRef', (_ob.users || []).map(u => u.name).concat(_ob.refs || []).sort((a, b) => a.localeCompare(b)), j.refBy);
+  const next = j.steps.find(s => s.no > 3 && !s.na && !s.done);
+  document.getElementById('obEmpTitle').innerHTML = edit ? '&#9999;&#65039; Edit &mdash; Employee Details (Step 3)' : '&#10003; Step 3 &mdash; Remaining Employee Details';
+  document.getElementById('obEmpWhat').innerHTML = '<b>' + obE(j.name) + '</b><span>' + obE(j.designation) + ' &middot; ' + obE(j.phone) +
+    (!edit && next ? ' &middot; agla: Step ' + next.no + ' (' + obE(obDef(next.no).title) + ')' : '') + '</span>';
+  document.getElementById('obEmpHint').style.display = edit ? 'none' : '';
+  document.getElementById('obEmpBtn').innerHTML = edit ? 'Save' : '&#10003; Save &amp; Done';
+  document.getElementById('obEmpErr').style.display = 'none';
+  document.getElementById('obEmpModal').classList.add('open');
+  setTimeout(() => { const e = document.getElementById('obeEmail'); if (e) e.focus(); }, 50);
+}
+async function obSaveEmp() {
+  const err = document.getElementById('obEmpErr');
+  const v = id => (document.getElementById(id).value || '').trim();
+  const body = {
+    email: v('obeEmail'), location: obPickVal('obeLoc'), dob: v('obeDob'),
+    esis: obPickVal('obeEsis'), contract: obPickVal('obeContract'),
+    probationDays: v('obeProb'), refBy: obPickVal('obeRef'), notes: v('obeNotes')
+  };
+  const bad = !body.email ? 'Email daalo'
+    : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email) ? 'Email sahi daalo'
+    : !body.location ? 'Location chuno (ya Other chun kar likho)'
+    : !body.dob ? 'Date of birth chuno'
+    : !body.esis ? 'ESIS eligible? chuno (ya Other chun kar likho)'
+    : !body.contract ? 'Contract signed? chuno (ya Other chun kar likho)' : '';
+  if (bad) { err.textContent = bad; err.style.display = 'block'; return; }
+  err.style.display = 'none';
+  const btn = document.getElementById('obEmpBtn');
+  btn.disabled = true;
+  try {
+    const empNo = (_ob.steps.find(d => d.empDetails) || {}).no || 3;
+    const r = _obEmpEdit
+      ? await api('/api/onboarding/' + _obEmpId, 'PUT', body)
+      : await api('/api/onboarding/' + _obEmpId + '/steps/' + empNo, 'PUT', Object.assign({ action: 'done' }, body));
+    if (!r || r.error) throw new Error((r && r.error) || 'Could not save');
+    closeModal('obEmpModal');
+    showToast(_obEmpEdit ? '✅ Saved' : '✅ Step 3 Done — details lock ho gayi', 'success');
+    await loadOnboarding(1);
+  } catch (e) {
+    err.textContent = e.message || 'Could not save';
+    err.style.display = 'block';
+  } finally { btn.disabled = false; }
+}
+// ── Unlock (wajah ke saath) / phir Lock ──
+let _obUnlockId = '';
+function obUnlock(jid) {
+  const j = obJoinee(jid);
+  if (!j) return;
+  _obUnlockId = String(j.id);
+  document.getElementById('obUnlockWhat').innerHTML = '<b>' + obE(j.name) + '</b><span>Step 3 ke baad lock hui details kholni hain</span>';
+  document.getElementById('obUnlockReason').value = '';
+  document.getElementById('obUnlockErr').style.display = 'none';
+  document.getElementById('obUnlockModal').classList.add('open');
+  setTimeout(() => document.getElementById('obUnlockReason').focus(), 50);
+}
+async function obSubmitUnlock() {
+  const err = document.getElementById('obUnlockErr');
+  const reason = document.getElementById('obUnlockReason').value.trim();
+  if (reason.length < 3) { err.textContent = 'Unlock ki wajah likho'; err.style.display = 'block'; return; }
+  const btn = document.getElementById('obUnlockBtn');
+  btn.disabled = true;
+  try {
+    const r = await api('/api/onboarding/' + _obUnlockId + '/unlock', 'POST', { reason: reason });
+    if (!r || r.error) throw new Error((r && r.error) || 'Unlock nahi hua');
+    closeModal('obUnlockModal');
+    showToast('🔓 Unlocked — sudhaar ke baad Lock dabana', 'success');
+    await loadOnboarding(1);
+  } catch (e) {
+    err.textContent = e.message || 'Unlock nahi hua';
+    err.style.display = 'block';
+  } finally { btn.disabled = false; }
+}
+async function obLockAgain(jid) {
+  const r = await api('/api/onboarding/' + jid + '/lock', 'POST', {});
+  if (!r || r.error) { showToast((r && r.error) || 'Lock nahi hua', 'error'); return; }
+  showToast('🔒 Locked', 'success');
+  await loadOnboarding(1);
+}
 function obOpenJoinee(id) {
   const j = id ? obJoinee(id) : null;
+  if (j && j.locked) { showToast('Details lock hain — pehle Unlock karo', 'error'); return; }
   _obEditId = j ? String(j.id) : '';
   const set = (k, v) => { const el = document.getElementById(k); if (el) el.value = v == null ? '' : v; };
   set('obfName', j ? j.name : '');
@@ -8353,16 +8561,7 @@ function obOpenJoinee(id) {
   set('obfPhone', j ? j.phone : '');
   set('obfAlt', j ? j.altPhone : '');
   document.getElementById('obfAltNA').checked = !!(j && j.altPhoneNA);
-  obAltToggle();
-  set('obfEmail', j ? j.email : '');
-  document.getElementById('obfEmailReq').style.display = j ? 'none' : '';
-  obFillPick('obfLoc', (_ob.places || ['Delhi', 'Mumbai']), j ? j.location : '');
-  set('obfDob', j ? j.dob : '');
-  obSetPick('obfEsis', j ? j.esis : '');
-  obSetPick('obfContract', j ? j.contract : '');
-  obFillPick('obfRef', (_ob.users || []).map(u => u.name).concat(_ob.refs || []).sort((a, b) => a.localeCompare(b)), j ? j.refBy : '');
-  set('obfProb', j ? j.probationDays : 90);
-  set('obfNotes', j ? j.notes : '');
+  obAltToggle('obf');
   // Resume / portfolio / intro video (file ya link)
   _obFiles = {}; _obFileDel = {}; _obFilePre = 'obf'; _obFileJid = _obEditId;
   Object.keys(OB_FILE_UI).forEach(k => {
@@ -8370,8 +8569,8 @@ function obOpenJoinee(id) {
     set('obfFile_' + k, '');
     obFileInfo(k);
   });
-  document.getElementById('obJoineeTitle').textContent = j ? 'Edit employee (HR)' : 'Employee master form (HR)';
-  document.getElementById('obJoineeSave').textContent = j ? 'Save changes' : 'Create employee & tasks';
+  document.getElementById('obJoineeTitle').innerHTML = j ? '&#9999;&#65039; Edit &mdash; Initial Candidate Details' : 'Step 1 &mdash; Initial Candidate Details';
+  document.getElementById('obJoineeSave').textContent = j ? 'Save changes' : 'Create & send to Director';
   document.getElementById('obJoineeHint').style.display = j ? 'none' : '';
   document.getElementById('obJoineeErr').style.display = 'none';
   document.getElementById('obJoineeModal').classList.add('open');
@@ -8381,36 +8580,26 @@ async function obSaveJoinee() {
   const err = document.getElementById('obJoineeErr');
   const v = id => (document.getElementById(id).value || '').trim();
   const digits = s => s.replace(/\D/g, '');
-  // Link me https:// na ho to laga do
+  // Link me https:// na ho to laga do (koi aur scheme ho to waisa hi -- server rokega)
   const link = k => { const x = v('obfLink_' + k); return x && !/^[a-z][a-z0-9+.-]*:\/\//i.test(x) ? 'https://' + x : x; };
   const body = {
     name: v('obfName'), designation: obPickVal('obfDesig'), phone: v('obfPhone'),
     altPhone: v('obfAlt'), altPhoneNA: document.getElementById('obfAltNA').checked,
-    email: v('obfEmail'), location: obPickVal('obfLoc'), dob: v('obfDob'),
-    esis: obPickVal('obfEsis'), contract: obPickVal('obfContract'), refBy: obPickVal('obfRef'),
-    probationDays: v('obfProb'), notes: v('obfNotes'),
     resumeLink: link('resume'), portfolioLink: link('portfolio'), videoLink: link('video')
   };
   const bad = !body.name ? 'Employee name daalo'
     : !body.designation ? 'Designation chuno (ya Other chun kar likho)'
     : digits(body.phone).length < 10 ? 'Phone sahi daalo (10 digit)'
-    : (!body.altPhoneNA && digits(body.altPhone).length < 10) ? 'Alternate phone daalo, ya "Not available" tick karo'
-    : (!_obEditId && !body.email) ? 'Email daalo'
-    : (body.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email)) ? 'Email sahi daalo'
-    : !body.location ? 'Location chuno (ya Other chun kar likho)'
-    : !body.dob ? 'Date of birth chuno'
-    : !body.esis ? 'ESIS eligible? chuno (ya Other chun kar likho)'
-    : !body.contract ? 'Contract signed? chuno (ya Other chun kar likho)'
-    : _obReading ? 'File abhi load ho rahi hai — ek second ruko' : '';
+    : (!body.altPhoneNA && digits(body.altPhone).length < 10) ? 'Alternate phone daalo, ya "Not available" tick karo' : '';
   if (bad) { err.textContent = bad; err.style.display = 'block'; return; }
   err.style.display = 'none';
   const btn = document.getElementById('obJoineeSave');
   const btnTxt = btn.textContent;
   const isNew = !_obEditId;
-  const resumeFile = !!_obFiles.resume;
   let id = _obEditId;
   btn.disabled = true;
   try {
+    // Nayi entry = Step 1 complete (server par) -> seedha Director Review
     const r = id
       ? await api('/api/onboarding/' + id, 'PUT', body)
       : await api('/api/onboarding', 'POST', body);
@@ -8420,46 +8609,28 @@ async function obSaveJoinee() {
   } catch (e) {
     btn.disabled = false; btn.textContent = btnTxt;
     if (isNew && id) {
-      // Entry ban chuki, sirf file atki -- Step 1 popup me dobara daal do
+      // Entry ban chuki, sirf file atki -- Edit se dobara daal do
       closeModal('obJoineeModal');
       _obEditId = ''; _obOpenId = id;
       await loadOnboarding(1);
-      showToast('Entry ban gayi, par ' + (e.message || 'file upload nahi hui'), 'error');
-      if (obJoinee(id)) obOpenInputs(id);
+      showToast('Entry ban gayi, par ' + (e.message || 'file upload nahi hui') + ' — Edit se dobara daalo', 'error');
     } else {
       err.textContent = e.message || 'Could not save';
       err.style.display = 'block';
     }
     return;
   }
-  // Nayi entry + resume (file ya link): Step 1 (Data Inputs) yahin Done -> Step 2 Interview
-  let diDone = false, diErr = '';
-  if (isNew && (body.resumeLink || resumeFile)) {
-    btn.textContent = 'Step 1 Done…';
-    const diNo = (_ob.steps.find(d => d.dataInputs) || {}).no || 1;
-    const d = await api('/api/onboarding/' + id + '/steps/' + diNo, 'PUT', {
-      action: 'done', note: 'Entry form se', name: body.name, phone: body.phone, email: body.email,
-      designation: body.designation, location: body.location,
-      resumeLink: body.resumeLink, portfolioLink: body.portfolioLink, videoLink: body.videoLink
-    });
-    if (d && !d.error) diDone = true; else diErr = (d && d.error) || 'Step 1 Done nahi hua';
-  }
   btn.disabled = false; btn.textContent = btnTxt;
   closeModal('obJoineeModal');
-  showToast(!isNew ? '✅ Employee updated'
-    : diDone ? '✅ Entry ban gayi — Step 1 Done, ab Step 2 (Interview with Director)'
-    : diErr ? 'Entry ban gayi, par Step 1: ' + diErr
-    : '✅ Entry ban gayi — resume baaki, Step 1 (Data Inputs) bharo', diErr ? 'error' : 'success');
+  showToast(isNew ? '✅ Entry ban gayi — Step 1 complete, ab Step 2 (Director Review)' : '✅ Saved', 'success');
   if (isNew) _obOpenId = id;
   _obEditId = '';
   await loadOnboarding(1);
-  // Resume nahi diya (ya Step 1 me kuch kami): Step 1 ka popup seedha
-  if (isNew && !diDone && obJoinee(id)) obOpenInputs(id);
 }
 async function obSetStatus(id, status) {
   const j = obJoinee(id);
   if (!confirm(status === 'cancelled' ? 'Is employee ki onboarding cancel karein? (data rahega, Reactivate kar sakte ho)'
-    : j && j.status === 'rejected' ? 'Rejected candidate ko phir chalu karein? Step 1 (Interview) wapas pending ho jayega.'
+    : j && j.status === 'rejected' ? 'Rejected candidate ko phir chalu karein? Step 2 (Director Review) wapas pending ho jayega.'
     : 'Onboarding phir se chalu karein?')) return;
   const r = await api('/api/onboarding/' + id, 'PUT', { status: status });
   if (!r || r.error) showToast((r && r.error) || 'Could not save', 'error');
@@ -8467,7 +8638,7 @@ async function obSetStatus(id, status) {
 }
 async function obDelete(id) {
   const j = obJoinee(id);
-  if (!confirm('"' + (j ? j.name : '') + '" ki poori entry (21 step) hamesha ke liye delete karein?')) return;
+  if (!confirm('"' + (j ? j.name : '') + '" ki poori entry (22 step) hamesha ke liye delete karein?')) return;
   const r = await api('/api/onboarding/' + id, 'DELETE');
   if (!r || r.error) { showToast((r && r.error) || 'Could not delete', 'error'); return; }
   showToast('🗑 Deleted', 'success');
