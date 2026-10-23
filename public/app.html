@@ -245,6 +245,14 @@ textarea.gold-inp{resize:vertical;}
 .ob-hrow em{display:block;font-style:normal;font-size:11px;color:#94a3b8;margin-top:2px;}
 .ob-hrow div{word-break:break-word;}
 .ob-cand{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;margin-top:8px;font-size:12.5px;color:#334155;line-height:1.6;}
+/* Step 3 popup me entry wali (Step 1) details */
+.ob-s1box{border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;margin:-4px 0 14px;background:#fff;}
+.ob-s1box .h{font-size:10.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#94a3b8;margin-bottom:8px;}
+.ob-s1grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px 14px;}
+.ob-s1grid div{font-size:13px;color:#0f172a;min-width:0;word-break:break-word;}
+.ob-s1grid i{display:block;font-style:normal;font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:#94a3b8;margin-bottom:2px;}
+.ob-s1iv{font-size:12.5px;color:#334155;margin-top:8px;}
+@media(max-width:560px){ .ob-s1grid{grid-template-columns:1fr 1fr;} }
 .ob-donewhat .ob-cand b{display:inline;font-size:12.5px;}
 .ob-donewhat .ob-cand span.ob-doc{font-size:12px;color:#94a3b8;}
 .ob-sechead{display:flex;align-items:center;gap:8px;}
@@ -2869,6 +2877,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     <h3 id="obEmpTitle">&#10003; Step 3 &mdash; Remaining Employee Details</h3>
     <div class="alert error" id="obEmpErr"></div>
     <div class="ob-donewhat" id="obEmpWhat"></div>
+    <div class="ob-s1box" id="obEmpCand"></div>
     <div class="ob-form">
       <div class="form-group"><label>Email <span class="ob-req">*</span></label>
         <input type="email" id="obeEmail" placeholder="name@gmail.com" maxlength="150"/></div>
@@ -8476,8 +8485,17 @@ function obOpenEmp(jid, edit) {
   obFillPick('obeRef', (_ob.users || []).map(u => u.name).concat(_ob.refs || []).sort((a, b) => a.localeCompare(b)), j.refBy);
   const next = j.steps.find(s => s.no > 3 && !s.na && !s.done);
   document.getElementById('obEmpTitle').innerHTML = edit ? '&#9999;&#65039; Edit &mdash; Employee Details (Step 3)' : '&#10003; Step 3 &mdash; Remaining Employee Details';
-  document.getElementById('obEmpWhat').innerHTML = '<b>' + obE(j.name) + '</b><span>' + obE(j.designation) + ' &middot; ' + obE(j.phone) +
+  document.getElementById('obEmpWhat').innerHTML = '<b>' + obE(j.name) + '</b><span>' + obE(j.designation) +
     (!edit && next ? ' &middot; agla: Step ' + next.no + ' (' + obE(obDef(next.no).title) + ')' : '') + '</span>';
+  // Entry ke waqt bhari details (Step 1) + Director ka nateeja -- sirf dekhne ke liye
+  const iv = j.steps.find(s => obDef(s.no).interview) || {};
+  const cell = (k, v) => '<div><i>' + k + '</i>' + (v ? obE(v) : '&mdash;') + '</div>';
+  document.getElementById('obEmpCand').innerHTML = '<div class="h">Step 1 &middot; Initial Candidate Details</div>' +
+    '<div class="ob-s1grid">' + cell('Name', j.name) + cell('Designation', j.designation) + cell('Phone', j.phone) +
+      cell('Alternate phone', j.altPhoneNA ? 'Not available' : j.altPhone) + '</div>' +
+    obDocsHtml(j) +
+    '<div class="ob-s1iv">Director Review: ' + obIvHtml(j) +
+      (j.interview === 'selected' && iv.note ? ' &mdash; ' + obE(iv.note) : '') + (iv.doneBy ? ' &middot; ' + obE(iv.doneBy) : '') + '</div>';
   document.getElementById('obEmpHint').style.display = edit ? 'none' : '';
   document.getElementById('obEmpBtn').innerHTML = edit ? 'Save' : '&#10003; Save &amp; Done';
   document.getElementById('obEmpErr').style.display = 'none';
