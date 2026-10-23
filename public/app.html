@@ -252,10 +252,11 @@ textarea.gold-inp{resize:vertical;}
 .ob-iconbtn.del{color:#dc2626;border-color:#fecaca;}
 .ob-iconbtn.del:hover{background:#fef2f2;}
 /* Person ka side panel */
-.ob-dw-ov{position:fixed;inset:0;z-index:1100;background:rgba(15,23,42,.42);display:none;justify-content:flex-end;}
+/* Person par click: details beech screen par popup (Harsh, 23 Oct -- pehle side panel tha) */
+.ob-dw-ov{position:fixed;inset:0;z-index:1100;background:rgba(15,23,42,.5);display:none;align-items:center;justify-content:center;padding:24px;}
 .ob-dw-ov.open{display:flex;}
-.ob-dw{width:560px;max-width:100vw;height:100%;background:#f8fafc;overflow-y:auto;box-shadow:-18px 0 50px rgba(15,23,42,.22);animation:obDwIn .22s ease-out;display:flex;flex-direction:column;}
-@keyframes obDwIn{from{transform:translateX(40px);opacity:.4;}to{transform:none;opacity:1;}}
+.ob-dw{width:860px;max-width:100%;max-height:calc(100vh - 48px);background:#f8fafc;overflow-y:auto;border-radius:18px;box-shadow:0 24px 70px rgba(15,23,42,.35);animation:obDwIn .2s ease-out;display:flex;flex-direction:column;}
+@keyframes obDwIn{from{transform:translateY(14px) scale(.98);opacity:.4;}to{transform:none;opacity:1;}}
 @media (prefers-reduced-motion: reduce){.ob-dw{animation:none;}}
 .ob-dw-top{background:linear-gradient(135deg,#0f3d33 0%,#14532d 55%,#1f6f4a 100%);color:#fff;padding:20px 22px 18px;position:relative;}
 .ob-dw-x{position:absolute;top:14px;right:14px;width:32px;height:32px;border-radius:50%;border:none;background:rgba(255,255,255,.14);color:#fff;font-size:16px;cursor:pointer;}
@@ -274,7 +275,9 @@ textarea.gold-inp{resize:vertical;}
 .ob-dw-acts button{font-family:inherit;font-size:12.5px;font-weight:600;padding:7px 12px;border-radius:9px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);color:#fff;cursor:pointer;}
 .ob-dw-acts button:hover{background:rgba(255,255,255,.2);}
 .ob-dw-acts button.del{border-color:rgba(254,202,202,.6);color:#fecaca;}
-.ob-dw-body{padding:16px 18px 28px;display:flex;flex-direction:column;gap:14px;}
+.ob-dw-body{padding:16px 18px 24px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start;}
+.ob-dw-body > *{grid-column:1 / -1;}
+.ob-dw-body > .ob-dw-half{grid-column:auto;}
 .ob-dw-card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px 16px;}
 .ob-dw-card h5{margin:0 0 10px;font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#94a3b8;}
 .ob-dw-now{border-color:#86efac;box-shadow:0 0 0 3px #dcfce7;}
@@ -308,6 +311,12 @@ textarea.gold-inp{resize:vertical;}
 .ob-tl-row.done .rt b{color:#15803d;}
 .ob-tl-row.late .rt b{color:#dc2626;}
 @media(max-width:560px){ .ob-dw-grid{grid-template-columns:1fr;} }
+@media(max-width:760px){
+  .ob-dw-ov{padding:0;align-items:stretch;}
+  .ob-dw{max-height:none;height:100%;border-radius:0;}
+  .ob-dw-body{grid-template-columns:minmax(0,1fr);}
+  .ob-dw-body > .ob-dw-half{grid-column:1 / -1;}
+}
 @media(max-width:900px){
   .ob-kpis.overview-cards{grid-template-columns:repeat(2,minmax(0,1fr));}
   .ob-step{grid-template-columns:38px minmax(0,1fr);}
@@ -2794,7 +2803,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       <div class="form-group"><label>Notes</label>
         <input type="text" id="obfNotes" placeholder="Optional" maxlength="300"/></div>
     </div>
-    <div class="ob-hint" id="obJoineeHint">Save karte hi 21 step ki entry banegi aur <b>Step 1 (Data Inputs)</b> uske doer ke paas jayega &mdash; wo Done par candidate ki details bharega. Har step Done hone par hi agla step khulta hai.</div>
+    <div class="ob-hint" id="obJoineeHint">Save karte hi <b>Step 1 (Data Inputs)</b> ka popup khulega &mdash; candidate ki details (resume, portfolio, intro video&hellip;) wahin bhar do. Baad me bharni ho to Cancel; Step 1 ke Done par phir milega. Har step Done hone par hi agla step khulta hai.</div>
     <div class="modal-footer" style="justify-content:flex-end;gap:8px">
       <button class="btn btn-outline" onclick="closeModal('obJoineeModal')">Cancel</button>
       <button class="btn ob-create" id="obJoineeSave" onclick="obSaveJoinee()">Create employee &amp; tasks</button>
@@ -2854,7 +2863,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
   </div>
 </div>
 
-<!-- HR Onboarding — person par click: side panel -->
+<!-- HR Onboarding — person par click: details ka popup (beech screen par) -->
 <div class="ob-dw-ov" id="obDrawer" onclick="if(event.target===this)obCloseDrawer()">
   <aside class="ob-dw" id="obDrawerBody" role="dialog" aria-label="Employee onboarding"></aside>
 </div>
@@ -7921,7 +7930,7 @@ function obWorkflowHtml() {
   return html + '<div class="ob-control">CONTROL: ' + obE(_ob.control || '') + '</div>';
 }
 
-// ── Person par click: side panel (profile + abhi ka step + poora safar) ──
+// ── Person par click: details ka popup (profile + abhi ka step + poora safar) ──
 let _obDrawerId = '';
 function obOpenDrawer(id) {
   if (!_ob || !_ob.canManage) return;
@@ -7952,7 +7961,7 @@ function obRenderDrawer() {
       '<div>' + obE(j.designation || '—') + ' &middot; ' + obE(j.location) + '</div></div></div>' +
     '<div class="ob-dw-meta">' + ring + '<div class="ob-dw-facts">' +
       '<div><b>' + p.done + '/' + p.total + '</b> steps done &middot; ' + obE(stTxt) + '</div>' +
-      '<div>Joining <b>' + maintDate(j.joiningDate) + '</b>' + (j.joiningDate ? ' &middot; ' + obE(obJoinRel(j)) : '') + '</div>' +
+      (j.joiningDate ? '<div>Joining <b>' + maintDate(j.joiningDate) + '</b> &middot; ' + obE(obJoinRel(j)) + '</div>' : '') +
       '<div>Mobile <b>' + obE(j.phone || '—') + '</b></div></div></div>' +
     '<div class="ob-dw-acts">' +
       '<button onclick="obOpenJoinee(\'' + jid + '\')">&#9999;&#65039; Edit</button>' +
@@ -7979,11 +7988,11 @@ function obRenderDrawer() {
   // Details
   const f = (k, v) => '<div><span>' + k + '</span>' + (v || '—') + '</div>';
   const probEnd = (j.steps.find(s => s.no === 21) || {}).plan;
-  h += '<div class="ob-dw-card"><h5>Data Inputs &middot; candidate</h5><div class="ob-dw-grid">' +
+  h += '<div class="ob-dw-card ob-dw-half"><h5>Data Inputs &middot; candidate</h5><div class="ob-dw-grid">' +
     f('Mobile', obE(j.phone)) + f('Email', obE(j.email)) +
     f('Designation', obE(j.designation)) + f('Location', obE(j.location)) +
     f('Interview', obIvHtml(j)) + '</div>' + obDocsHtml(j, 1) + '</div>';
-  h += '<div class="ob-dw-card"><h5>Employee master form</h5><div class="ob-dw-grid">' +
+  h += '<div class="ob-dw-card ob-dw-half"><h5>Employee master form</h5><div class="ob-dw-grid">' +
     f('Alternate phone', j.altPhoneNA ? 'Not available' : obE(j.altPhone)) +
     f('Ref. by', obE(j.refBy)) + f('Date of birth', j.dob ? maintDate(j.dob) : '') +
     (j.salary ? f('Salary', obE(j.salary)) : '') + (j.joiningDate ? f('Date of joining', maintDate(j.joiningDate)) : '') + f('Probation', j.probationDays + ' days' + (probEnd ? ' (till ' + maintDate(probEnd) + ')' : '')) +
@@ -8349,11 +8358,14 @@ async function obSaveJoinee() {
       ? await api('/api/onboarding/' + _obEditId, 'PUT', body)
       : await api('/api/onboarding', 'POST', body);
     if (!r || r.error) throw new Error((r && r.error) || 'Could not save');
+    const isNew = !_obEditId;
     closeModal('obJoineeModal');
-    showToast(_obEditId ? '✅ Employee updated' : '✅ Entry ban gayi — Step 1 doer ke paas gaya', 'success');
-    if (!_obEditId && r.id) _obOpenId = String(r.id);
+    showToast(isNew ? '✅ Entry ban gayi — ab Step 1 (Data Inputs) bharo' : '✅ Employee updated', 'success');
+    if (isNew && r.id) _obOpenId = String(r.id);
     _obEditId = '';
     await loadOnboarding(1);
+    // Nayi entry: Step 1 (Data Inputs) ka popup seedha -- candidate ki details abhi bhar do
+    if (isNew && r.id && obJoinee(r.id)) obOpenInputs(r.id);
   } catch (e) {
     err.textContent = e.message || 'Could not save';
     err.style.display = 'block';
