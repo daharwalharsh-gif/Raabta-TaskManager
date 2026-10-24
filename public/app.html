@@ -2879,6 +2879,28 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     <div class="ob-donewhat" id="obEmpWhat"></div>
     <div class="ob-s1box" id="obEmpCand"></div>
     <div class="ob-form">
+      <div class="form-group"><label>Employee name <span class="ob-req">*</span></label>
+        <input type="text" id="obeName" maxlength="120"/></div>
+      <div class="form-group"><label>Designation <span class="ob-req">*</span></label>
+        <select id="obeDesigSel" onchange="obOtherToggle('obeDesig')"></select>
+        <input type="text" id="obeDesig" class="ob-other" placeholder="Designation likho" maxlength="120" style="display:none"/></div>
+      <div class="form-group"><label>Phone <span class="ob-req">*</span></label>
+        <input type="tel" id="obePhone" placeholder="10-digit mobile" maxlength="20"/></div>
+      <div class="form-group"><label>Alternate phone</label>
+        <input type="tel" id="obeAlt" placeholder="10-digit mobile" maxlength="20"/>
+        <label class="ob-check"><input type="checkbox" id="obeAltNA" onchange="obAltToggle('obe')"/> Not available</label></div>
+      <div class="form-group ob-full"><label>Resume <span class="ob-lim">PDF / Word / image &middot; file ya link</span></label>
+        <div class="ob-filebox"><input type="file" id="obeFile_resume" accept=".pdf,.doc,.docx,image/*" onchange="obFilePick('resume')"/>
+          <input type="url" id="obeLink_resume" placeholder="ya link paste karo (Google Drive…)" maxlength="500"/></div>
+        <div class="ob-fileinfo" id="obeInfo_resume"></div></div>
+      <div class="form-group ob-full"><label>Portfolio <span class="ob-lim">PDF / PPT / image &middot; file ya link</span></label>
+        <div class="ob-filebox"><input type="file" id="obeFile_portfolio" accept=".pdf,.doc,.docx,.ppt,.pptx,image/*" onchange="obFilePick('portfolio')"/>
+          <input type="url" id="obeLink_portfolio" placeholder="ya link (Behance, Drive, website…)" maxlength="500"/></div>
+        <div class="ob-fileinfo" id="obeInfo_portfolio"></div></div>
+      <div class="form-group ob-full"><label>Intro video <span class="ob-lim">koi bhi video &middot; file ya link</span></label>
+        <div class="ob-filebox"><input type="file" id="obeFile_video" accept="video/*" onchange="obFilePick('video')"/>
+          <input type="url" id="obeLink_video" placeholder="ya link (YouTube / Google Drive…)" maxlength="500"/></div>
+        <div class="ob-fileinfo" id="obeInfo_video"></div></div>
       <div class="form-group"><label>Email <span class="ob-req">*</span></label>
         <input type="email" id="obeEmail" placeholder="name@gmail.com" maxlength="150"/></div>
       <div class="form-group"><label>Location <span class="ob-req">*</span></label>
@@ -2899,8 +2921,13 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
         <input type="text" id="obeRef" class="ob-other" placeholder="Kisne refer kiya, naam likho" maxlength="150" style="display:none"/></div>
       <div class="form-group"><label>Notes</label>
         <input type="text" id="obeNotes" placeholder="Optional" maxlength="300"/></div>
+      <div class="form-group"><label>Documents collected? <span class="ob-req">*</span></label>
+        <select id="obeDocs"><option value="">Select</option><option value="yes">Yes</option><option value="no">No</option></select></div>
+      <div class="form-group ob-full"><label>Documents <span class="ob-lim">sirf PDF</span></label>
+        <div class="ob-filebox"><input type="file" id="obeFile_documents" accept=".pdf,application/pdf" onchange="obFilePick('documents')"/></div>
+        <div class="ob-fileinfo" id="obeInfo_documents"></div></div>
     </div>
-    <div class="ob-hint" id="obEmpHint">Save &amp; Done ke baad saari details <b>lock</b> ho jayengi &mdash; badalni ho to Admin se <b>Unlock</b> karwana hoga.</div>
+    <div class="ob-hint" id="obEmpHint">Step 1 ki details bhi yahin badal sakte ho. Step 3 ke baad bhi Admin details edit kar sakta hai (lock nahi hai).</div>
     <div class="modal-footer" style="justify-content:space-between">
       <button class="btn btn-outline" onclick="closeModal('obEmpModal')">Cancel</button>
       <button class="btn btn-green" id="obEmpBtn" onclick="obSaveEmp()">&#10003; Save &amp; Done</button>
@@ -7670,6 +7697,8 @@ const OB_FILE_UI = {
   portfolio: { label: 'Portfolio', icon: '&#127912;' },
   video: { label: 'Intro video', icon: '&#127916;' }
 };
+// Step 3 ke Documents (sirf PDF) -- Step 1 wale resume / portfolio / video ke saath nahi dikhte
+const OB_ALL_FILE_UI = Object.assign({}, OB_FILE_UI, { documents: { label: 'Documents', icon: '&#128206;' } });
 // Harsh (23 Oct): "kitne bhi MB" -- file 4 MB ke tukdon me jaati hai; ek file 500 MB tak
 const OB_FILE_MAX_MB = 500, OB_CHUNK = 4 * 1024 * 1024;
 // Resume / portfolio / intro video -- file app me khulti hai, link naye tab me
@@ -7696,10 +7725,17 @@ function obIvHtml(j) {
 function obInEditBtn(j) {
   return _ob.canManage && !j.locked ? '<button type="button" class="ob-doc" style="color:#475569;background:#fff;border-color:#e2e8f0" onclick="event.stopPropagation();obOpenJoinee(\'' + obE(j.id) + '\')">&#9999;&#65039; Edit</button>' : '';
 }
-// Step 3 ho chuka? (details tab lock hoti hain)
+// Step 3 ke Documents: Yes / No + PDF (dekhne ka button)
+function obDocsCollHtml(j) {
+  const d = j.docs && j.docs.documents, yes = String(j.docsCollected || '').toLowerCase();
+  const pdf = d && d.file ? ' <button type="button" class="ob-doc" onclick="event.stopPropagation();obViewFile(\'' + obE(j.id) + '\',\'documents\')" title="' + obE(d.file.name) + '">' + OB_ALL_FILE_UI.documents.icon + ' PDF</button>' : '';
+  return (yes === 'yes' ? '<b style="color:#15803d">Yes</b>' : yes === 'no' ? '<b>No</b>' : obE(j.docsCollected)) + pdf;
+}
+// Step 3 ho chuka? (pehle details tab lock hoti thi -- ab lock nahi)
 function obEmpDone(j) { const s3 = j.steps.find(s => obDef(s.no).empDetails); return !!(s3 && s3.done); }
 // Lock patti: lock / unlocked + button
 function obLockHtml(j) {
+  return '';   // lock hata diya (24 Oct) -- Step 3 ke baad bhi Admin / HR edit kar sakte hain
   if (!_ob.canManage && !_ob.canUnlock) return '';
   const jid = obE(j.id);
   if (j.locked) {
@@ -7712,7 +7748,7 @@ function obLockHtml(j) {
 }
 // Director ke liye candidate ki Step 1 details (Approve / Reject popup me)
 function obCandHtml(j) {
-  return '<div class="ob-cand"><b>' + obE(j.designation || '—') + '</b> &middot; Phone <b>' + obE(j.phone || '—') + '</b>' +
+  return '<div class="ob-cand"><b>' + obE(j.name || '—') + '</b> &middot; ' + obE(j.designation || '—') + ' &middot; Phone <b>' + obE(j.phone || '—') + '</b>' +
     ' &middot; Alternate ' + (j.altPhoneNA ? 'Not available' : '<b>' + obE(j.altPhone || '—') + '</b>') + obDocsHtml(j) + '</div>';
 }
 // History (audit) -- khulne par server se
@@ -7730,7 +7766,7 @@ async function obLoadHistory(jid, elId) {
 }
 let _obFileUrl = '';
 async function obViewFile(jid, kind) {
-  const j = obJoinee(jid), ui = OB_FILE_UI[kind];
+  const j = obJoinee(jid), ui = OB_ALL_FILE_UI[kind];
   const body = document.getElementById('obFileBody');
   document.getElementById('obFileTitle').textContent = ui.label + (j ? ' — ' + j.name : '');
   const meta = j && j.docs && j.docs[kind] && j.docs[kind].file;
@@ -7898,6 +7934,7 @@ function obDetailHtml(j) {
         field('Location', obE(j.location)) +
         field('Date of birth', j.dob ? maintDate(j.dob) : '') +
         field('ESIS eligible', yn(j.esis)) + field('Contract signed', yn(j.contract)) +
+        field('Documents collected', obDocsCollHtml(j)) +
         field('Ref. by', obE(j.refBy)) +
         (j.joiningDate ? field('Date of joining', maintDate(j.joiningDate) + ' &middot; <b>' + obE(obJoinRel(j)) + '</b>') : '') +
         (j.salary ? field('Salary', obE(j.salary)) : '') +
@@ -8121,6 +8158,7 @@ function obRenderDrawer() {
       f('Email', obE(j.email)) + f('Location', obE(j.location)) +
       f('Date of birth', j.dob ? maintDate(j.dob) : '') + f('Probation', j.probationDays + ' days' + (probEnd ? ' (till ' + maintDate(probEnd) + ')' : '')) +
       f('ESIS eligible', yn(j.esis)) + f('Contract signed', yn(j.contract)) +
+      f('Documents collected', obDocsCollHtml(j)) +
       f('Ref. by', obE(j.refBy)) + (j.joiningDate ? f('Date of joining', maintDate(j.joiningDate)) : '') +
       (j.salary ? f('Salary', obE(j.salary)) : '') + (j.notes ? f('Notes', obE(j.notes)) : '') + '</div>'
       : '<div style="font-size:12.5px;color:#94a3b8">Director ke Approve karne ke baad Step 3 me bharni hain</div>') +
@@ -8354,13 +8392,18 @@ function obFileInfo(kind) {
     : '';
 }
 function obFilePick(kind) {
-  const inp = document.getElementById(_obFilePre + 'File_' + kind), f = inp.files && inp.files[0], ui = OB_FILE_UI[kind];
+  const inp = document.getElementById(_obFilePre + 'File_' + kind), f = inp.files && inp.files[0], ui = OB_ALL_FILE_UI[kind];
   const el = document.getElementById(_obFilePre + 'Info_' + kind);
   delete _obFiles[kind];
   if (!f) { obFileInfo(kind); return; }
   if (!f.size || f.size > OB_FILE_MAX_MB * 1024 * 1024) {
     inp.value = '';
     el.innerHTML = '<span class="bad">&#9888;&#65039; ' + obE(ui.label) + (f.size ? ' ' + OB_FILE_MAX_MB + ' MB se badi hai &mdash; link daal do' : ': file khali hai') + '</span>';
+    return;
+  }
+  if (kind === 'documents' && !/\.pdf$/i.test(f.name)) {
+    inp.value = '';
+    el.innerHTML = '<span class="bad">&#9888;&#65039; Documents sirf PDF me upload hote hain</span>';
     return;
   }
   _obFiles[kind] = { file: f, name: f.name, type: f.type, size: f.size };
@@ -8378,8 +8421,8 @@ function obB64(blob) {
 // Chuni hui files upload / hatai hui hatao. Upload 4 MB ke tukdon me (badi file
 // bhi chale), button par % dikhta hai.
 async function obUploadFiles(id, btn) {
-  for (const k of Object.keys(OB_FILE_UI)) {
-    const f = _obFiles[k], lbl = OB_FILE_UI[k].label;
+  for (const k of Object.keys(OB_ALL_FILE_UI)) {
+    const f = _obFiles[k], lbl = OB_ALL_FILE_UI[k].label;
     if (f) {
       btn.textContent = lbl + ' upload shuru…';
       const st = await api('/api/onboarding/' + id + '/files/start', 'POST', { kind: k, fileName: f.name, mimeType: f.type, size: f.size });
@@ -8397,7 +8440,7 @@ async function obUploadFiles(id, btn) {
       delete _obFiles[k];
     } else if (_obFileDel[k]) {
       const u = await api('/api/onboarding/' + id + '/files/' + k, 'DELETE');
-      if (!u || u.error) throw new Error(OB_FILE_UI[k].label + ': ' + ((u && u.error) || 'hat nahi payi'));
+      if (!u || u.error) throw new Error(OB_ALL_FILE_UI[k].label + ': ' + ((u && u.error) || 'hat nahi payi'));
       _obFileDel[k] = false;
     }
   }
@@ -8478,6 +8521,17 @@ function obOpenEmp(jid, edit) {
   if (j.locked) { showToast('Details lock hain — pehle Unlock karo', 'error'); return; }
   _obEmpId = String(j.id); _obEmpEdit = !!edit;
   const set = (k, v) => { const el = document.getElementById(k); if (el) el.value = v == null ? '' : v; };
+  _obFiles = {}; _obFileDel = {}; _obFilePre = 'obe'; _obFileJid = _obEmpId;
+  set('obeName', j.name); set('obePhone', j.phone); set('obeAlt', j.altPhone);
+  document.getElementById('obeAltNA').checked = !!j.altPhoneNA;
+  obAltToggle('obe');
+  obFillPick('obeDesig', OB_DESIGNATIONS.concat(_ob.designations || []), j.designation);
+  ['resume', 'portfolio', 'video', 'documents'].forEach(k => {
+    set('obeLink_' + k, j.docs && j.docs[k] ? j.docs[k].link : '');
+    set('obeFile_' + k, '');
+    obFileInfo(k);
+  });
+  set('obeDocs', j.docsCollected);
   set('obeEmail', j.email); set('obeDob', j.dob); set('obeProb', j.probationDays || 90); set('obeNotes', j.notes);
   obFillPick('obeLoc', (_ob.places || ['Delhi', 'Mumbai']), j.location);
   obSetPick('obeEsis', j.esis);
@@ -8490,49 +8544,60 @@ function obOpenEmp(jid, edit) {
   // Entry ke waqt bhari details (Step 1) + Director ka nateeja -- sirf dekhne ke liye
   const iv = j.steps.find(s => obDef(s.no).interview) || {};
   const cell = (k, v) => '<div><i>' + k + '</i>' + (v ? obE(v) : '&mdash;') + '</div>';
-  document.getElementById('obEmpCand').innerHTML = '<div class="h">Step 1 &middot; Initial Candidate Details</div>' +
-    '<div class="ob-s1grid">' + cell('Name', j.name) + cell('Designation', j.designation) + cell('Phone', j.phone) +
-      cell('Alternate phone', j.altPhoneNA ? 'Not available' : j.altPhone) + '</div>' +
-    obDocsHtml(j) +
+  document.getElementById('obEmpCand').innerHTML = '<div class="h">Step 2 &middot; Director Review</div>' +
     '<div class="ob-s1iv">Director Review: ' + obIvHtml(j) +
       (j.interview === 'selected' && iv.note ? ' &mdash; ' + obE(iv.note) : '') + (iv.doneBy ? ' &middot; ' + obE(iv.doneBy) : '') + '</div>';
   document.getElementById('obEmpHint').style.display = edit ? 'none' : '';
   document.getElementById('obEmpBtn').innerHTML = edit ? 'Save' : '&#10003; Save &amp; Done';
   document.getElementById('obEmpErr').style.display = 'none';
   document.getElementById('obEmpModal').classList.add('open');
-  setTimeout(() => { const e = document.getElementById('obeEmail'); if (e) e.focus(); }, 50);
+  setTimeout(() => { const e = document.getElementById('obeName'); if (e) e.focus(); }, 50);
 }
 async function obSaveEmp() {
   const err = document.getElementById('obEmpErr');
   const v = id => (document.getElementById(id).value || '').trim();
+  const digits = x => x.replace(/\D/g, '');
+  const link = k => { const x = v('obeLink_' + k); return x && !/^[a-z][a-z0-9+.-]*:\/\//i.test(x) ? 'https://' + x : x; };
   const body = {
+    name: v('obeName'), designation: obPickVal('obeDesig'), phone: v('obePhone'),
+    altPhone: v('obeAlt'), altPhoneNA: document.getElementById('obeAltNA').checked,
+    resumeLink: link('resume'), portfolioLink: link('portfolio'), videoLink: link('video'),
     email: v('obeEmail'), location: obPickVal('obeLoc'), dob: v('obeDob'),
-    esis: obPickVal('obeEsis'), contract: obPickVal('obeContract'),
+    esis: obPickVal('obeEsis'), contract: obPickVal('obeContract'), docsCollected: v('obeDocs'),
     probationDays: v('obeProb'), refBy: obPickVal('obeRef'), notes: v('obeNotes')
   };
-  const bad = !body.email ? 'Email daalo'
+  const bad = !body.name ? 'Employee name daalo'
+    : !body.designation ? 'Designation chuno (ya Other chun kar likho)'
+    : digits(body.phone).length < 10 ? 'Phone sahi daalo (10 digit)'
+    : (!body.altPhoneNA && digits(body.altPhone).length < 10) ? 'Alternate phone daalo, ya "Not available" tick karo'
+    : !body.email ? 'Email daalo'
     : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email) ? 'Email sahi daalo'
     : !body.location ? 'Location chuno (ya Other chun kar likho)'
     : !body.dob ? 'Date of birth chuno'
     : !body.esis ? 'ESIS eligible? chuno (ya Other chun kar likho)'
-    : !body.contract ? 'Contract signed? chuno (ya Other chun kar likho)' : '';
+    : !body.contract ? 'Contract signed? chuno (ya Other chun kar likho)'
+    : !body.docsCollected ? 'Documents collected? chuno (Yes / No)' : '';
   if (bad) { err.textContent = bad; err.style.display = 'block'; return; }
   err.style.display = 'none';
   const btn = document.getElementById('obEmpBtn');
+  const btnHtml = btn.innerHTML;
   btn.disabled = true;
   try {
+    await obUploadFiles(_obEmpId, btn);
+    btn.textContent = 'Saving…';
     const empNo = (_ob.steps.find(d => d.empDetails) || {}).no || 3;
     const r = _obEmpEdit
       ? await api('/api/onboarding/' + _obEmpId, 'PUT', body)
       : await api('/api/onboarding/' + _obEmpId + '/steps/' + empNo, 'PUT', Object.assign({ action: 'done' }, body));
     if (!r || r.error) throw new Error((r && r.error) || 'Could not save');
     closeModal('obEmpModal');
-    showToast(_obEmpEdit ? '✅ Saved' : '✅ Step 3 Done — details lock ho gayi', 'success');
+    showToast(_obEmpEdit ? '✅ Saved' : '✅ Step 3 Done', 'success');
     await loadOnboarding(1);
   } catch (e) {
     err.textContent = e.message || 'Could not save';
     err.style.display = 'block';
-  } finally { btn.disabled = false; }
+    loadOnboarding(1);
+  } finally { btn.disabled = false; btn.innerHTML = btnHtml; }
 }
 // ── Unlock (wajah ke saath) / phir Lock ──
 let _obUnlockId = '';

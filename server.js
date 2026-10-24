@@ -623,6 +623,7 @@ const MYSQL_SCHEMA = {
     joining_date: "VARCHAR(20) DEFAULT ''",       // YYYY-MM-DD -- har step ki plan date isi se
     esis: "VARCHAR(60) DEFAULT ''",               // yes / no / haath se likha -- no ho to step 20 N/A
     contract: "VARCHAR(60) DEFAULT ''",           // yes / no / haath se likha
+    docs_collected: "VARCHAR(60) DEFAULT ''",     // Step 3: documents collected? yes / no (PDF HR_Onboarding_Files me, kind documents)
     is_sales: "VARCHAR(5) DEFAULT 'no'",          // designation me "sales" -> step 17 lagu
     probation_days: "VARCHAR(10) DEFAULT '90'",   // step 20 = joining + itne din
     status: "VARCHAR(20) DEFAULT 'active'",       // active / cancelled / rejected
@@ -4818,7 +4819,7 @@ const OB_PHASES = [
 const OB_STEPS = [
   { no: 1, phase: 1, title: 'Initial Candidate Details', owner: 'HR Team', channel: 'Employee entry form', note: 'Employee name, designation, phone, alternate phone, resume, portfolio, intro video', when: 'Entry ke saath', off: null, dataInputs: true },
   { no: 2, phase: 1, title: 'Director Review', owner: 'Director', channel: 'Onboarding system / Google Meet', note: 'Candidate details aur resume / portfolio / intro video dekh kar remarks ke saath Approve ya Reject — Reject ya pending par aage nahi badhta', when: 'Step 1 ke baad', off: null, interview: true },
-  { no: 3, phase: 1, title: 'Remaining Employee Details', owner: 'HR Team', channel: 'Onboarding system', note: 'Email, location, date of birth, ESIS, contract signed, probation days, ref. by, notes — Done ke baad details lock', when: 'Director approval ke baad', off: null, empDetails: true },
+  { no: 3, phase: 1, title: 'Remaining Employee Details', owner: 'HR Team', channel: 'Onboarding system', note: 'Email, location, date of birth, ESIS, contract signed, probation days, ref. by, notes, documents (PDF) — Step 1 ki details bhi yahin edit ho sakti hain', when: 'Director approval ke baad', off: null, empDetails: true },
   { no: 4, phase: 1, title: 'Collect documents', owner: 'HR Team', channel: 'Email; CC Director, Logistics Head, EA and Marketing Head', when: '7 days before joining', off: -7 },
   { no: 5, phase: 1, title: 'Reference check + alternate contact numbers', owner: 'HR Team', channel: 'Email + update Google Sheets', when: '5 days before joining', off: -5 },
   { no: 6, phase: 1, title: 'Send offer letter', owner: 'HR Team', channel: 'Email', when: '2 days before joining', off: -2 },
@@ -4907,6 +4908,7 @@ function obClean(b, old) {
     joining_date: toIsoDateSrv(b.joiningDate != null ? b.joiningDate : (old ? old.joining_date : '')),
     esis: yn('esis', 'esis'),
     contract: yn('contract', 'contract'),
+    docs_collected: yn('docsCollected', 'docs_collected'),
     probation_days: String(Number.isInteger(prob) && prob > 0 && prob <= 730 ? prob : 90),
     notes: String(b.notes != null ? b.notes : (old ? old.notes || '' : '')).trim().slice(0, 2000)
   };
@@ -4947,7 +4949,7 @@ function obCheckEmp(f) {
   return '';
 }
 const OB_STEP1_KEYS = ['name', 'designation', 'phone', 'altPhone', 'altPhoneNA', 'resumeLink', 'portfolioLink', 'videoLink'];
-const OB_EMP_KEYS = ['email', 'location', 'dob', 'esis', 'contract', 'probationDays', 'refBy', 'notes'];
+const OB_EMP_KEYS = ['email', 'location', 'dob', 'esis', 'contract', 'docsCollected', 'probationDays', 'refBy', 'notes'];
 const obPick = (b, keys) => { const o = {}; keys.forEach(k => { if (b[k] !== undefined) o[k] = b[k]; }); return o; };
 // Interview ka nateeja -- purani entry jisme Interview Done tha = selected
 function obInterview(j, ivRow) {
@@ -4981,7 +4983,7 @@ async function obIsDoer(jid, uid, nos) {
 // Audit history: kaun, kab, kya badla (field: purana -> naya)
 const OB_LABELS = { name: 'Name', designation: 'Designation', phone: 'Phone', alt_phone: 'Alternate phone', alt_phone_na: 'Alternate N/A',
   resume_link: 'Resume link', portfolio_link: 'Portfolio link', video_link: 'Intro video link', email: 'Email', location: 'Location',
-  dob: 'Date of birth', esis: 'ESIS', contract: 'Contract signed', probation_days: 'Probation', ref_by: 'Ref. by', notes: 'Notes' };
+  dob: 'Date of birth', esis: 'ESIS', contract: 'Contract signed', docs_collected: 'Documents collected', probation_days: 'Probation', ref_by: 'Ref. by', notes: 'Notes' };
 function obDiff(old, f) {
   return Object.keys(OB_LABELS).filter(k => f[k] !== undefined && String(f[k] == null ? '' : f[k]) !== String(old[k] == null ? '' : old[k]))
     .map(k => OB_LABELS[k] + ': ' + (String(old[k] || '') || '—') + ' → ' + (String(f[k] || '') || '—')).join('; ');
@@ -4993,7 +4995,8 @@ async function obAudit(jid, action, details, me, uid) {
   } catch (e) { console.error('  onboarding audit:', e.message); }
 }
 // Lock: Step 3 complete hote hi. Unlock: Admin, ya jinhe Admin ne Step Admin me ijazat di
-const obLocked = j => String(j.locked) === '1';
+// Harsh (24 Oct): lock hata diya -- Step 3 ke baad bhi Admin / HR details edit kar sakte hain
+const obLocked = j => false;
 const OB_LOCK_MSG = 'Details lock hain (Step 3 complete) -- pehle Unlock karo';
 const OB_UNLOCK_KEY = 'onboarding_unlockers';
 async function obUnlockers() {
@@ -5010,7 +5013,8 @@ async function obCanUnlock(req) { return req.session.role === 'admin' || (await 
 const OB_FILE_KINDS = {
   resume:    { label: 'Resume', exts: ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'webp'] },
   portfolio: { label: 'Portfolio', exts: ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'jpg', 'jpeg', 'png', 'webp'] },
-  video:     { label: 'Intro video', exts: ['mp4', 'mov', 'webm', 'mkv', '3gp', 'avi', 'm4v'] }
+  video:     { label: 'Intro video', exts: ['mp4', 'mov', 'webm', 'mkv', '3gp', 'avi', 'm4v'] },
+  documents: { label: 'Documents', exts: ['pdf'] }       // Step 3 -- sirf PDF
 };
 const OB_FILE_MAX_MB = 500;
 const OB_CHUNK_B64_MAX = 8 * 1024 * 1024;        // ek tukda (base64) -- app 4 MB ke bhejta hai
@@ -5245,7 +5249,7 @@ app.get('/api/onboarding', requireAuth, obMw, async (req, res) => {
       return {
         id: String(j.id), name: j.name || '', designation: j.designation || '',
         phone: j.phone || '', email: j.email || '', refBy: j.ref_by || '', docs, interview: obInterview(j, ivRow),
-        locked: obLocked(j), lockNote: j.lock_note || '',
+        locked: false, lockNote: '', docsCollected: j.docs_collected || '',
         altPhone: j.alt_phone || '', altPhoneNA: String(j.alt_phone_na) === '1',
         salary: canManage ? (j.salary || '') : '', location: j.location || '', dob: j.dob || '',
         joiningDate: j.joining_date || '', esis: j.esis || '', contract: j.contract || '',
@@ -5426,13 +5430,15 @@ app.put('/api/onboarding/:id/steps/:no', requireAuth, obMw, async (req, res) => 
         diData = { name: f.name, designation: f.designation, phone: f.phone, alt_phone: f.alt_phone, alt_phone_na: f.alt_phone_na, is_sales: f.is_sales,
           resume_link: f.resume_link, portfolio_link: f.portfolio_link, video_link: f.video_link, updated_at: now };
       }
-      // Step 3: Remaining Employee Details -- Done ke saath, phir lock
+      // Step 3: Remaining Employee Details -- Done ke saath (Step 1 ki details bhi yahin edit; lock nahi)
       if (def.empDetails) {
-        const f = obClean(obPick(b, OB_EMP_KEYS), j);
-        const bad = obCheckEmp(f);
+        const f = obClean(obPick(b, OB_STEP1_KEYS.concat(OB_EMP_KEYS)), j);
+        const bad = obCheck(f) || obCheckEmp(f) || (!f.docs_collected ? 'Documents collected? -- Yes / No chuno' : '');
         if (bad) return res.status(400).json({ error: bad });
-        empData = { email: f.email, location: f.location, dob: f.dob, esis: f.esis, contract: f.contract, probation_days: f.probation_days,
-          ref_by: f.ref_by, notes: f.notes, locked: '1', lock_note: '', updated_at: now };
+        empData = { name: f.name, designation: f.designation, phone: f.phone, alt_phone: f.alt_phone, alt_phone_na: f.alt_phone_na, is_sales: f.is_sales,
+          resume_link: f.resume_link, portfolio_link: f.portfolio_link, video_link: f.video_link,
+          email: f.email, location: f.location, dob: f.dob, esis: f.esis, contract: f.contract, docs_collected: f.docs_collected, probation_days: f.probation_days,
+          ref_by: f.ref_by, notes: f.notes, locked: '0', lock_note: '', updated_at: now };
       }
       const note = String(b.note || '').trim().slice(0, 1000);
       if (action === 'rejected') {
@@ -5471,7 +5477,6 @@ app.put('/api/onboarding/:id/steps/:no', requireAuth, obMw, async (req, res) => 
       await db.update('HR_Onboarding', String(j.id), empData);
       await obSyncSteps(j, Object.assign({}, j, empData), now);
       await obAudit(j.id, 'details', 'Step 3: ' + (obDiff(j, empData) || 'details bhari'), me, uid);
-      await obAudit(j.id, 'lock', 'Step 3 complete -- details lock', me, uid);
     }
     // History: step ke kaam (doer badalna nahi)
     if (action) {
@@ -5509,7 +5514,7 @@ async function obFileMetaAll(jid) {
 }
 app.post('/api/onboarding/:id/files/start', requireAuth, obMw, async (req, res) => {
   try {
-    const ctx = await obFileReq(req, res, [OB_DI_NO]);
+    const ctx = await obFileReq(req, res, [OB_DI_NO, OB_EMP_NO]);
     if (!ctx) return;
     if (obLocked(ctx.j)) return res.status(403).json({ error: OB_LOCK_MSG });
     const { kind, fileName, mimeType, size } = req.body || {};
@@ -5531,7 +5536,7 @@ app.post('/api/onboarding/:id/files/start', requireAuth, obMw, async (req, res) 
 });
 app.post('/api/onboarding/:id/files/:fid/chunk', requireAuth, obMw, async (req, res) => {
   try {
-    const ctx = await obFileReq(req, res, [OB_DI_NO]);
+    const ctx = await obFileReq(req, res, [OB_DI_NO, OB_EMP_NO]);
     if (!ctx) return;
     if (!(await obUploadRow(ctx.j, req.params.fid))) return res.status(404).json({ error: 'Upload nahi mili -- dobara try karo' });
     const seq = parseInt((req.body || {}).seq, 10);
@@ -5548,7 +5553,7 @@ app.post('/api/onboarding/:id/files/:fid/chunk', requireAuth, obMw, async (req, 
 });
 app.post('/api/onboarding/:id/files/:fid/finish', requireAuth, obMw, async (req, res) => {
   try {
-    const ctx = await obFileReq(req, res, [OB_DI_NO]);
+    const ctx = await obFileReq(req, res, [OB_DI_NO, OB_EMP_NO]);
     if (!ctx) return;
     const f = await obUploadRow(ctx.j, req.params.fid);
     if (!f) return res.status(404).json({ error: 'Upload nahi mili -- dobara try karo' });
@@ -5607,7 +5612,7 @@ app.get('/api/onboarding/:id/files/:kind', requireAuth, obMw, async (req, res) =
 app.delete('/api/onboarding/:id/files/:kind', requireAuth, obMw, async (req, res) => {
   try {
     const { me, uid, canManage } = await obWho(req);
-    if (!canManage && !(await obIsDoer(req.params.id, uid, [OB_DI_NO]))) return res.status(403).json({ error: 'Not allowed' });
+    if (!canManage && !(await obIsDoer(req.params.id, uid, [OB_DI_NO, OB_EMP_NO]))) return res.status(403).json({ error: 'Not allowed' });
     if (!OB_FILE_KINDS[req.params.kind]) return res.status(400).json({ error: 'File type galat hai' });
     const j = await db.findOne('HR_Onboarding', { id: String(req.params.id) });
     if (j && obLocked(j)) return res.status(403).json({ error: OB_LOCK_MSG });
