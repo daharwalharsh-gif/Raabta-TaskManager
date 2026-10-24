@@ -336,7 +336,7 @@ class MySqlDB {
     this._cache = {};       // { table: { data, ts } }
     this._hdrCache = {};    // { table: string[] }
     this._colsCache = {};   // { table: Set<colName> }
-    this.TTL = 2000;        // short cache to coalesce repeat reads within a request
+    this.TTL = parseInt(process.env.DB_CACHE_TTL_MS, 10) || 2000;   // short cache to coalesce repeat reads within a request (local test par .env se lamba)
   }
 
   _invalidate(table) { delete this._cache[table]; }
