@@ -5220,7 +5220,9 @@ app.get('/api/onboarding', requireAuth, obMw, async (req, res) => {
         const tat = tatMap[String(s.no)];
         s.tat = tat != null ? tat : null;
         if (s.na) return;
+        // Day 0 = entry upload: na TAT, na joining-date wali plan to 0 din -- step jis din chalu ho usi din due
         if (tat != null) s.plan = obAddDays(prevEnd, tat);
+        else if (!s.plan) s.plan = obAddDays(prevEnd, 0);
         const doneDay = String(s.doneAt || '').slice(0, 10);
         prevEnd = s.done && isRealDate(doneDay) ? doneDay : (s.plan || prevEnd);
       });
