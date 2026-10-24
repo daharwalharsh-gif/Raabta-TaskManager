@@ -7805,6 +7805,7 @@ function obPipelineHtml() {
     '<div class="k">ALL</div><div class="t">All Employees &middot; Full Data</div>' +
     '<div class="n"><b>' + _ob.joinees.length + '</b> employees <span class="r pill">' + act.length + ' pending</span></div></div>';
   _ob.steps.forEach(def => {
+    if (def.dataInputs) return;   // Step 1 entry ke saath hi complete -- uska tab nahi dikhana
     const here = act.filter(j => { const c = curOf.get(j.id); return c && c.no === def.no; });
     const late = here.filter(j => curOf.get(j.id).status === 'late').length;
     const ph = obPhase(def.phase);
