@@ -217,6 +217,27 @@ textarea.gold-inp{resize:vertical;}
 .ob-fileinfo .ok{color:#15803d;font-weight:600;}
 .ob-fileinfo .bad{color:#dc2626;font-weight:600;}
 .ob-fileinfo button{font-family:inherit;font-size:11.5px;font-weight:600;border:none;background:none;color:#dc2626;cursor:pointer;padding:0 4px;}
+/* Upload: turant save, preview, hatao / badlo */
+.ob-up{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid #e2e8f0;background:#f8fafc;border-radius:10px;padding:8px 10px;}
+.ob-up.ok{background:#f0fdf4;border-color:#bbf7d0;} .ob-up.err{background:#fef2f2;border-color:#fecaca;}
+.ob-upth{width:44px;height:44px;border-radius:8px;object-fit:cover;background:#e2e8f0;flex:none;display:flex;align-items:center;justify-content:center;font-size:20px;}
+.ob-upmeta{min-width:0;flex:1 1 140px;font-size:12px;color:#475569;} .ob-upmeta b{display:block;color:#0f172a;word-break:break-all;}
+.ob-upmeta .ok{color:#15803d;font-weight:700;} .ob-upmeta .bad{color:#dc2626;font-weight:600;}
+.ob-upbtns{display:flex;gap:6px;flex-wrap:wrap;}
+.ob-fileinfo .ob-upbtns button{font-family:inherit;font-size:11.5px;font-weight:600;border:1px solid #e2e8f0;background:#fff;color:#334155;border-radius:7px;padding:5px 10px;cursor:pointer;}
+.ob-fileinfo .ob-upbtns button.del{color:#dc2626;border-color:#fecaca;}
+.ob-upbar{height:6px;border-radius:99px;background:#e2e8f0;overflow:hidden;flex:1 1 100%;} .ob-upbar i{display:block;height:100%;background:#2e8b65;transition:width .15s;}
+/* Complete Task checklist */
+.ob-chk{margin:10px 0 4px;border:1px solid #e2e8f0;border-radius:10px;padding:8px 10px;background:#f8fafc;}
+.ob-chkt{font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:#64748b;margin-bottom:6px;display:flex;justify-content:space-between;}
+.ob-chki{display:grid;grid-template-columns:20px minmax(0,1fr);gap:2px 8px;align-items:start;font-size:13px;color:#1e293b;padding:6px 2px;border-bottom:1px dashed #e2e8f0;cursor:pointer;}
+.ob-chki:last-child{border-bottom:none;} .ob-chki input{margin-top:3px;accent-color:#2e8b65;}
+.ob-chki em{grid-column:2;font-style:normal;font-size:11px;color:#94a3b8;} .ob-chki.on span{color:#15803d;}
+.ob-chkh{display:inline-block;font-size:10.5px;font-weight:700;padding:3px 7px;border-radius:999px;background:#e0f2fe;color:#0369a1;margin-left:4px;white-space:nowrap;}
+.ob-chklist{list-style:none;margin:8px 0 0;padding:8px 10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:12px;}
+.ob-chklist li{display:flex;gap:6px;flex-wrap:wrap;padding:2px 0;color:#94a3b8;} .ob-chklist li.on{color:#334155;}
+.ob-chklist li i{font-style:normal;color:#15803d;font-weight:800;width:14px;} .ob-chklist li em{font-style:normal;font-size:11px;color:#94a3b8;}
+.ob-chklist.none{color:#94a3b8;font-style:italic;list-style:none;}
 /* Resume / portfolio / video ke button */
 .ob-docs{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
 .ob-doc{display:inline-flex;align-items:center;gap:4px;font-family:inherit;font-size:12px;font-weight:600;color:#1d4ed8;background:#eff6ff;border:1px solid #dbeafe;border-radius:999px;padding:3px 10px;cursor:pointer;text-decoration:none;white-space:nowrap;}
@@ -230,6 +251,8 @@ textarea.gold-inp{resize:vertical;}
 .ob-fv-msg span{font-size:12px;color:#94a3b8;}
 /* Side panel (z 1100) ke upar se khulne wale onboarding popup */
 #obJoineeModal,#obInputsModal,#obEmpModal,#obUnlockModal,#obDoneModal,#obAdminModal,#obFileModal{z-index:1200;}
+/* File preview kisi bhi popup (Approve, Step 1 / 3, Complete Task) ke upar khule; Close par wahi popup wapas */
+#obFileModal{z-index:1300;}
 /* Lock patti + history + Director ke liye candidate box */
 .ob-lockbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-radius:10px;padding:9px 12px;font-size:12.5px;font-weight:600;margin-top:12px;}
 .ob-lockbar.on{background:#f1f5f9;border:1px solid #cbd5e1;color:#334155;}
@@ -2795,10 +2818,10 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
   </div>
 </div>
 
-<!-- HR Onboarding — Employee master form (naya / edit) -->
+<!-- HR Onboarding - Employee master form (naya / edit) -->
 <div class="modal-overlay" id="obJoineeModal">
   <div class="modal" style="width:640px;max-width:95vw">
-    <h3 id="obJoineeTitle">Step 1 &mdash; Initial Candidate Details</h3>
+    <h3 id="obJoineeTitle">Step 1 - Initial Candidate Details</h3>
     <div class="alert error" id="obJoineeErr"></div>
     <div class="ob-form">
       <div class="form-group"><label>Employee name <span class="ob-req">*</span></label>
@@ -2807,9 +2830,9 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
         <select id="obfDesigSel" onchange="obOtherToggle('obfDesig')"></select>
         <input type="text" id="obfDesig" class="ob-other" placeholder="Designation likho" maxlength="120" style="display:none"/></div>
       <div class="form-group"><label>Phone <span class="ob-req">*</span></label>
-        <input type="tel" id="obfPhone" placeholder="10-digit mobile" maxlength="20"/></div>
+        <input type="tel" id="obfPhone" placeholder="10-digit mobile" maxlength="10" inputmode="numeric" pattern="[0-9]{10}" oninput="obPhoneIn(this)"/></div>
       <div class="form-group"><label>Alternate phone</label>
-        <input type="tel" id="obfAlt" placeholder="10-digit mobile" maxlength="20"/>
+        <input type="tel" id="obfAlt" placeholder="10-digit mobile" maxlength="10" inputmode="numeric" pattern="[0-9]{10}" oninput="obPhoneIn(this)"/>
         <label class="ob-check"><input type="checkbox" id="obfAltNA" onchange="obAltToggle('obf')"/> Not available</label></div>
       <div class="form-group ob-full"><label>Resume <span class="ob-lim">PDF / Word / image &middot; file ya link</span></label>
         <div class="ob-filebox"><input type="file" id="obfFile_resume" accept=".pdf,.doc,.docx,image/*" onchange="obFilePick('resume')"/>
@@ -2824,18 +2847,18 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
           <input type="url" id="obfLink_video" placeholder="ya link (YouTube / Google Drive…)" maxlength="500"/></div>
         <div class="ob-fileinfo" id="obfInfo_video"></div></div>
     </div>
-    <div class="ob-hint" id="obJoineeHint">Save karte hi <b>Step 1</b> complete &mdash; details <b>Step 2 (Director Review)</b> ke paas jayengi. Email, location, DOB, ESIS, contract, probation, ref. by, notes <b>Step 3</b> me bharne hain (Director ke Approve karne ke baad).</div>
+    <div class="ob-hint" id="obJoineeHint">Save karte hi <b>Step 1</b> complete - details <b>Step 2 (Director Review)</b> ke paas jayengi. Email, location, DOB, ESIS, contract, probation, ref. by, notes <b>Step 3</b> me bharne hain (Director ke Approve karne ke baad).</div>
     <div class="modal-footer" style="justify-content:flex-end;gap:8px">
-      <button class="btn btn-outline" onclick="closeModal('obJoineeModal')">Cancel</button>
+      <button class="btn btn-outline" onclick="obCancelJoinee()">Cancel</button>
       <button class="btn ob-create" id="obJoineeSave" onclick="obSaveJoinee()">Create &amp; send to Director</button>
     </div>
   </div>
 </div>
 
-<!-- HR Onboarding — Step 1 "Data Inputs": Done par candidate ki details -->
+<!-- HR Onboarding - Step 1 "Data Inputs": Done par candidate ki details -->
 <div class="modal-overlay" id="obInputsModal">
   <div class="modal" style="width:640px;max-width:95vw">
-    <h3 id="obInputsTitle">&#10003; Step 1 &mdash; Initial Candidate Details</h3>
+    <h3 id="obInputsTitle">&#10003; Step 1 - Initial Candidate Details</h3>
     <div class="alert error" id="obInputsErr"></div>
     <div class="ob-donewhat" id="obInputsWhat"></div>
     <div class="ob-form">
@@ -2845,9 +2868,9 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
         <select id="obiDesigSel" onchange="obOtherToggle('obiDesig')"></select>
         <input type="text" id="obiDesig" class="ob-other" placeholder="Designation likho" maxlength="120" style="display:none"/></div>
       <div class="form-group"><label>Phone <span class="ob-req">*</span></label>
-        <input type="tel" id="obiPhone" placeholder="10-digit mobile" maxlength="20"/></div>
+        <input type="tel" id="obiPhone" placeholder="10-digit mobile" maxlength="10" inputmode="numeric" pattern="[0-9]{10}" oninput="obPhoneIn(this)"/></div>
       <div class="form-group"><label>Alternate phone</label>
-        <input type="tel" id="obiAlt" placeholder="10-digit mobile" maxlength="20"/>
+        <input type="tel" id="obiAlt" placeholder="10-digit mobile" maxlength="10" inputmode="numeric" pattern="[0-9]{10}" oninput="obPhoneIn(this)"/>
         <label class="ob-check"><input type="checkbox" id="obiAltNA" onchange="obAltToggle('obi')"/> Not available</label></div>
       <div class="form-group ob-full"><label>Resume <span class="ob-lim">PDF / Word / image &middot; file ya link</span></label>
         <div class="ob-filebox"><input type="file" id="obiFile_resume" accept=".pdf,.doc,.docx,image/*" onchange="obFilePick('resume')"/>
@@ -2871,10 +2894,10 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
   </div>
 </div>
 
-<!-- HR Onboarding — Step 3 "Remaining Employee Details" (Done / Edit) -->
+<!-- HR Onboarding - Step 3 "Remaining Employee Details" (Done / Edit) -->
 <div class="modal-overlay" id="obEmpModal">
   <div class="modal" style="width:640px;max-width:95vw">
-    <h3 id="obEmpTitle">&#10003; Step 3 &mdash; Remaining Employee Details</h3>
+    <h3 id="obEmpTitle">&#10003; Step 3 - Remaining Employee Details</h3>
     <div class="alert error" id="obEmpErr"></div>
     <div class="ob-donewhat" id="obEmpWhat"></div>
     <div class="ob-s1box" id="obEmpCand"></div>
@@ -2885,9 +2908,9 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
         <select id="obeDesigSel" onchange="obOtherToggle('obeDesig')"></select>
         <input type="text" id="obeDesig" class="ob-other" placeholder="Designation likho" maxlength="120" style="display:none"/></div>
       <div class="form-group"><label>Phone <span class="ob-req">*</span></label>
-        <input type="tel" id="obePhone" placeholder="10-digit mobile" maxlength="20"/></div>
+        <input type="tel" id="obePhone" placeholder="10-digit mobile" maxlength="10" inputmode="numeric" pattern="[0-9]{10}" oninput="obPhoneIn(this)"/></div>
       <div class="form-group"><label>Alternate phone</label>
-        <input type="tel" id="obeAlt" placeholder="10-digit mobile" maxlength="20"/>
+        <input type="tel" id="obeAlt" placeholder="10-digit mobile" maxlength="10" inputmode="numeric" pattern="[0-9]{10}" oninput="obPhoneIn(this)"/>
         <label class="ob-check"><input type="checkbox" id="obeAltNA" onchange="obAltToggle('obe')"/> Not available</label></div>
       <div class="form-group ob-full"><label>Resume <span class="ob-lim">PDF / Word / image &middot; file ya link</span></label>
         <div class="ob-filebox"><input type="file" id="obeFile_resume" accept=".pdf,.doc,.docx,image/*" onchange="obFilePick('resume')"/>
@@ -2923,8 +2946,8 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
         <input type="text" id="obeNotes" placeholder="Optional" maxlength="300"/></div>
       <div class="form-group"><label>Documents collected? <span class="ob-req">*</span></label>
         <select id="obeDocs"><option value="">Select</option><option value="yes">Yes</option><option value="no">No</option></select></div>
-      <div class="form-group ob-full"><label>Documents <span class="ob-lim">sirf PDF</span></label>
-        <div class="ob-filebox"><input type="file" id="obeFile_documents" accept=".pdf,application/pdf" onchange="obFilePick('documents')"/></div>
+      <div class="form-group ob-full"><label>Documents <span class="ob-lim">PDF / Word / PPT / image / video</span></label>
+        <div class="ob-filebox"><input type="file" id="obeFile_documents" accept=".pdf,.doc,.docx,.ppt,.pptx,image/*,video/*" onchange="obFilePick('documents')"/></div>
         <div class="ob-fileinfo" id="obeInfo_documents"></div></div>
     </div>
     <div class="ob-hint" id="obEmpHint">Step 1 ki details bhi yahin badal sakte ho. Step 3 ke baad bhi Admin details edit kar sakta hai (lock nahi hai).</div>
@@ -2935,7 +2958,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
   </div>
 </div>
 
-<!-- HR Onboarding — Unlock (wajah ke saath) -->
+<!-- HR Onboarding - Unlock (wajah ke saath) -->
 <div class="modal-overlay" id="obUnlockModal">
   <div class="modal" style="max-width:440px">
     <h3>&#128275; Unlock details</h3>
@@ -2951,7 +2974,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
   </div>
 </div>
 
-<!-- HR Onboarding — resume / portfolio / video dekhna -->
+<!-- HR Onboarding - resume / portfolio / video dekhna -->
 <div class="modal-overlay" id="obFileModal">
   <div class="modal" style="width:760px;max-width:95vw">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px">
@@ -2962,20 +2985,20 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
   </div>
 </div>
 
-<!-- HR Onboarding — person par click: details ka popup (beech screen par) -->
+<!-- HR Onboarding - person par click: details ka popup (beech screen par) -->
 <div class="ob-dw-ov" id="obDrawer" onclick="if(event.target===this)obCloseDrawer()">
   <aside class="ob-dw" id="obDrawerBody" role="dialog" aria-label="Employee onboarding"></aside>
 </div>
 
-<!-- HR Onboarding — Step Admin: har step ke saamne doer -->
+<!-- HR Onboarding - Step Admin: har step ke saamne doer -->
 <div class="modal-overlay" id="obAdminModal">
   <div class="modal" style="width:760px;max-width:95vw">
-    <h3>&#9881;&#65039; Step Admin &mdash; har step ka Doer aur TAT</h3>
+    <h3>&#9881;&#65039; Step Admin - har step ka Doer aur TAT</h3>
     <div class="alert error" id="obAdminErr"></div>
     <div class="ob-hint">Har step ke saamne doer chuno (list me na ho to <b>&#9998; Type name</b>). <b>TAT</b> = ye step pichhle step ke Done hone ke kitne din me complete hona chahiye; khali chhodo to 0 din (step jis din chalu ho usi din due, agle din Late). Step 12 aur 13 me Delhi aur Mumbai ke alag doer.</div>
     <div class="ob-admin" id="obAdminBody"></div>
     <div id="obUnlockersBox" style="display:none;margin-top:12px">
-      <div class="ob-ahead" style="grid-template-columns:1fr;position:static;border-radius:8px">&#128275; Unlock ki ijazat (Admin ke alawa) &mdash; Step 3 ke baad lock hui details sirf ye khol sakte hain</div>
+      <div class="ob-ahead" style="grid-template-columns:1fr;position:static;border-radius:8px">&#128275; Unlock ki ijazat (Admin ke alawa) - Step 3 ke baad lock hui details sirf ye khol sakte hain</div>
       <div class="ob-ulist" id="obUnlockersList"></div>
     </div>
     <label class="ob-check" style="margin:12px 0 4px"><input type="checkbox" id="obAdminApply" checked/> Chalu entries ke jo step abhi Done nahi hue, unpar bhi naya doer laga do</label>
@@ -2986,16 +3009,17 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
   </div>
 </div>
 
-<!-- HR Onboarding — step Done -->
+<!-- HR Onboarding - step Done -->
 <div class="modal-overlay" id="obDoneModal">
   <div class="modal" style="max-width:440px">
     <h3 id="obDoneTitle">&#10003; Mark Step Done</h3>
     <div class="alert error" id="obDoneErr"></div>
     <div class="ob-donewhat" id="obDoneWhat"></div>
+    <div id="obDoneChecks"></div>
     <div class="form-group"><label id="obDoneNoteLbl">Note (optional)</label>
       <textarea id="obDoneNote" rows="3" placeholder="Kya kiya, koi link ya detail…"></textarea></div>
     <div class="modal-footer" style="justify-content:space-between">
-      <button class="btn btn-outline" onclick="closeModal('obDoneModal')">Cancel</button>
+      <button class="btn btn-outline" onclick="obCloseDone()">Cancel</button>
       <button class="btn btn-green" id="obDoneBtn" onclick="obSubmitDone()">&#10003; Mark Done &amp; next step</button>
     </div>
   </div>
@@ -7497,7 +7521,7 @@ function ftOpenDetail(sheetRow) {
 }
 
 // ══════════════════════════════════════════════════════
-// HR REPORTING — Employee Onboarding FMS
+// HR REPORTING - Employee Onboarding FMS
 // ══════════════════════════════════════════════════════
 // Harsh (22 Oct): "HR Reporting me pura FMS bana do" -- purana attendance
 // (Excel upload) hata diya. Workflow onboarding_workflow_flowchart.pdf ka:
@@ -7549,7 +7573,16 @@ function obPlanRel(s) {
   if (d > 0) return 'in ' + d + ' day' + (d > 1 ? 's' : '');
   return (-d) + ' day' + (d < -1 ? 's' : '') + ' late';
 }
+// Checklist wale chalu step par kitne point tick hue (2/5)
 function obChip(s) {
+  const c = obChip0(s), d = obDef(s.no);
+  if (d.checklist && !s.done && !s.na && s.status !== 'waiting') {
+    const n = Object.keys(s.checklist || {}).length;
+    if (n) return c + '<span class="ob-chkh">' + n + '/' + d.checklist.length + '</span>';
+  }
+  return c;
+}
+function obChip0(s) {
   if (s.done) return '<span class="ob-chip done">&#10003; Done</span>';
   if (s.na) return '<span class="ob-chip na">N/A</span>';
   if (s.status === 'rejected') return '<span class="ob-chip rej">&#10005; Rejected</span>';
@@ -7561,7 +7594,7 @@ function obChip(s) {
 // Doer ka dropdown: app ke users + haath se likha naam ("✎ Type name…")
 function obDoerSelect(id, manual, kindArgs, disabled) {
   const users = (_ob.users || []);
-  let opts = '<option value="">&mdash; Select Doer &mdash;</option>';
+  let opts = '<option value="">- Select Doer -</option>';
   if (manual) opts += '<option value="__m__" selected>&#9998; ' + obE(manual) + ' (manual)</option>';
   opts += users.map(u => '<option value="' + obE(u.id) + '"' + (!manual && String(u.id) === String(id || '') ? ' selected' : '') + '>' +
     obE(u.name) + (u.department ? ' (' + obE(u.department) + ')' : '') + '</option>').join('');
@@ -7690,14 +7723,14 @@ function obActBtns(j, s) {
   if (obDef(s.no).empDetails) {
     return '<button class="btn btn-green btn-sm" onclick="obOpenEmp(\'' + jid + '\')" title="Email, location, DOB… bharo, phir Done">&#10003; Done</button>';
   }
-  return '<button class="btn btn-green btn-sm" onclick="obAskDone(\'' + jid + '\',' + s.no + ')">&#10003; Done</button>';
+  return '<button class="btn btn-green btn-sm" onclick="obAskDone(\'' + jid + '\',' + s.no + ')">&#10003; Complete Task</button>';
 }
 const OB_FILE_UI = {
   resume: { label: 'Resume', icon: '&#128196;' },
   portfolio: { label: 'Portfolio', icon: '&#127912;' },
   video: { label: 'Intro video', icon: '&#127916;' }
 };
-// Step 3 ke Documents (sirf PDF) -- Step 1 wale resume / portfolio / video ke saath nahi dikhte
+// Step 3 ke Documents (PDF / Word / PPT / image / video) -- Step 1 wale resume / portfolio / video ke saath nahi dikhte
 const OB_ALL_FILE_UI = Object.assign({}, OB_FILE_UI, { documents: { label: 'Documents', icon: '&#128206;' } });
 // Harsh (23 Oct): "kitne bhi MB" -- file 4 MB ke tukdon me jaati hai; ek file 500 MB tak
 const OB_FILE_MAX_MB = 500, OB_CHUNK = 4 * 1024 * 1024;
@@ -7728,7 +7761,7 @@ function obInEditBtn(j) {
 // Step 3 ke Documents: Yes / No + PDF (dekhne ka button)
 function obDocsCollHtml(j) {
   const d = j.docs && j.docs.documents, yes = String(j.docsCollected || '').toLowerCase();
-  const pdf = d && d.file ? ' <button type="button" class="ob-doc" onclick="event.stopPropagation();obViewFile(\'' + obE(j.id) + '\',\'documents\')" title="' + obE(d.file.name) + '">' + OB_ALL_FILE_UI.documents.icon + ' PDF</button>' : '';
+  const pdf = d && d.file ? ' <button type="button" class="ob-doc" onclick="event.stopPropagation();obViewFile(\'' + obE(j.id) + '\',\'documents\')" title="' + obE(d.file.name) + '">' + OB_ALL_FILE_UI.documents.icon + ' File</button>' : '';
   return (yes === 'yes' ? '<b style="color:#15803d">Yes</b>' : yes === 'no' ? '<b>No</b>' : obE(j.docsCollected)) + pdf;
 }
 // Step 3 ho chuka? (pehle details tab lock hoti thi -- ab lock nahi)
@@ -7739,7 +7772,7 @@ function obLockHtml(j) {
   if (!_ob.canManage && !_ob.canUnlock) return '';
   const jid = obE(j.id);
   if (j.locked) {
-    return '<div class="ob-lockbar on">&#128274; Locked &mdash; Step 3 complete, details badal nahi sakte<span class="sp"></span>' +
+    return '<div class="ob-lockbar on">&#128274; Locked - Step 3 complete, details badal nahi sakte<span class="sp"></span>' +
       (_ob.canUnlock ? '<button class="btn btn-outline btn-sm" onclick="obUnlock(\'' + jid + '\')">&#128275; Unlock</button>' : '<span style="font-weight:500">Unlock: Admin se</span>') + '</div>';
   }
   if (!obEmpDone(j)) return '';
@@ -7748,11 +7781,11 @@ function obLockHtml(j) {
 }
 // Director ke liye candidate ki Step 1 details (Approve / Reject popup me)
 function obCandHtml(j) {
-  return '<div class="ob-cand"><b>' + obE(j.name || '—') + '</b> &middot; ' + obE(j.designation || '—') + ' &middot; Phone <b>' + obE(j.phone || '—') + '</b>' +
-    ' &middot; Alternate ' + (j.altPhoneNA ? 'Not available' : '<b>' + obE(j.altPhone || '—') + '</b>') + obDocsHtml(j) + '</div>';
+  return '<div class="ob-cand"><b>' + obE(j.name || '-') + '</b> &middot; ' + obE(j.designation || '-') + ' &middot; Phone <b>' + obE(j.phone || '-') + '</b>' +
+    ' &middot; Alternate ' + (j.altPhoneNA ? 'Not available' : '<b>' + obE(j.altPhone || '-') + '</b>') + obDocsHtml(j) + '</div>';
 }
 // History (audit) -- khulne par server se
-const OB_HIST_LBL = { create: 'Entry', edit: 'Edit', details: 'Step 3', lock: 'Lock', unlock: 'Unlock', approve: 'Approve', reject: 'Reject', step: 'Step', file: 'File', status: 'Status' };
+const OB_HIST_LBL = { check: 'Checklist', create: 'Entry', edit: 'Edit', details: 'Step 3', lock: 'Lock', unlock: 'Unlock', approve: 'Approve', reject: 'Reject', step: 'Step', file: 'File', status: 'Status' };
 async function obLoadHistory(jid, elId) {
   const el = document.getElementById(elId);
   if (!el) return;
@@ -7765,12 +7798,12 @@ async function obLoadHistory(jid, elId) {
     : '<span style="color:#94a3b8">Abhi koi history nahi</span>';
 }
 let _obFileUrl = '';
-async function obViewFile(jid, kind) {
+async function obViewFile(jid, kind, metaOv) {
   const j = obJoinee(jid), ui = OB_ALL_FILE_UI[kind];
   const body = document.getElementById('obFileBody');
-  document.getElementById('obFileTitle').textContent = ui.label + (j ? ' — ' + j.name : '');
-  const meta = j && j.docs && j.docs[kind] && j.docs[kind].file;
-  body.innerHTML = '<div class="ob-fv-msg">Loading…' + (meta && meta.size > 5 * 1048576 ? '<br><span>' + obSize(meta.size) + ' &mdash; badi file, thoda time lagega</span>' : '') + '</div>';
+  document.getElementById('obFileTitle').textContent = ui.label + (j ? ' - ' + j.name : '');
+  const meta = metaOv || (j && j.docs && j.docs[kind] && j.docs[kind].file);
+  body.innerHTML = '<div class="ob-fv-msg">Loading…' + (meta && meta.size > 5 * 1048576 ? '<br><span>' + obSize(meta.size) + ' - badi file, thoda time lagega</span>' : '') + '</div>';
   document.getElementById('obFileModal').classList.add('open');
   try {
     const tok = localStorage.getItem('authToken');
@@ -7785,7 +7818,7 @@ async function obViewFile(jid, kind) {
     if (t.startsWith('image/') || /\.(jpe?g|png|webp)$/.test(nm)) view = '<img src="' + _obFileUrl + '" style="max-width:100%;border-radius:8px;display:block;margin:0 auto"/>';
     else if (t.includes('pdf') || /\.pdf$/.test(nm)) view = '<iframe src="' + _obFileUrl + '" style="width:100%;height:68vh;border:1px solid #e2e8f0;border-radius:8px"></iframe>';
     else if (t.startsWith('video/') || /\.(mp4|webm|m4v|mov)$/.test(nm)) view = '<video src="' + _obFileUrl + '" controls style="width:100%;max-height:68vh;border-radius:8px;background:#000"></video>';
-    else view = '<div class="ob-fv-msg">&#128196; <b>' + obE(r.name) + '</b><br><span>Is file ka preview nahi hota &mdash; Download karke kholo</span></div>';
+    else view = '<div class="ob-fv-msg">&#128196; <b>' + obE(r.name) + '</b><br><span>Is file ka preview nahi hota - Download karke kholo</span></div>';
     body.innerHTML = view + '<div style="margin-top:12px;display:flex;justify-content:flex-end">' +
       '<a class="btn btn-outline btn-sm" href="' + _obFileUrl + '" download="' + obE(r.name || 'file') + '">&#11015; Download</a></div>';
   } catch (e) {
@@ -7850,8 +7883,8 @@ function obListHtml() {
           '<td class="ob-emp" style="cursor:pointer" onclick="obOpenDrawer(\'' + obE(j.id) + '\')"><b>' + obE(j.name) + '</b><span>' + obE(j.designation) + '</span></td>' +
           '<td>' + obE(j.location) + '</td>' +
           '<td class="ob-dt">' + maintDate(j.joiningDate) + '<span>' + obE(obJoinRel(j)) + '</span></td>' +
-          '<td class="ob-dt"><b>' + (s.plan ? maintDate(s.plan) : '&mdash;') + '</b><span>' + obE(obPlanRel(s)) + '</span></td>' +
-          '<td style="min-width:190px">' + (m ? obDoerSelect(s.doerId, s.manualDoer, '\'step\',\'' + obE(j.id) + '\',' + s.no) : obE(s.doerName || '—')) + '</td>' +
+          '<td class="ob-dt"><b>' + (s.plan ? maintDate(s.plan) : '-') + '</b><span>' + obE(obPlanRel(s)) + '</span></td>' +
+          '<td style="min-width:190px">' + (m ? obDoerSelect(s.doerId, s.manualDoer, '\'step\',\'' + obE(j.id) + '\',' + s.no) : obE(s.doerName || '-')) + '</td>' +
           '<td>' + obChip(s) + '</td>' +
           '<td><div class="ob-rowacts">' + ((m || mine) ? obActBtns(j, s) : '') +
             (m ? '<button class="btn btn-outline btn-sm" onclick="obStepAction(\'' + obE(j.id) + '\',' + s.no + ',\'na\')" title="Is employee par ye step lagu nahi">N/A</button>' : '') + '</div></td></tr>';
@@ -7876,7 +7909,7 @@ function obAllRows() {
     (!q || [j.name, j.designation, j.location, j.phone, j.email].some(x => String(x || '').toLowerCase().includes(q))));
   if (!list.length) {
     return '<tr><td colspan="8"><div class="empty">' + (_ob.joinees.length ? 'Is filter me koi employee nahi'
-      : 'Abhi koi entry nahi. <b>+ Employee Entry</b> dabao &mdash; Step 1 (Data Inputs) uske doer ke paas chala jayega.') + '</div></td></tr>';
+      : 'Abhi koi entry nahi. <b>+ Employee Entry</b> dabao - Step 1 (Data Inputs) uske doer ke paas chala jayega.') + '</div></td></tr>';
   }
   return list.map(j => {
     const s = obCur(j), st = obState(j);
@@ -7891,7 +7924,7 @@ function obAllRows() {
       '<td class="ob-dt">' + maintDate(j.joiningDate) + '<span>' + obE(obJoinRel(j)) + '</span></td>' +
       '<td style="min-width:220px">' + curCell + '</td>' +
       '<td><div class="ob-mini"><div class="ob-pbar"><i style="width:' + pct + '%"></i></div>' + p.done + '/' + p.total + '</div></td>' +
-      '<td>' + (s && st === 'active' ? (s.doerName ? obE(s.doerName) : '<span class="ob-warn">doer not set</span>') : '&mdash;') + '</td>' +
+      '<td>' + (s && st === 'active' ? (s.doerName ? obE(s.doerName) : '<span class="ob-warn">doer not set</span>') : '-') + '</td>' +
       '<td>' + (s && st === 'active' ? obChip(s) : '') + '</td>' +
       '<td><div class="ob-rowacts" onclick="event.stopPropagation()">' +
         '<button class="ob-iconbtn" title="Edit" onclick="obOpenJoinee(\'' + obE(j.id) + '\')">&#9999;&#65039;</button>' +
@@ -7902,11 +7935,11 @@ function obAllRows() {
 // ── Ek employee ka poora safar (phase-wise, PDF jaisa) ──
 function obStepInfo(j, no) {
   if (no === 5) return j.altPhoneNA ? 'Alternate number: not available' : (j.altPhone ? 'Alternate: ' + j.altPhone : '');
-  if (no === 10) return 'Contract signed: ' + (j.contract === 'yes' ? 'Yes' : j.contract === 'no' ? 'No' : (j.contract || '—'));
+  if (no === 10) return 'Contract signed: ' + (j.contract === 'yes' ? 'Yes' : j.contract === 'no' ? 'No' : (j.contract || '-'));
   if (no === 15) return j.phone ? 'Phone: ' + j.phone : '';
   if (no === 16) return j.dob ? 'Birthday: ' + maintDate(j.dob) : '';
   if (no === 19) return j.isSales ? 'Sales employee' : '';
-  if (no === 21) return 'ESIS eligible: ' + (j.esis === 'yes' ? 'Yes' : j.esis === 'no' ? 'No' : (j.esis || '—'));
+  if (no === 21) return 'ESIS eligible: ' + (j.esis === 'yes' ? 'Yes' : j.esis === 'no' ? 'No' : (j.esis || '-'));
   return '';
 }
 function obDetailHtml(j) {
@@ -7914,11 +7947,11 @@ function obDetailHtml(j) {
   const p = j.progress, pct = p.total ? Math.round(p.done * 100 / p.total) : 0;
   const st = obState(j), cur = obCur(j);
   const probEnd = (j.steps.find(s => s.no === 22) || {}).plan;
-  const field = (k, v) => '<div><span class="ob-dk">' + k + '</span>' + (v || '&mdash;') + '</div>';
+  const field = (k, v) => '<div><span class="ob-dk">' + k + '</span>' + (v || '-') + '</div>';
   const yn = v => v === 'yes' ? 'Yes' : v === 'no' ? 'No' : obE(v || '');
   let html = '<button class="ob-back" onclick="obBack()">&larr; Pipeline</button>' +
     '<div class="ob-dhead"><div class="ob-dtop"><div class="ob-av">' + obE(obInitials(j.name)) + '</div>' +
-      '<div class="ob-dname"><h3>' + obE(j.name) + '</h3><div>' + obE(j.designation || '—') + ' &middot; ' + obE(j.location) + '</div></div>' +
+      '<div class="ob-dname"><h3>' + obE(j.name) + '</h3><div>' + obE(j.designation || '-') + ' &middot; ' + obE(j.location) + '</div></div>' +
       '<div class="ob-dacts">' +
         (j.locked ? '' : '<button class="btn btn-outline btn-sm" onclick="obOpenJoinee(\'' + obE(j.id) + '\')">&#9999;&#65039; Edit</button>') +
         (st === 'cancelled' || st === 'rejected'
@@ -7980,12 +8013,13 @@ function obStepHtml(j, s, lastDone) {
       (info ? '<div class="ob-sinfo">' + obE(info) + '</div>' : '') +
       '<div class="ob-swhen">' + (s.tat != null ? 'TAT: <b>' + s.tat + ' day' + (s.tat === 1 ? '' : 's') + '</b> (pichhle step ke baad)' : 'When: <b>' + obE(def.when) + '</b>') +
         (s.plan ? ' &middot; Plan <b>' + maintDate(s.plan) + '</b>' + (s.current ? ' <em>(' + obE(obPlanRel(s)) + ')</em>' : '') : '') + '</div>' +
-      (s.done ? '<div class="ob-sdone">&#10003; ' + (def.interview ? 'Approved ' : 'Done ') + obE(obDT(s.doneAt)) + (s.doneBy ? ' by <b>' + obE(s.doneBy) + '</b>' : '') + (s.note ? ' &mdash; ' + obE(s.note) : '') + '</div>' : '') +
-      (s.status === 'rejected' ? '<div class="ob-sdone" style="color:#b91c1c">&#10005; Rejected ' + obE(obDT(s.doneAt)) + (s.doneBy ? ' by <b>' + obE(s.doneBy) + '</b>' : '') + (s.note ? ' &mdash; ' + obE(s.note) : '') + '</div>' : '') +
+      (s.done ? '<div class="ob-sdone">&#10003; ' + (def.interview ? 'Approved ' : 'Done ') + obE(obDT(s.doneAt)) + (s.doneBy ? ' by <b>' + obE(s.doneBy) + '</b>' : '') + (s.note ? ' - ' + obE(s.note) : '') + '</div>' : '') +
+      (s.status === 'rejected' ? '<div class="ob-sdone" style="color:#b91c1c">&#10005; Rejected ' + obE(obDT(s.doneAt)) + (s.doneBy ? ' by <b>' + obE(s.doneBy) + '</b>' : '') + (s.note ? ' - ' + obE(s.note) : '') + '</div>' : '') +
+      obChecklistHtml(def, s) +
       (def.interview || (def.dataInputs && s.done) ? obDocsHtml(j) : '') +
     '</div>' +
     '<div class="ob-sside"><label>Doer</label>' +
-      (m && !s.done ? obDoerSelect(s.doerId, s.manualDoer, '\'step\',\'' + jid + '\',' + s.no) : '<div class="ob-doername">' + obE(s.doerName || '—') + '</div>') +
+      (m && !s.done ? obDoerSelect(s.doerId, s.manualDoer, '\'step\',\'' + jid + '\',' + s.no) : '<div class="ob-doername">' + obE(s.doerName || '-') + '</div>') +
       '<div>' + obChip(s) + '</div>' + (acts ? '<div class="ob-sacts">' + acts + '</div>' : '') + '</div>' +
   '</div>';
 }
@@ -8010,7 +8044,7 @@ function obMineHtml() {
     if (kind === 'wait') {
       const cn = x.j.currentNo, cd = cn ? obDef(cn) : null;
       const who = _ob.canManage ? ((x.j.steps.find(s => s.no === cn) || {}).doerName || '') : (x.j.currentDoer || '');
-      waitTxt = cd ? 'Abhi Step ' + cn + ' (' + cd.title + ')' + (who ? ' — ' + who : '') + ' par hai' : '';
+      waitTxt = cd ? 'Abhi Step ' + cn + ' (' + cd.title + ')' + (who ? ' - ' + who : '') + ' par hai' : '';
     }
     return '<div class="ob-mrow st-' + (kind === 'done' ? 'done' : kind === 'wait' ? 'waiting' : x.s.status) + '">' +
       '<div class="ob-num sm" style="background:' + ph.color + '">' + x.s.no + '</div>' +
@@ -8021,16 +8055,16 @@ function obMineHtml() {
         (info ? '<div class="ob-sinfo">' + obE(info) + '</div>' : '') +
         (def.interview && kind !== 'done' ? obCandHtml(x.j) : '') +
         (waitTxt ? '<div class="ob-smeta">&#9203; ' + obE(waitTxt) + '</div>' : '') +
-        (kind === 'done' ? '<div class="ob-sdone">&#10003; ' + (def.interview ? 'Approved ' : 'Done ') + obE(obDT(x.s.doneAt)) + (x.s.note ? ' &mdash; ' + obE(x.s.note) : '') + '</div>' : '') +
+        (kind === 'done' ? '<div class="ob-sdone">&#10003; ' + (def.interview ? 'Approved ' : 'Done ') + obE(obDT(x.s.doneAt)) + (x.s.note ? ' - ' + obE(x.s.note) : '') + '</div>' : '') +
       '</div>' +
-      '<div class="ob-mside"><div class="ob-mplan">' + (x.s.plan ? maintDate(x.s.plan) : '&mdash;') + '</div>' + obChip(x.s) +
+      '<div class="ob-mside"><div class="ob-mplan">' + (x.s.plan ? maintDate(x.s.plan) : '-') + '</div>' + obChip(x.s) +
         (kind === 'pend' ? obActBtns(x.j, x.s) : '') + '</div>' +
     '</div>';
   };
   const box = t => '<div class="empty" style="background:#fff;border-radius:12px;border:1px solid #e2e8f0">' + t + '</div>';
   return '<div class="ob-sec">Abhi aapki baari (' + pend.length + ')</div>' +
     (pend.length ? pend.map(x => row(x, 'pend')).join('') : box('Abhi koi step aapki baari me nahi &#127881;')) +
-    (wait.length ? '<div class="ob-sec" style="margin-top:18px">Coming up &mdash; pichhla step hote hi aayega (' + wait.length + ')</div>' + wait.map(x => row(x, 'wait')).join('') : '') +
+    (wait.length ? '<div class="ob-sec" style="margin-top:18px">Coming up - pichhla step hote hi aayega (' + wait.length + ')</div>' + wait.map(x => row(x, 'wait')).join('') : '') +
     (done.length ? '<div class="ob-sec" style="margin-top:18px">Recently done</div>' + done.map(x => row(x, 'done')).join('') : '');
 }
 
@@ -8047,7 +8081,7 @@ function obTrackingHtml() {
     '<td class="ob-tprog">' + j.progress.done + '/' + j.progress.total + (j.progress.late ? '<em>late</em>' : '') + '</td>' +
     j.steps.map(s => {
       const def = obDef(s.no);
-      const tip = s.no + '. ' + def.title + ' — ' + (s.done ? 'Done ' + obDT(s.doneAt) + (s.doneBy ? ' by ' + s.doneBy : '')
+      const tip = s.no + '. ' + def.title + ' - ' + (s.done ? 'Done ' + obDT(s.doneAt) + (s.doneBy ? ' by ' + s.doneBy : '')
         : s.na ? 'N/A' : s.status === 'waiting' ? 'Waiting' : 'Pending, plan ' + maintDate(s.plan) + ' (' + obPlanRel(s) + ')') + ' · ' + (s.doerName || 'doer not set');
       return '<td class="ob-tdot"><i class="d-' + s.status + (s.current ? ' cur' : '') + '" title="' + obE(tip) + '"></i></td>';
     }).join('') + '</tr>').join('');
@@ -8066,7 +8100,7 @@ function obWorkflowHtml() {
   };
   let html = '<div class="ob-wintro">' + (m
     ? 'Har step ka <b>default doer</b> yahan chuno (list me na ho to "Type name" se likh do). Nayi entry me apne aap lag jayega, aur chalu entries ke jin step me doer khali hai unme bhi bhar jayega. Kram: Step 1 Initial Candidate Details &rarr; Step 2 Director Review (Approve) &rarr; Step 3 Remaining Employee Details (phir lock) &rarr; &hellip; &rarr; Step 22.'
-    : 'Employee onboarding ka poora kram &mdash; har step pichhle step ke Done hone par khulta hai.') + '</div>';
+    : 'Employee onboarding ka poora kram - har step pichhle step ke Done hone par khulta hai.') + '</div>';
   _ob.phases.forEach(ph => {
     html += '<div class="ob-phase" style="background:' + ph.color + '">Phase ' + ph.no + ' &nbsp;|&nbsp; ' + obE(ph.title) + '</div><div class="ob-steps">' +
       _ob.steps.filter(s => s.phase === ph.no).map(def => {
@@ -8112,18 +8146,18 @@ function obRenderDrawer() {
   const p = j.progress, pct = p.total ? Math.round(p.done * 100 / p.total) : 0;
   const st = obState(j), cur = obCur(j);
   const jid = obE(j.id);
-  const yn = v => v === 'yes' ? 'Yes' : v === 'no' ? 'No' : (v ? obE(v) : '—');
+  const yn = v => v === 'yes' ? 'Yes' : v === 'no' ? 'No' : (v ? obE(v) : '-');
   const R = 27, C = 2 * Math.PI * R;
   const ring = '<div class="ob-ring"><svg viewBox="0 0 66 66"><circle cx="33" cy="33" r="' + R + '" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="7"/>' +
     '<circle cx="33" cy="33" r="' + R + '" fill="none" stroke="#86efac" stroke-width="7" stroke-linecap="round" stroke-dasharray="' + (C * pct / 100).toFixed(1) + ' ' + C.toFixed(1) + '"/></svg><b>' + pct + '%</b></div>';
-  const stTxt = st === 'cancelled' ? 'Cancelled' : st === 'rejected' ? 'Rejected (Director)' : st === 'completed' ? 'Completed 🎉' : (cur && cur.status === 'late' ? 'Late — ' + obPlanRel(cur) : 'On track');
+  const stTxt = st === 'cancelled' ? 'Cancelled' : st === 'rejected' ? 'Rejected (Director)' : st === 'completed' ? 'Completed 🎉' : (cur && cur.status === 'late' ? 'Late - ' + obPlanRel(cur) : 'On track');
   let h = '<div class="ob-dw-top"><button class="ob-dw-x" onclick="obCloseDrawer()" title="Close">&#10005;</button>' +
     '<div class="ob-dw-id"><div class="ob-dw-av">' + obE(obInitials(j.name)) + '</div><div><h3>' + obE(j.name) + '</h3>' +
-      '<div>' + obE(j.designation || '—') + ' &middot; ' + obE(j.location) + '</div></div></div>' +
+      '<div>' + obE(j.designation || '-') + ' &middot; ' + obE(j.location) + '</div></div></div>' +
     '<div class="ob-dw-meta">' + ring + '<div class="ob-dw-facts">' +
       '<div><b>' + p.done + '/' + p.total + '</b> steps done &middot; ' + obE(stTxt) + '</div>' +
       (j.joiningDate ? '<div>Joining <b>' + maintDate(j.joiningDate) + '</b> &middot; ' + obE(obJoinRel(j)) + '</div>' : '') +
-      '<div>Mobile <b>' + obE(j.phone || '—') + '</b></div></div></div>' +
+      '<div>Mobile <b>' + obE(j.phone || '-') + '</b></div></div></div>' +
     '<div class="ob-dw-acts">' +
       (j.locked ? '' : '<button onclick="obOpenJoinee(\'' + jid + '\')">&#9999;&#65039; Edit</button>') +
       '<button onclick="obCloseDrawer();obOpen(\'' + jid + '\')">&#10530; Full view &amp; doers</button>' +
@@ -8142,12 +8176,12 @@ function obRenderDrawer() {
         '<div class="m">Owner: ' + obE(def.owner) + ' &middot; ' + obE(def.channel) + '</div>' +
         (def.note ? '<div class="m" style="color:#334155;font-weight:600">' + obE(def.note) + '</div>' : '') +
         (info ? '<div class="ob-sinfo">' + obE(info) + '</div>' : '') + '</div></div>' +
-      '<div class="ob-dw-nowfoot"><span>Plan <b>' + (cur.plan ? maintDate(cur.plan) : '—') + '</b></span>' + obChip(cur) +
+      '<div class="ob-dw-nowfoot"><span>Plan <b>' + (cur.plan ? maintDate(cur.plan) : '-') + '</b></span>' + obChip(cur) +
         '<span>Doer <b>' + (cur.doerName ? obE(cur.doerName) : '<span class="ob-warn">not set</span>') + '</b></span><span class="sp"></span>' +
         obActBtns(j, cur) + '</div></div>';
   }
   // Details
-  const f = (k, v) => '<div><span>' + k + '</span>' + (v || '—') + '</div>';
+  const f = (k, v) => '<div><span>' + k + '</span>' + (v || '-') + '</div>';
   const probEnd = (j.steps.find(s => s.no === 22) || {}).plan;
   h += '<div class="ob-dw-card ob-dw-half"><h5>Step 1 &middot; Initial Candidate Details</h5><div class="ob-dw-grid">' +
     f('Designation', obE(j.designation)) + f('Phone', obE(j.phone)) +
@@ -8173,9 +8207,9 @@ function obRenderDrawer() {
       const def = obDef(s.no);
       const cls = s.done ? 'done' : s.na ? 'na' : s.status === 'waiting' ? 'waiting' : s.status === 'late' ? 'late cur' : 'cur';
       const right = s.done ? '<b>&#10003; ' + obE(obDT(s.doneAt).slice(0, 10)) + '</b>' + obE(s.doneBy || '')
-        : s.na ? '<b>N/A</b>' : '<b>' + (s.plan ? maintDate(s.plan) : '—') + '</b>' + (s.current ? obE(obPlanRel(s)) : 'plan');
+        : s.na ? '<b>N/A</b>' : '<b>' + (s.plan ? maintDate(s.plan) : '-') + '</b>' + (s.current ? obE(obPlanRel(s)) : 'plan');
       h += '<div class="ob-tl-row ' + cls + '"><div class="ob-tl-dot">' + (s.done ? '&#10003;' : s.no) + '</div>' +
-        '<div style="min-width:0"><div class="tt">' + obE(def.title) + '</div><div class="dd">' + obE(s.doerName || 'doer not set') + (s.note ? ' &middot; ' + obE(s.note) : '') + '</div></div>' +
+        '<div style="min-width:0"><div class="tt">' + obE(def.title) + '</div><div class="dd">' + obE(s.doerName || 'doer not set') + (s.note ? ' &middot; ' + obE(s.note) : '') + '</div>' + obChecklistHtml(def, s) + '</div>' +
         '<div class="rt">' + right + '</div></div>';
     });
   });
@@ -8188,7 +8222,7 @@ function obRenderDrawer() {
 function obAdminSelect(no, loc) {
   const o = (_ob.owners || {})[no + '|' + (loc || '')] || {};
   const orig = o.id ? 'u:' + o.id : (o.manual ? 'm:' + o.name : '');
-  let opts = '<option value="">&mdash; Select Doer &mdash;</option>';
+  let opts = '<option value="">- Select Doer -</option>';
   if (o.manual) opts += '<option value="__m__" selected>&#9998; ' + obE(o.name) + ' (manual)</option>';
   opts += (_ob.users || []).map(u => '<option value="' + obE(u.id) + '"' + (!o.manual && String(u.id) === String(o.id || '') ? ' selected' : '') + '>' +
     obE(u.name) + (u.department ? ' (' + obE(u.department) + ')' : '') + '</option>').join('');
@@ -8297,11 +8331,13 @@ function obAskDone(jid, no, mode) {
   const next = j ? j.steps.find(s => s.no > no && !s.na && !s.done) : null;
   const nextTxt = next ? 'Step ' + next.no + ' (' + obE(obDef(next.no).title) + ')' : '';
   document.getElementById('obDoneTitle').innerHTML = mode === 'selected' ? '&#10003; Approve candidate'
-    : mode === 'rejected' ? '&#10005; Reject candidate' : '&#10003; Mark Step Done';
+    : mode === 'rejected' ? '&#10005; Reject candidate' : '&#10003; Complete Task';
   document.getElementById('obDoneWhat').innerHTML = '<b>' + no + '. ' + obE(def.title) + '</b><span>For ' + obE(j ? j.name : '') +
     (mode === 'rejected' ? ' &middot; flow yahin rukega (baad me Reactivate ho sakta hai)'
       : (nextTxt ? ' &middot; agla: ' + nextTxt : '')) + '</span>' +
     (j && (mode === 'selected' || mode === 'rejected') ? obCandHtml(j) : '');
+  const stp = j ? j.steps.find(x => x.no === no) : null;
+  document.getElementById('obDoneChecks').innerHTML = def.checklist && mode === 'done' ? obChecksHtml(def, stp) : '';
   document.getElementById('obDoneNoteLbl').textContent = mode === 'selected' || mode === 'rejected' ? 'Remarks (optional)' : 'Note (optional)';
   const btn = document.getElementById('obDoneBtn');
   btn.className = 'btn ' + (mode === 'rejected' ? 'btn-rej' : 'btn-green');
@@ -8309,6 +8345,59 @@ function obAskDone(jid, no, mode) {
   document.getElementById('obDoneNote').value = '';
   document.getElementById('obDoneErr').style.display = 'none';
   document.getElementById('obDoneModal').classList.add('open');
+  obDoneSync();
+}
+// ── Complete Task checklist: har point tick hote hi save; saare tick hone par hi Done ──
+function obChecksHtml(def, step) {
+  return '<div class="ob-chk"><div class="ob-chkt"><span>Checklist</span><span id="obChkCnt"></span></div>' + def.checklist.map(c => {
+    const t = step && step.checklist && step.checklist[c.id];
+    return '<label class="ob-chki' + (t ? ' on' : '') + '" id="obChk_' + c.id + '"><input type="checkbox"' + (t ? ' checked' : '') + ' onchange="obTick(\'' + c.id + '\',this)"/><span>' + obE(c.label) + '</span><em>' +
+      (t ? obE(t.byName || '') + (t.at ? ' &middot; ' + obE(obDT(t.at)) : '') : '') + '</em></label>';
+  }).join('') + '</div>';
+}
+function obDoneSync() {
+  const d = _obDone, btn = document.getElementById('obDoneBtn');
+  const def = d ? obDef(d.no) : null;
+  if (!d || !def || !def.checklist || d.mode !== 'done') { btn.disabled = false; return; }
+  const j = obJoinee(d.jid), st = j && j.steps.find(x => x.no === d.no);
+  const n = Object.keys((st && st.checklist) || {}).length, tot = def.checklist.length;
+  const cnt = document.getElementById('obChkCnt'); if (cnt) cnt.textContent = n + '/' + tot;
+  btn.disabled = n < tot;
+  btn.title = n < tot ? 'Pehle checklist ke saare points tick karo' : '';
+}
+async function obTick(itemId, cb) {
+  const d = _obDone;
+  if (!d) return;
+  const on = cb.checked, err = document.getElementById('obDoneErr');
+  cb.disabled = true;
+  const r = await api('/api/onboarding/' + d.jid + '/steps/' + d.no, 'PUT', { action: 'tick', item: itemId, checked: on });
+  cb.disabled = false;
+  if (!r || r.error) { cb.checked = !on; err.textContent = (r && r.error) || 'Could not save'; err.style.display = 'block'; return; }
+  err.style.display = 'none';
+  const j = obJoinee(d.jid), st = j && j.steps.find(x => x.no === d.no);
+  const now = new Date(Date.now() + 330 * 60000).toISOString().replace('T', ' ').slice(0, 19);
+  if (st) { st.checklist = st.checklist || {}; if (on) st.checklist[itemId] = { at: now, byName: (_ob.me && _ob.me.name) || '' }; else delete st.checklist[itemId]; }
+  const row = document.getElementById('obChk_' + itemId);
+  if (row) { row.classList.toggle('on', on); row.querySelector('em').innerHTML = on ? obE((_ob.me && _ob.me.name) || '') + ' &middot; ' + obE(obDT(now)) : ''; }
+  obDoneSync();
+}
+function obCloseDone() {
+  closeModal('obDoneModal');
+  _obDone = null;
+  obRender();                                     // 2/5 jaisa hint taaza
+  if (_obDrawerId && obJoinee(_obDrawerId)) obRenderDrawer();
+}
+// Journey me: kaun se point kisne kab tick kiye
+function obChecklistHtml(def, s) {
+  if (!def.checklist) return '';
+  const cl = s.checklist || {}, n = Object.keys(cl).length;
+  if (s.done && !n) return '<div class="ob-chklist none">Done (no checklist)</div>';
+  if (!n) return '';
+  return '<ul class="ob-chklist">' + def.checklist.map(c => {
+    const t = cl[c.id];
+    return '<li class="' + (t ? 'on' : '') + '"><i>' + (t ? '&#10003;' : '&#9744;') + '</i><span>' + obE(c.label) + '</span>' +
+      (t ? '<em>' + obE(t.byName || '') + (t.at ? ' &middot; ' + obE(obDT(t.at)) : '') + '</em>' : '') + '</li>';
+  }).join('') + '</ul>';
 }
 async function obSubmitDone() {
   if (!_obDone) return;
@@ -8322,8 +8411,8 @@ async function obSubmitDone() {
     if (!r || r.error) throw new Error((r && r.error) || 'Could not save');
     closeModal('obDoneModal');
     _obDone = null;
-    showToast(d.mode === 'rejected' ? 'Candidate rejected' : d.mode === 'selected' ? '✅ Approved — ab Step 3 (Remaining Employee Details)'
-      : '✅ Step done — agla step khul gaya', 'success');
+    showToast(d.mode === 'rejected' ? 'Candidate rejected' : d.mode === 'selected' ? '✅ Approved - ab Step 3 (Remaining Employee Details)'
+      : '✅ Step done - agla step khul gaya', 'success');
     await loadOnboarding(1);
   } catch (e) {
     err.textContent = e.message || 'Could not save';
@@ -8379,36 +8468,117 @@ let _obInId = '', _obInEdit = false, _obFiles = {}, _obFileDel = {}, _obReading 
 // Files abhi kaun sa form le raha hai: 'obi' = Step 1 popup, 'obf' = entry form;
 // _obFileJid = jis entry ki purani file dikhani hai ('' = nayi entry)
 let _obFilePre = 'obi', _obFileJid = '';
+let _obUp = {}, _obDraft = '';       // upload ka haal (neeche) aur nayi entry ke form ka draft token
 function obSize(b) { return b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB'; }
-function obFileInfo(kind) {
-  const el = document.getElementById(_obFilePre + 'Info_' + kind);
-  const j = _obFileJid ? obJoinee(_obFileJid) : null;
-  const old = j && j.docs && j.docs[kind] && j.docs[kind].file;
-  const nf = _obFiles[kind];
-  el.innerHTML = nf ? '<span class="ok">&#10003; ' + obE(nf.name) + ' &middot; ' + obSize(nf.size) + '</span> &mdash; save par upload hogi' +
-      (old ? ' (purani ' + obE(old.name) + ' ki jagah)' : '')
-    : old && !_obFileDel[kind] ? '&#128206; ' + obE(old.name) + ' &middot; ' + obSize(old.size) +
-      ' <button type="button" onclick="_obFileDel.' + kind + '=true;obFileInfo(\'' + kind + '\')">&#10005; hatao</button>'
-    : old ? '<span class="bad">' + obE(old.name) + ' hat jayegi</span> <button type="button" style="color:#2563eb" onclick="_obFileDel.' + kind + '=false;obFileInfo(\'' + kind + '\')">wapas</button>'
-    : '';
+// ── Upload: file chunte hi turant upload (progress), preview, hatao / badlo ──
+// Har form (obf = entry form, obi = Step 1 popup, obe = Step 3 popup) ki har file ka apna state:
+// _obUp[pre + '_' + kind] = { st: 'uploading' | 'saved' | 'error' | 'bad', name, size, type, at, pct, err, file, prev, thumb }
+const OB_FILE_EXTS = {
+  resume: ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'webp'],
+  portfolio: ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'jpg', 'jpeg', 'png', 'webp'],
+  video: ['mp4', 'mov', 'webm', 'mkv', '3gp', 'avi', 'm4v'],
+  documents: ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'jpg', 'jpeg', 'png', 'webp', 'mp4', 'mov', 'webm', 'mkv', '3gp', 'avi', 'm4v']
+};
+const OB_UP_BTN = { obf: 'obJoineeSave', obi: 'obInputsBtn', obe: 'obEmpBtn' };
+// Sirf 10 digit ka number (phone / alternate phone)
+function obPhoneIn(el) { const d = el.value.replace(/\D/g, '').slice(0, 10); if (el.value !== d) el.value = d; }
+function obPh(v) { let d = String(v == null ? '' : v).replace(/\D/g, ''); if (d.length > 10) d = d.slice(-10); return d; }
+function obNowStr() { return new Date(Date.now() + 330 * 60000).toISOString().replace('T', ' ').slice(0, 19); }
+function obFileInfo(kind) { obUpRender(_obFilePre, kind); }
+// Form khulte waqt: purani file (agar hai) "saved" dikhe
+function obUpReset(pre, jid) {
+  Object.keys(_obUp).forEach(k => { const u = _obUp[k]; if (u && u.thumb) URL.revokeObjectURL(u.thumb); delete _obUp[k]; });
+  const j = jid ? obJoinee(jid) : null;
+  Object.keys(OB_ALL_FILE_UI).forEach(k => {
+    const f = j && j.docs && j.docs[k] && j.docs[k].file;
+    _obUp[pre + '_' + k] = f ? { st: 'saved', name: f.name, size: f.size, type: f.type, at: f.at || '' } : null;
+    if (f) obUpThumb(pre, k, jid);
+  });
+}
+// Server par jo file save hui wahi dikhao (image ka chhota thumbnail)
+async function obUpThumb(pre, kind, jid) {
+  const key = pre + '_' + kind, u = _obUp[key];
+  if (!u || u.thumb || u.size > 8 * 1048576 || !(/^image\//.test(u.type || '') || /\.(jpe?g|png|webp)$/i.test(u.name || ''))) return;
+  try {
+    const tok = localStorage.getItem('authToken');
+    const resp = await fetch('/api/onboarding/' + jid + '/files/' + kind, { headers: tok ? { Authorization: 'Bearer ' + tok } : {}, credentials: 'include' });
+    if (!resp.ok) return;
+    const url = URL.createObjectURL(await resp.blob());
+    if (_obUp[key] !== u) { URL.revokeObjectURL(url); return; }
+    u.thumb = url;
+    obUpRender(pre, kind);
+  } catch (e) { /* thumbnail na aaye to bhi theek */ }
+}
+function obUpRender(pre, kind) {
+  const el = document.getElementById(pre + 'Info_' + kind);
+  if (!el) return;
+  const inp = document.getElementById(pre + 'File_' + kind), link = document.getElementById(pre + 'Link_' + kind);
+  const u = _obUp[pre + '_' + kind], has = !!u && u.st !== 'bad';
+  if (inp) inp.style.display = has ? 'none' : '';
+  if (link) {
+    if (!link.dataset.ph) link.dataset.ph = link.placeholder;
+    link.disabled = has;
+    link.placeholder = has ? 'File upload hai - link ke liye pehle file Remove karo' : link.dataset.ph;
+  }
+  if (!u) { el.innerHTML = ''; return; }
+  const k = "'" + kind + "'";
+  const th = u.thumb ? '<img class="ob-upth" src="' + u.thumb + '" alt=""/>' : '<div class="ob-upth">' + OB_ALL_FILE_UI[kind].icon + '</div>';
+  if (u.st === 'bad') { el.innerHTML = '<span class="bad">&#9888;&#65039; ' + obE(u.err) + '</span>'; return; }
+  if (u.st === 'uploading') {
+    el.innerHTML = '<div class="ob-up">' + th + '<div class="ob-upmeta"><b>' + obE(u.name) + '</b>' + obSize(u.size) + ' &middot; Uploading ' + u.pct + '%</div>' +
+      '<div class="ob-upbar"><i style="width:' + u.pct + '%"></i></div></div>';
+    return;
+  }
+  if (u.st === 'error') {
+    el.innerHTML = '<div class="ob-up err">' + th + '<div class="ob-upmeta"><b>' + obE(u.name) + '</b><span class="bad">' + obE(u.err) + '</span></div><div class="ob-upbtns">' +
+      (u.file ? '<button type="button" onclick="obUpRetry(' + k + ')">&#8635; Retry</button>' : '') +
+      (u.prev ? '<button type="button" onclick="obUpKeepOld(' + k + ')">Purani rakho</button>' : '') +
+      '<button type="button" class="del" onclick="obUpRemove(' + k + ')">Remove</button></div></div>';
+    return;
+  }
+  el.innerHTML = '<div class="ob-up ok">' + th + '<div class="ob-upmeta"><b>' + obE(u.name) + '</b>' + obSize(u.size) + (u.at ? ' &middot; ' + obE(obDT(u.at)) : '') +
+    ' &middot; <span class="ok">&#10003; Saved</span></div><div class="ob-upbtns">' +
+    '<button type="button" onclick="obUpPreview(' + k + ')">&#128065; Preview</button>' +
+    '<button type="button" onclick="obUpReplace(' + k + ')">Replace</button>' +
+    '<button type="button" class="del" onclick="obUpRemove(' + k + ')">Remove</button></div></div>';
+}
+// Upload chal rahi ya fail hui file ho to Save band
+function obUpBusy(pre) {
+  return Object.keys(_obUp).some(k => k.indexOf(pre + '_') === 0 && _obUp[k] && (_obUp[k].st === 'uploading' || _obUp[k].st === 'error'));
+}
+function obUpSync(pre) {
+  const btn = document.getElementById(OB_UP_BTN[pre]);
+  if (!btn) return;
+  const busy = obUpBusy(pre);
+  btn.disabled = busy;
+  btn.title = busy ? 'File upload poori hone do (ya fail wali file Retry / Remove karo)' : '';
+}
+// Local data me bhi file ka haal badlo (taaki baaki screen bhi taaza dikhe)
+function obUpMeta(jid, kind, meta) {
+  const j = obJoinee(jid);
+  if (j && j.docs && j.docs[kind]) j.docs[kind].file = meta;
+}
+function obUpBad(kind, f) {
+  const lbl = OB_ALL_FILE_UI[kind].label, ext = (String(f.name).split('.').pop() || '').toLowerCase();
+  if (!f.size) return lbl + ': file khali hai';
+  if (f.size > OB_FILE_MAX_MB * 1024 * 1024) return lbl + ' ' + OB_FILE_MAX_MB + ' MB se badi hai - link daal do';
+  if (!(OB_FILE_EXTS[kind].includes(ext) || (kind === 'video' && /^video\//.test(f.type || '')))) {
+    return lbl + ': ye file type nahi chalega (' + OB_FILE_EXTS[kind].join(', ') + ')';
+  }
+  return '';
 }
 function obFilePick(kind) {
-  const inp = document.getElementById(_obFilePre + 'File_' + kind), f = inp.files && inp.files[0], ui = OB_ALL_FILE_UI[kind];
-  const el = document.getElementById(_obFilePre + 'Info_' + kind);
-  delete _obFiles[kind];
-  if (!f) { obFileInfo(kind); return; }
-  if (!f.size || f.size > OB_FILE_MAX_MB * 1024 * 1024) {
-    inp.value = '';
-    el.innerHTML = '<span class="bad">&#9888;&#65039; ' + obE(ui.label) + (f.size ? ' ' + OB_FILE_MAX_MB + ' MB se badi hai &mdash; link daal do' : ': file khali hai') + '</span>';
+  const pre = _obFilePre, key = pre + '_' + kind;
+  const inp = document.getElementById(pre + 'File_' + kind), f = inp.files && inp.files[0];
+  if (!f) return;
+  const bad = obUpBad(kind, f);
+  inp.value = '';
+  if (bad) {
+    if (_obUp[key] && _obUp[key].st !== 'bad') showToast(bad, 'error');          // purani file waisi hi rahegi
+    else { _obUp[key] = { st: 'bad', err: bad }; obUpRender(pre, kind); }
     return;
   }
-  if (kind === 'documents' && !/\.pdf$/i.test(f.name)) {
-    inp.value = '';
-    el.innerHTML = '<span class="bad">&#9888;&#65039; Documents sirf PDF me upload hote hain</span>';
-    return;
-  }
-  _obFiles[kind] = { file: f, name: f.name, type: f.type, size: f.size };
-  obFileInfo(kind);
+  obUpStart(pre, kind, f);
 }
 // Blob ka base64 (data: wala aage ka hissa hata ke)
 function obB64(blob) {
@@ -8419,40 +8589,94 @@ function obB64(blob) {
     rd.readAsDataURL(blob);
   });
 }
-// Chuni hui files upload / hatai hui hatao. Upload 4 MB ke tukdon me (badi file
-// bhi chale), button par % dikhta hai.
-async function obUploadFiles(id, btn) {
-  for (const k of Object.keys(OB_ALL_FILE_UI)) {
-    const f = _obFiles[k], lbl = OB_ALL_FILE_UI[k].label;
-    if (f) {
-      btn.textContent = lbl + ' upload shuru…';
-      const st = await api('/api/onboarding/' + id + '/files/start', 'POST', { kind: k, fileName: f.name, mimeType: f.type, size: f.size });
-      if (!st || st.error || !st.fileId) throw new Error(lbl + ': ' + ((st && st.error) || 'upload shuru nahi hui'));
-      const total = Math.ceil(f.size / OB_CHUNK);
-      for (let i = 0; i < total; i++) {
-        const data = await obB64(f.file.slice(i * OB_CHUNK, Math.min(f.size, (i + 1) * OB_CHUNK)));
-        let u = null;
-        for (let t = 0; t < 3 && !(u && u.success); t++) u = await api('/api/onboarding/' + id + '/files/' + st.fileId + '/chunk', 'POST', { seq: i, data: data });
-        if (!u || !u.success) throw new Error(lbl + ': ' + ((u && u.error) || 'upload beech me ruk gayi -- dobara try karo'));
-        btn.textContent = lbl + ' upload ' + Math.round((i + 1) * 100 / total) + '%…';
-      }
-      const fin = await api('/api/onboarding/' + id + '/files/' + st.fileId + '/finish', 'POST', {});
-      if (!fin || fin.error) throw new Error(lbl + ': ' + ((fin && fin.error) || 'upload poori nahi hui'));
-      delete _obFiles[k];
-    } else if (_obFileDel[k]) {
-      const u = await api('/api/onboarding/' + id + '/files/' + k, 'DELETE');
-      if (!u || u.error) throw new Error(OB_ALL_FILE_UI[k].label + ': ' + ((u && u.error) || 'hat nahi payi'));
-      _obFileDel[k] = false;
+// Ek file turant upload: start -> 4 MB ke tukde -> finish. Purani file finish par hi hatti hai.
+async function obUpStart(pre, kind, f) {
+  const key = pre + '_' + kind, jid = _obFileJid, lbl = OB_ALL_FILE_UI[kind].label;
+  const cur = _obUp[key];
+  const prev = cur && cur.st === 'saved' ? cur : (cur && cur.prev) || null;
+  const u = _obUp[key] = { st: 'uploading', name: f.name, size: f.size, type: f.type, pct: 0, file: f, prev: prev };
+  const draw = () => { if (_obUp[key] === u) obUpRender(pre, kind); };
+  draw(); obUpSync(pre);
+  try {
+    const st = await api('/api/onboarding/' + jid + '/files/start', 'POST', { kind: kind, fileName: f.name, mimeType: f.type, size: f.size });
+    if (!st || st.error || !st.fileId) throw new Error((st && st.error) || 'upload shuru nahi hui');
+    const total = Math.ceil(f.size / OB_CHUNK);
+    for (let i = 0; i < total; i++) {
+      if (_obUp[key] !== u) return;                                  // form band / file badal gayi
+      const data = await obB64(f.slice(i * OB_CHUNK, Math.min(f.size, (i + 1) * OB_CHUNK)));
+      let r = null;
+      for (let t = 0; t < 3 && !(r && r.success); t++) r = await api('/api/onboarding/' + jid + '/files/' + st.fileId + '/chunk', 'POST', { seq: i, data: data });
+      if (!r || !r.success) throw new Error((r && r.error) || 'upload beech me ruk gayi');
+      u.pct = Math.round((i + 1) * 100 / total);
+      draw();
     }
+    const fin = await api('/api/onboarding/' + jid + '/files/' + st.fileId + '/finish', 'POST', {});
+    if (!fin || fin.error) throw new Error((fin && fin.error) || 'upload poori nahi hui');
+    if (_obUp[key] !== u) return;
+    u.st = 'saved'; u.at = obNowStr(); u.pct = 100;
+    delete u.file; delete u.prev;
+    const link = document.getElementById(pre + 'Link_' + kind);
+    if (link) link.value = '';                                       // file hai to link nahi
+    obUpMeta(jid, kind, { name: u.name, type: u.type, size: u.size, at: u.at });
+    obUpThumb(pre, kind, jid);
+  } catch (e) {
+    if (_obUp[key] !== u) return;
+    u.st = 'error'; u.err = lbl + ': ' + (e.message || 'upload nahi hui');
   }
+  draw(); obUpSync(pre);
+}
+function obUpRetry(kind) {
+  const u = _obUp[_obFilePre + '_' + kind];
+  if (u && u.file) obUpStart(_obFilePre, kind, u.file);
+}
+function obUpKeepOld(kind) {
+  const pre = _obFilePre, key = pre + '_' + kind, u = _obUp[key];
+  if (!u || !u.prev) return;
+  _obUp[key] = u.prev;
+  obUpRender(pre, kind); obUpSync(pre);
+}
+function obUpReplace(kind) {
+  const inp = document.getElementById(_obFilePre + 'File_' + kind);
+  if (!inp) return;
+  inp.value = '';
+  inp.click();
+}
+function obUpPreview(kind) {
+  const u = _obUp[_obFilePre + '_' + kind];
+  if (u) obViewFile(_obFileJid, kind, { name: u.name, size: u.size, type: u.type });
+}
+async function obUpRemove(kind) {
+  const pre = _obFilePre, key = pre + '_' + kind, u = _obUp[key];
+  if (!u) return;
+  if (!confirm('Is file ko hata dein?')) return;
+  const r = await api('/api/onboarding/' + _obFileJid + '/files/' + kind, 'DELETE');
+  if (!r || r.error) { showToast((r && r.error) || 'File hat nahi payi', 'error'); return; }
+  if (u.thumb) URL.revokeObjectURL(u.thumb);
+  _obUp[key] = null;
+  const inp = document.getElementById(pre + 'File_' + kind);
+  if (inp) inp.value = '';
+  obUpMeta(_obFileJid, kind, null);
+  obUpRender(pre, kind); obUpSync(pre);
+}
+// Nayi entry ka form Cancel: draft me upload hui files hatao (entry form me upload entry banne se pehle hoti hai)
+function obCancelJoinee() {
+  closeModal('obJoineeModal');
+  if (!_obEditId && _obDraft) {
+    const any = Object.keys(_obUp).some(k => k.indexOf('obf_') === 0 && _obUp[k] && _obUp[k].st !== 'bad');
+    const t = _obDraft;
+    _obDraft = '';
+    if (any) api('/api/onboarding-draft/' + t, 'DELETE');
+  }
+  obUpReset('obf', '');
 }
 function obOpenInputs(jid, edit) {
   const j = obJoinee(jid);
   if (!j) return;
   _obInId = String(j.id); _obInEdit = !!edit; _obFiles = {}; _obFileDel = {};
   _obFilePre = 'obi'; _obFileJid = _obInId;
+  obUpReset('obi', _obInId);
   const set = (k, v) => { const el = document.getElementById(k); if (el) el.value = v == null ? '' : v; };
-  set('obiName', j.name); set('obiPhone', j.phone); set('obiAlt', j.altPhone); set('obiNote', '');
+  set('obiName', j.name); set('obiPhone', obPh(j.phone)); set('obiAlt', obPh(j.altPhone)); set('obiNote', '');
   document.getElementById('obiAltNA').checked = !!j.altPhoneNA;
   obAltToggle('obi');
   obFillPick('obiDesig', OB_DESIGNATIONS.concat(_ob.designations || []), j.designation);
@@ -8462,7 +8686,7 @@ function obOpenInputs(jid, edit) {
     obFileInfo(k);
   });
   const next = j.steps.find(s => s.no > 1 && !s.na && !s.done);
-  document.getElementById('obInputsTitle').innerHTML = '&#10003; Step 1 &mdash; Initial Candidate Details';
+  document.getElementById('obInputsTitle').innerHTML = '&#10003; Step 1 - Initial Candidate Details';
   document.getElementById('obInputsWhat').innerHTML = '<b>' + obE(j.name) + '</b><span>Details bharo aur Done' +
     (next ? ' &middot; agla: Step ' + next.no + ' (' + obE(obDef(next.no).title) + ')' : '') + '</span>';
   document.getElementById('obiNoteWrap').style.display = '';
@@ -8486,23 +8710,22 @@ async function obSaveInputs() {
   };
   const bad = !body.name ? 'Employee name daalo'
     : !body.designation ? 'Designation chuno (ya Other chun kar likho)'
-    : digits(body.phone).length < 10 ? 'Phone sahi daalo (10 digit)'
-    : (!body.altPhoneNA && digits(body.altPhone).length < 10) ? 'Alternate phone daalo, ya "Not available" tick karo' : '';
+    : !/^\d{10}$/.test(body.phone) ? 'Phone sahi daalo (sirf 10 digit ka number)'
+    : (!body.altPhoneNA && !/^\d{10}$/.test(body.altPhone)) ? 'Alternate phone: sirf 10 digit ka number daalo, ya "Not available" tick karo' : '';
   if (bad) { err.textContent = bad; err.style.display = 'block'; return; }
+  if (obUpBusy('obi')) { err.textContent = 'File upload chal rahi hai ya fail hui - pehle poori hone do ya hata do'; err.style.display = 'block'; return; }
   err.style.display = 'none';
   const btn = document.getElementById('obInputsBtn');
   const btnHtml = btn.innerHTML;
   btn.disabled = true;
   const id = _obInId;
   try {
-    // Pehle files, phir details + Done
-    await obUploadFiles(id, btn);
     btn.textContent = 'Saving…';
     const diNo = (_ob.steps.find(d => d.dataInputs) || {}).no || 1;
     const r = await api('/api/onboarding/' + id + '/steps/' + diNo, 'PUT', Object.assign({ action: 'done', note: v('obiNote') }, body));
     if (!r || r.error) throw new Error((r && r.error) || 'Could not save');
     closeModal('obInputsModal');
-    showToast('✅ Step 1 Done — ab Step 2 (Director Review)', 'success');
+    showToast('✅ Step 1 Done - ab Step 2 (Director Review)', 'success');
     await loadOnboarding(1);
   } catch (e) {
     err.textContent = e.message || 'Could not save';
@@ -8519,11 +8742,12 @@ let _obEmpId = '', _obEmpEdit = false;
 function obOpenEmp(jid, edit) {
   const j = obJoinee(jid);
   if (!j) return;
-  if (j.locked) { showToast('Details lock hain — pehle Unlock karo', 'error'); return; }
+  if (j.locked) { showToast('Details lock hain - pehle Unlock karo', 'error'); return; }
   _obEmpId = String(j.id); _obEmpEdit = !!edit;
   const set = (k, v) => { const el = document.getElementById(k); if (el) el.value = v == null ? '' : v; };
   _obFiles = {}; _obFileDel = {}; _obFilePre = 'obe'; _obFileJid = _obEmpId;
-  set('obeName', j.name); set('obePhone', j.phone); set('obeAlt', j.altPhone);
+  obUpReset('obe', _obEmpId);
+  set('obeName', j.name); set('obePhone', obPh(j.phone)); set('obeAlt', obPh(j.altPhone));
   document.getElementById('obeAltNA').checked = !!j.altPhoneNA;
   obAltToggle('obe');
   obFillPick('obeDesig', OB_DESIGNATIONS.concat(_ob.designations || []), j.designation);
@@ -8539,15 +8763,15 @@ function obOpenEmp(jid, edit) {
   obSetPick('obeContract', j.contract);
   obFillPick('obeRef', (_ob.users || []).map(u => u.name).concat(_ob.refs || []).sort((a, b) => a.localeCompare(b)), j.refBy);
   const next = j.steps.find(s => s.no > 3 && !s.na && !s.done);
-  document.getElementById('obEmpTitle').innerHTML = edit ? '&#9999;&#65039; Edit &mdash; Employee Details (Step 3)' : '&#10003; Step 3 &mdash; Remaining Employee Details';
+  document.getElementById('obEmpTitle').innerHTML = edit ? '&#9999;&#65039; Edit - Employee Details (Step 3)' : '&#10003; Step 3 - Remaining Employee Details';
   document.getElementById('obEmpWhat').innerHTML = '<b>' + obE(j.name) + '</b><span>' + obE(j.designation) +
     (!edit && next ? ' &middot; agla: Step ' + next.no + ' (' + obE(obDef(next.no).title) + ')' : '') + '</span>';
   // Entry ke waqt bhari details (Step 1) + Director ka nateeja -- sirf dekhne ke liye
   const iv = j.steps.find(s => obDef(s.no).interview) || {};
-  const cell = (k, v) => '<div><i>' + k + '</i>' + (v ? obE(v) : '&mdash;') + '</div>';
+  const cell = (k, v) => '<div><i>' + k + '</i>' + (v ? obE(v) : '-') + '</div>';
   document.getElementById('obEmpCand').innerHTML = '<div class="h">Step 2 &middot; Director Review</div>' +
     '<div class="ob-s1iv">Director Review: ' + obIvHtml(j) +
-      (j.interview === 'selected' && iv.note ? ' &mdash; ' + obE(iv.note) : '') + (iv.doneBy ? ' &middot; ' + obE(iv.doneBy) : '') + '</div>';
+      (j.interview === 'selected' && iv.note ? ' - ' + obE(iv.note) : '') + (iv.doneBy ? ' &middot; ' + obE(iv.doneBy) : '') + '</div>';
   document.getElementById('obEmpHint').style.display = edit ? 'none' : '';
   document.getElementById('obEmpBtn').innerHTML = edit ? 'Save' : '&#10003; Save &amp; Done';
   document.getElementById('obEmpErr').style.display = 'none';
@@ -8569,8 +8793,8 @@ async function obSaveEmp() {
   };
   const bad = !body.name ? 'Employee name daalo'
     : !body.designation ? 'Designation chuno (ya Other chun kar likho)'
-    : digits(body.phone).length < 10 ? 'Phone sahi daalo (10 digit)'
-    : (!body.altPhoneNA && digits(body.altPhone).length < 10) ? 'Alternate phone daalo, ya "Not available" tick karo'
+    : !/^\d{10}$/.test(body.phone) ? 'Phone sahi daalo (sirf 10 digit ka number)'
+    : (!body.altPhoneNA && !/^\d{10}$/.test(body.altPhone)) ? 'Alternate phone: sirf 10 digit ka number daalo, ya "Not available" tick karo'
     : !body.email ? 'Email daalo'
     : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email) ? 'Email sahi daalo'
     : !body.location ? 'Location chuno (ya Other chun kar likho)'
@@ -8579,12 +8803,12 @@ async function obSaveEmp() {
     : !body.contract ? 'Contract signed? chuno (ya Other chun kar likho)'
     : !body.docsCollected ? 'Documents collected? chuno (Yes / No)' : '';
   if (bad) { err.textContent = bad; err.style.display = 'block'; return; }
+  if (obUpBusy('obe')) { err.textContent = 'File upload chal rahi hai ya fail hui - pehle poori hone do ya hata do'; err.style.display = 'block'; return; }
   err.style.display = 'none';
   const btn = document.getElementById('obEmpBtn');
   const btnHtml = btn.innerHTML;
   btn.disabled = true;
   try {
-    await obUploadFiles(_obEmpId, btn);
     btn.textContent = 'Saving…';
     const empNo = (_ob.steps.find(d => d.empDetails) || {}).no || 3;
     const r = _obEmpEdit
@@ -8622,7 +8846,7 @@ async function obSubmitUnlock() {
     const r = await api('/api/onboarding/' + _obUnlockId + '/unlock', 'POST', { reason: reason });
     if (!r || r.error) throw new Error((r && r.error) || 'Unlock nahi hua');
     closeModal('obUnlockModal');
-    showToast('🔓 Unlocked — sudhaar ke baad Lock dabana', 'success');
+    showToast('🔓 Unlocked - sudhaar ke baad Lock dabana', 'success');
     await loadOnboarding(1);
   } catch (e) {
     err.textContent = e.message || 'Unlock nahi hua';
@@ -8637,23 +8861,26 @@ async function obLockAgain(jid) {
 }
 function obOpenJoinee(id) {
   const j = id ? obJoinee(id) : null;
-  if (j && j.locked) { showToast('Details lock hain — pehle Unlock karo', 'error'); return; }
+  if (j && j.locked) { showToast('Details lock hain - pehle Unlock karo', 'error'); return; }
   _obEditId = j ? String(j.id) : '';
   const set = (k, v) => { const el = document.getElementById(k); if (el) el.value = v == null ? '' : v; };
   set('obfName', j ? j.name : '');
   obFillPick('obfDesig', OB_DESIGNATIONS.concat(_ob.designations || []), j ? j.designation : '');
-  set('obfPhone', j ? j.phone : '');
-  set('obfAlt', j ? j.altPhone : '');
+  set('obfPhone', j ? obPh(j.phone) : '');
+  set('obfAlt', j ? obPh(j.altPhone) : '');
   document.getElementById('obfAltNA').checked = !!(j && j.altPhoneNA);
   obAltToggle('obf');
   // Resume / portfolio / intro video (file ya link)
-  _obFiles = {}; _obFileDel = {}; _obFilePre = 'obf'; _obFileJid = _obEditId;
+  _obFiles = {}; _obFileDel = {}; _obFilePre = 'obf';
+  _obDraft = _obEditId ? '' : 'd' + (Math.random().toString(36).slice(2) + '000000000000').slice(0, 12);
+  _obFileJid = _obEditId || _obDraft;
+  obUpReset('obf', _obEditId);
   Object.keys(OB_FILE_UI).forEach(k => {
     set('obfLink_' + k, j && j.docs && j.docs[k] ? j.docs[k].link : '');
     set('obfFile_' + k, '');
     obFileInfo(k);
   });
-  document.getElementById('obJoineeTitle').innerHTML = j ? '&#9999;&#65039; Edit &mdash; Initial Candidate Details' : 'Step 1 &mdash; Initial Candidate Details';
+  document.getElementById('obJoineeTitle').innerHTML = j ? '&#9999;&#65039; Edit - Initial Candidate Details' : 'Step 1 - Initial Candidate Details';
   document.getElementById('obJoineeSave').textContent = j ? 'Save changes' : 'Create & send to Director';
   document.getElementById('obJoineeHint').style.display = j ? 'none' : '';
   document.getElementById('obJoineeErr').style.display = 'none';
@@ -8673,9 +8900,10 @@ async function obSaveJoinee() {
   };
   const bad = !body.name ? 'Employee name daalo'
     : !body.designation ? 'Designation chuno (ya Other chun kar likho)'
-    : digits(body.phone).length < 10 ? 'Phone sahi daalo (10 digit)'
-    : (!body.altPhoneNA && digits(body.altPhone).length < 10) ? 'Alternate phone daalo, ya "Not available" tick karo' : '';
+    : !/^\d{10}$/.test(body.phone) ? 'Phone sahi daalo (sirf 10 digit ka number)'
+    : (!body.altPhoneNA && !/^\d{10}$/.test(body.altPhone)) ? 'Alternate phone: sirf 10 digit ka number daalo, ya "Not available" tick karo' : '';
   if (bad) { err.textContent = bad; err.style.display = 'block'; return; }
+  if (obUpBusy('obf')) { err.textContent = 'File upload chal rahi hai ya fail hui - pehle poori hone do ya hata do'; err.style.display = 'block'; return; }
   err.style.display = 'none';
   const btn = document.getElementById('obJoineeSave');
   const btnTxt = btn.textContent;
@@ -8686,10 +8914,9 @@ async function obSaveJoinee() {
     // Nayi entry = Step 1 complete (server par) -> seedha Director Review
     const r = id
       ? await api('/api/onboarding/' + id, 'PUT', body)
-      : await api('/api/onboarding', 'POST', body);
+      : await api('/api/onboarding', 'POST', Object.assign({ draft: _obDraft }, body));
     if (!r || r.error) throw new Error((r && r.error) || 'Could not save');
-    if (!id) id = String(r.id);
-    await obUploadFiles(id, btn);
+    if (!id) { id = String(r.id); _obDraft = ''; }
   } catch (e) {
     btn.disabled = false; btn.textContent = btnTxt;
     if (isNew && id) {
@@ -8697,7 +8924,7 @@ async function obSaveJoinee() {
       closeModal('obJoineeModal');
       _obEditId = ''; _obOpenId = id;
       await loadOnboarding(1);
-      showToast('Entry ban gayi, par ' + (e.message || 'file upload nahi hui') + ' — Edit se dobara daalo', 'error');
+      showToast('Entry ban gayi, par ' + (e.message || 'file upload nahi hui') + ' - Edit se dobara daalo', 'error');
     } else {
       err.textContent = e.message || 'Could not save';
       err.style.display = 'block';
@@ -8706,7 +8933,7 @@ async function obSaveJoinee() {
   }
   btn.disabled = false; btn.textContent = btnTxt;
   closeModal('obJoineeModal');
-  showToast(isNew ? '✅ Entry ban gayi — Step 1 complete, ab Step 2 (Director Review)' : '✅ Saved', 'success');
+  showToast(isNew ? '✅ Entry ban gayi - Step 1 complete, ab Step 2 (Director Review)' : '✅ Saved', 'success');
   if (isNew) _obOpenId = id;
   _obEditId = '';
   await loadOnboarding(1);
