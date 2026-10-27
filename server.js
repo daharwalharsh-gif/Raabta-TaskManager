@@ -5630,6 +5630,17 @@ app.post('/api/onboarding/:id/files/:fid/chunk', requireAuth, obMw, async (req, 
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+// Upload beech me Cancel -- sirf wahi adhoori file + uske tukde hatao; pehle se saved file waisi hi rehti hai
+app.post('/api/onboarding/:id/files/:fid/cancel', requireAuth, obMw, async (req, res) => {
+  try {
+    const ctx = await obFileReq(req, res, [OB_DI_NO, OB_EMP_NO]);
+    if (!ctx) return;
+    const f = await obUploadRow(ctx.j, req.params.fid);
+    if (!f) return res.json({ success: true, deleted: 0 });
+    const fid = String(f.id);
+    res.json({ success: true, deleted: await obDeleteFiles(ctx.j.id, null, x => String(x.id) !== fid) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 app.post('/api/onboarding/:id/files/:fid/finish', requireAuth, obMw, async (req, res) => {
   try {
     const ctx = await obFileReq(req, res, [OB_DI_NO, OB_EMP_NO]);

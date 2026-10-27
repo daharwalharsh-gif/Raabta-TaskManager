@@ -8525,7 +8525,8 @@ function obUpRender(pre, kind) {
   const th = u.thumb ? '<img class="ob-upth" src="' + u.thumb + '" alt=""/>' : '<div class="ob-upth">' + OB_ALL_FILE_UI[kind].icon + '</div>';
   if (u.st === 'bad') { el.innerHTML = '<span class="bad">&#9888;&#65039; ' + obE(u.err) + '</span>'; return; }
   if (u.st === 'uploading') {
-    el.innerHTML = '<div class="ob-up">' + th + '<div class="ob-upmeta"><b>' + obE(u.name) + '</b>' + obSize(u.size) + ' &middot; Uploading ' + u.pct + '%</div>' +
+    el.innerHTML = '<div class="ob-up">' + th + '<div class="ob-upmeta"><b>' + obE(u.name) + '</b>' + obSize(u.size) + ' &middot; ' + (u.pct < 100 ? 'Uploading ' + u.pct + '%' : 'Saving…') + '</div>' +
+      (u.pct < 100 ? '<div class="ob-upbtns"><button type="button" class="del" onclick="obUpCancel(' + k + ')">&#10005; Cancel upload</button></div>' : '') +
       '<div class="ob-upbar"><i style="width:' + u.pct + '%"></i></div></div>';
     return;
   }
@@ -8600,12 +8601,15 @@ async function obUpStart(pre, kind, f) {
   try {
     const st = await api('/api/onboarding/' + jid + '/files/start', 'POST', { kind: kind, fileName: f.name, mimeType: f.type, size: f.size });
     if (!st || st.error || !st.fileId) throw new Error((st && st.error) || 'upload shuru nahi hui');
+    // Cancel dabaya / form band / file badal gayi -> server se adhoori file hatao aur ruk jao
+    const stopped = () => { if (_obUp[key] === u) return false; obUpAbort(jid, st.fileId); return true; };
     const total = Math.ceil(f.size / OB_CHUNK);
     for (let i = 0; i < total; i++) {
-      if (_obUp[key] !== u) return;                                  // form band / file badal gayi
+      if (stopped()) return;
       const data = await obB64(f.slice(i * OB_CHUNK, Math.min(f.size, (i + 1) * OB_CHUNK)));
       let r = null;
       for (let t = 0; t < 3 && !(r && r.success); t++) r = await api('/api/onboarding/' + jid + '/files/' + st.fileId + '/chunk', 'POST', { seq: i, data: data });
+      if (stopped()) return;
       if (!r || !r.success) throw new Error((r && r.error) || 'upload beech me ruk gayi');
       u.pct = Math.round((i + 1) * 100 / total);
       draw();
@@ -8624,6 +8628,20 @@ async function obUpStart(pre, kind, f) {
     u.st = 'error'; u.err = lbl + ': ' + (e.message || 'upload nahi hui');
   }
   draw(); obUpSync(pre);
+}
+// Galti se badi file chun li -- upload beech me roko. Purani saved file (agar thi) wapas dikhti hai;
+// upload loop agle tukde se pehle khud rukta hai aur server se adhoori file hata deta hai (obUpAbort).
+function obUpCancel(kind) {
+  const pre = _obFilePre, key = pre + '_' + kind, u = _obUp[key];
+  if (!u || u.st !== 'uploading') return;
+  _obUp[key] = u.prev || null;
+  const inp = document.getElementById(pre + 'File_' + kind);
+  if (inp) inp.value = '';
+  obUpRender(pre, kind); obUpSync(pre);
+  showToast(OB_ALL_FILE_UI[kind].label + ' upload cancel ho gaya', 'success');
+}
+function obUpAbort(jid, fid) {
+  api('/api/onboarding/' + jid + '/files/' + fid + '/cancel', 'POST', {});
 }
 function obUpRetry(kind) {
   const u = _obUp[_obFilePre + '_' + kind];
