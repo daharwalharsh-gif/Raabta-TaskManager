@@ -2595,14 +2595,14 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
         <div class="card-head" style="flex-wrap:wrap;gap:8px">
           <div class="card-head-title">Transaction Records</div>
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-            <input type="date" id="goldFrom" onchange="renderGold()" class="gold-filt" title="From date">
-            <span style="font-size:12px;color:#94a3b8">to</span>
-            <input type="date" id="goldTo" onchange="renderGold()" class="gold-filt" title="To date">
+            <input type="date" id="goldFrom" onchange="renderGold()" class="gold-filt gold-date-filt" title="From date">
+            <span class="gold-date-filt" style="font-size:12px;color:#94a3b8">to</span>
+            <input type="date" id="goldTo" onchange="renderGold()" class="gold-filt gold-date-filt" title="To date">
             <select id="goldFType" onchange="renderGold()" class="gold-filt gold-silver-filt" title="IN / OUT" style="display:none">
               <option value="">All (IN + OUT)</option><option value="IN">IN</option><option value="OUT">OUT</option>
             </select>
-            <select id="goldFNaam" onchange="renderGold()" class="gold-filt gold-silver-filt" title="Vendor / Karigar" style="display:none">
-              <option value="">All Vendor / Karigar</option>
+            <select id="goldFNaam" onchange="renderGold()" class="gold-filt gold-silver-filt" title="Vendor" style="display:none">
+              <option value="">All Vendors</option>
             </select>
             <button class="btn btn-outline" onclick="goldResetFilter()" style="font-size:12px;padding:5px 12px">Reset</button>
           </div>
@@ -9929,16 +9929,16 @@ const GOLD_CFG = {
   silver: {
     naam: 'Silver',
     weight:   { IN: 'Silver Weight (grams)', OUT: 'Issue Weight (Gram)' },
-    naamLbl:  { IN: 'Vendor Name', OUT: 'Karigar Name' },
+    naamLbl:  { IN: 'Vendor Name', OUT: 'Vendor Name' },
     remark:   { IN: 'Remark / Purpose', OUT: 'Remark' },
     purityLbl: 'Purity',
     purity: ['92.5', '999'],
     // Rate Silver me nahi poochhte, par photo/PDF chahiye (Harsh, 14 Oct)
-    naamCol: 'Vendor / Karigar', rate: false, pic: true
+    naamCol: 'Vendor', rate: false, pic: true
   }
 };
 
-// Silver OUT par Karigar ka naam dropdown se. Aakhri option "Other" = haath se
+// Silver me Vendor ka naam (IN aur OUT dono) dropdown se. Aakhri option "Other" = haath se
 // likho. Purani entries ke purane spelling naye naam par dikhte hain (filter me
 // ek aadmi do baar na aaye) -- DB me naam wahi rehta hai jab tak edit na ho.
 const SILVER_KARIGAR = ['Bappi jii', 'Raju', 'Saroj', 'Haveera', 'Virasat'];
@@ -9949,7 +9949,7 @@ function goldNaam(v) {
   const k = x.toLowerCase().replace(/\s+/g, ' ');
   return SILVER_NAAM_ALIAS[k] || SILVER_KARIGAR.find(n => n.toLowerCase() === k) || x;
 }
-function goldUseList() { return _goldKind === 'silver' && _goldType === 'OUT'; }
+function goldUseList() { return _goldKind === 'silver'; }
 
 // Dropdown ke hisaab se text box dikhao / chhupao (sirf "Other" par dikhe)
 function goldVendorPick() {
@@ -10007,14 +10007,18 @@ function goldApplyCfg() {
   }
   const vSel = document.getElementById('goldVendorSel');
   if (!vSel.options.length) {
-    vSel.innerHTML = '<option value="">-- Select Karigar --</option>' +
+    vSel.innerHTML = '<option value="">-- Select Vendor --</option>' +
       SILVER_KARIGAR.map(n => '<option>' + maintEsc(n) + '</option>').join('') +
       '<option value="__other">Other (manual enter)</option>';
   }
   goldVendorPick();
-  // IN / OUT aur naam ka filter abhi sirf Silver me
+  // IN / OUT aur Vendor ka filter abhi sirf Silver me
   document.querySelectorAll('#page-gold .gold-silver-filt').forEach(el => {
     el.style.display = _goldKind === 'silver' ? '' : 'none';
+  });
+  // Date ka filter Silver me abhi nahi chahiye (28 Oct)
+  document.querySelectorAll('#page-gold .gold-date-filt').forEach(el => {
+    el.style.display = _goldKind === 'silver' ? 'none' : '';
   });
 
   // Rate aur photo -- form me bhi, table ke column me bhi
@@ -10146,7 +10150,7 @@ function renderGold() {
     const pehle = fN.value;
     const naam = [...new Set(all.map(goldRowNaam).filter(Boolean))].sort((a, b) => a.localeCompare(b));
     if (pehle && naam.indexOf(pehle) < 0) naam.push(pehle);
-    fN.innerHTML = '<option value="">All Vendor / Karigar</option>' +
+    fN.innerHTML = '<option value="">All Vendors</option>' +
       naam.map(n => '<option value="' + maintEsc(n) + '">' + maintEsc(n) + '</option>').join('');
     fN.value = pehle;
   }
@@ -10171,7 +10175,7 @@ function renderGold() {
     '<td data-lbl="Karat" style="white-space:nowrap">' + (r.karat ? maintEsc(r.karat) : '—') + '</td>' +
     '<td data-lbl="Rate" class="gold-c-rate" style="white-space:nowrap;text-align:right">' +
       (r.rate === '' || r.rate == null ? '—' : maintMoney(r.rate)) + '</td>' +
-    '<td data-lbl="' + (_goldKind === 'silver' ? (r.type === 'OUT' ? 'Karigar' : 'Vendor') : 'Vendor') + '">' +
+    '<td data-lbl="Vendor">' +
       (r.type === 'OUT' && r.toKarigar === 'no'
         ? '<span style="font-size:11px;font-weight:600;color:#64748b;background:#f1f5f9;border-radius:8px;padding:2px 8px;white-space:nowrap">Direct OUT</span>'
         : (r.vendor ? maintEsc(goldNaam(r.vendor)) : '—')) + '</td>' +
