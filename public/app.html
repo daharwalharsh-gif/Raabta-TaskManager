@@ -2578,6 +2578,7 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
 
           <div id="goldVendorBlock" style="display:none">
             <label class="gold-lbl" id="goldVendorLbl">Vendor Name</label>
+            <select id="goldVendorSel" class="gold-inp" onchange="goldVendorPick()" style="display:none"></select>
             <input type="text" id="goldVendor" class="gold-inp" placeholder="Enter name">
           </div>
 
@@ -2597,6 +2598,12 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
             <input type="date" id="goldFrom" onchange="renderGold()" class="gold-filt" title="From date">
             <span style="font-size:12px;color:#94a3b8">to</span>
             <input type="date" id="goldTo" onchange="renderGold()" class="gold-filt" title="To date">
+            <select id="goldFType" onchange="renderGold()" class="gold-filt gold-silver-filt" title="IN / OUT" style="display:none">
+              <option value="">All (IN + OUT)</option><option value="IN">IN</option><option value="OUT">OUT</option>
+            </select>
+            <select id="goldFNaam" onchange="renderGold()" class="gold-filt gold-silver-filt" title="Vendor / Karigar" style="display:none">
+              <option value="">All Vendor / Karigar</option>
+            </select>
             <button class="btn btn-outline" onclick="goldResetFilter()" style="font-size:12px;padding:5px 12px">Reset</button>
           </div>
         </div>
@@ -9931,6 +9938,46 @@ const GOLD_CFG = {
   }
 };
 
+// Silver OUT par Karigar ka naam dropdown se. Aakhri option "Other" = haath se
+// likho. Purani entries ke purane spelling naye naam par dikhte hain (filter me
+// ek aadmi do baar na aaye) -- DB me naam wahi rehta hai jab tak edit na ho.
+const SILVER_KARIGAR = ['Bappi jii', 'Raju', 'Saroj', 'Haveera', 'Virasat'];
+const SILVER_NAAM_ALIAS = { 'bappi': 'Bappi jii', 'bappi ji': 'Bappi jii', 'haviraa': 'Haveera', 'havira': 'Haveera' };
+function goldNaam(v) {
+  const x = String(v || '').trim();
+  if (_goldKind !== 'silver' || !x) return x;
+  const k = x.toLowerCase().replace(/\s+/g, ' ');
+  return SILVER_NAAM_ALIAS[k] || SILVER_KARIGAR.find(n => n.toLowerCase() === k) || x;
+}
+function goldUseList() { return _goldKind === 'silver' && _goldType === 'OUT'; }
+
+// Dropdown ke hisaab se text box dikhao / chhupao (sirf "Other" par dikhe)
+function goldVendorPick() {
+  const sel = document.getElementById('goldVendorSel');
+  const inp = document.getElementById('goldVendor');
+  const list = goldUseList();
+  sel.style.display = list ? '' : 'none';
+  const other = sel.value === '__other';
+  inp.style.display = (!list || other) ? '' : 'none';
+  if (list && other && document.activeElement === sel) inp.focus();
+}
+
+// Edit ke waqt naam bharo -- list me ho to dropdown, warna "Other" + text
+function goldSetVendor(v) {
+  const sel = document.getElementById('goldVendorSel');
+  const inp = document.getElementById('goldVendor');
+  const n = goldNaam(v);
+  if (goldUseList() && SILVER_KARIGAR.indexOf(n) >= 0) { sel.value = n; inp.value = ''; }
+  else { sel.value = (goldUseList() && n) ? '__other' : ''; inp.value = n; }
+  goldVendorPick();
+}
+
+function goldVendorVal() {
+  const sel = document.getElementById('goldVendorSel');
+  if (goldUseList() && sel.value !== '__other') return sel.value;
+  return document.getElementById('goldVendor').value;
+}
+
 // Chune hue khaate aur IN/OUT ke hisaab se poora form set kar do
 function goldApplyCfg() {
   const c = GOLD_CFG[_goldKind] || GOLD_CFG.stock;
@@ -9958,6 +10005,17 @@ function goldApplyCfg() {
     document.getElementById('goldVendorLbl').textContent = lbl;
     document.getElementById('goldVendor').placeholder = 'Enter ' + lbl;
   }
+  const vSel = document.getElementById('goldVendorSel');
+  if (!vSel.options.length) {
+    vSel.innerHTML = '<option value="">-- Select Karigar --</option>' +
+      SILVER_KARIGAR.map(n => '<option>' + maintEsc(n) + '</option>').join('') +
+      '<option value="__other">Other (manual enter)</option>';
+  }
+  goldVendorPick();
+  // IN / OUT aur naam ka filter abhi sirf Silver me
+  document.querySelectorAll('#page-gold .gold-silver-filt').forEach(el => {
+    el.style.display = _goldKind === 'silver' ? '' : 'none';
+  });
 
   // Rate aur photo -- form me bhi, table ke column me bhi
   document.getElementById('goldRateBlock').style.display = c.rate ? '' : 'none';
@@ -10003,7 +10061,7 @@ function switchGoldTab(kind, el) {
   clearGoldForm();              // ek khaate ka adhoora form doosre me na chala jaye
   // Purana date filter bhi hata do -- warna naye khaate me "No entries in
   // this date range" dikhta hai aur lagta hai data hi nahi hai
-  ['goldFrom', 'goldTo'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  ['goldFrom', 'goldTo', 'goldFType', 'goldFNaam'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   loadGold();
 }
 
@@ -10048,11 +10106,22 @@ function goldInRange(row) {
   const dt = String(row.date || '');
   if (f && dt < f) return false;
   if (t && dt > t) return false;
+  if (_goldKind === 'silver') {
+    const ty = (document.getElementById('goldFType') || {}).value || '';
+    if (ty && row.type !== ty) return false;
+    const nm = (document.getElementById('goldFNaam') || {}).value || '';
+    if (nm && goldRowNaam(row) !== nm) return false;
+  }
   return true;
 }
 
+// Table / filter me dikhne wala naam ("No" wali OUT = Direct OUT)
+function goldRowNaam(r) {
+  return (r.type === 'OUT' && r.toKarigar === 'no') ? 'Direct OUT' : goldNaam(r.vendor);
+}
+
 function goldResetFilter() {
-  ['goldFrom', 'goldTo'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  ['goldFrom', 'goldTo', 'goldFType', 'goldFNaam'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   renderGold();
 }
 
@@ -10071,11 +10140,22 @@ function renderGold() {
   const balEl = document.getElementById('goldBal');
   balEl.style.color = (Number(d.balance) || 0) < 0 ? '#dc2626' : '';
 
+  // Naam ke filter me wahi naam jo entries me hain (chuna hua bana rahe)
+  const fN = document.getElementById('goldFNaam');
+  if (fN && _goldKind === 'silver') {
+    const pehle = fN.value;
+    const naam = [...new Set(all.map(goldRowNaam).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    if (pehle && naam.indexOf(pehle) < 0) naam.push(pehle);
+    fN.innerHTML = '<option value="">All Vendor / Karigar</option>' +
+      naam.map(n => '<option value="' + maintEsc(n) + '">' + maintEsc(n) + '</option>').join('');
+    fN.value = pehle;
+  }
+
   const rows = all.filter(goldInRange);
   const body = document.getElementById('goldBody');
   if (!rows.length) {
     body.innerHTML = '<tr><td colspan="9" class="empty">' +
-      (all.length ? 'No entries in this date range' : 'No records found.') + '</td></tr>';
+      (all.length ? 'No entries match these filters' : 'No records found.') + '</td></tr>';
     return;
   }
   body.innerHTML = rows.map(r =>
@@ -10094,7 +10174,7 @@ function renderGold() {
     '<td data-lbl="' + (_goldKind === 'silver' ? (r.type === 'OUT' ? 'Karigar' : 'Vendor') : 'Vendor') + '">' +
       (r.type === 'OUT' && r.toKarigar === 'no'
         ? '<span style="font-size:11px;font-weight:600;color:#64748b;background:#f1f5f9;border-radius:8px;padding:2px 8px;white-space:nowrap">Direct OUT</span>'
-        : (r.vendor ? maintEsc(r.vendor) : '—')) + '</td>' +
+        : (r.vendor ? maintEsc(goldNaam(r.vendor)) : '—')) + '</td>' +
     '<td data-lbl="Image" class="gold-c-img" style="white-space:nowrap">' + (r.hasImage
       ? '<button class="btn btn-outline" style="font-size:11px;padding:3px 8px" onclick="goldViewImage(\'' + r.id + '\')">📎 View</button>'
       : '<span style="color:#cbd5e1">—</span>') + '</td>' +
@@ -10151,6 +10231,7 @@ function clearGoldForm() {
   set('goldWeight', '');
   set('goldRate', '');
   set('goldVendor', '');
+  set('goldVendorSel', '');
   set('goldRemarks', '');
   set('goldImage', '');
   const info = document.getElementById('goldImageInfo'); if (info) info.textContent = '';
@@ -10177,7 +10258,7 @@ async function saveGoldEntry() {
     karat: document.getElementById('goldKarat').value,
     rate: document.getElementById('goldRate').value,
     // "Karigar ko diya?" No ho to naam nahi jaata -- seedha Total OUT
-    vendor: (_goldType === 'OUT' && _goldKarigar === 'no') ? '' : document.getElementById('goldVendor').value,
+    vendor: (_goldType === 'OUT' && _goldKarigar === 'no') ? '' : goldVendorVal(),
     toKarigar: _goldType === 'OUT' ? _goldKarigar : '',
     remarks: document.getElementById('goldRemarks').value
   };
@@ -10228,7 +10309,7 @@ function goldEdit(id) {
     }
   }
   document.getElementById('goldRate').value = (r.rate === '' || r.rate == null) ? '' : r.rate;
-  document.getElementById('goldVendor').value = r.vendor || '';
+  goldSetVendor(r.vendor);
   document.getElementById('goldRemarks').value = r.remarks || '';
   document.getElementById('goldImage').value = '';
   document.getElementById('goldImageInfo').innerHTML = r.hasImage
