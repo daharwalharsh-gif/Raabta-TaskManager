@@ -782,7 +782,13 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
 .fms-step-rows-scroll{max-height:calc(100vh - 200px);overflow:auto;}
 .fms-step-rows-table table{width:100%;border-collapse:separate;border-spacing:0;}
 .fms-step-rows-table table th{font-size:12px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:#1e293b;padding:10px 12px;background:#f1f5f9;border-bottom:2px solid #cbd5e1;white-space:nowrap;position:sticky;top:0;z-index:3;box-shadow:0 2px 4px -2px rgba(15,23,42,.12);}
-.fms-step-rows-table table td{padding:10px 14px;font-size:13px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
+.fms-step-rows-table table td{padding:6px 10px;font-size:12.5px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
+/* Heading 2 line tak wrap -- lambe naam (WhatsApp Phone Number…) column ko chauda na karein */
+#fmsList .fms-step-rows-table table thead tr:first-child th{white-space:normal;min-width:64px;max-width:150px;font-size:11px;line-height:1.25;padding:8px 10px;vertical-align:bottom;}
+.fms-cell{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-width:220px;min-width:60px;line-height:1.35;word-break:break-word;}
+.fms-links{display:flex;flex-wrap:wrap;gap:3px;max-width:160px;}
+.fms-links a{margin:0 !important;padding:1px 6px !important;font-size:11px !important;}
+#fmsList .fms-done-btn{padding:5px 10px;font-size:11.5px;white-space:nowrap;}
 /* FMS Tasks: patli chipki patti + chhote KPI / pipeline (30 Oct 2026) */
 .fms-bar{position:sticky;top:60px;z-index:80;display:flex;align-items:center;gap:12px;flex-wrap:wrap;
   margin:-22px -24px 14px;padding:10px 24px;background:#f1f5f9;border-bottom:1px solid #e2e8f0;box-shadow:0 6px 12px -10px rgba(15,23,42,.25);}
@@ -837,6 +843,49 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
   .fms-top{position:static;margin:0;padding:0;}
   #fmsList .ob-listcard{max-height:80vh;}
 }
+/* FMS Workflow view */
+.fms-vtabs{display:inline-flex;background:#fff;border:1.5px solid #e2e8f0;border-radius:9px;padding:2px;gap:2px;}
+.fms-vtabs button{font-family:inherit;font-size:12.5px;font-weight:600;color:#475569;background:none;border:none;border-radius:7px;padding:5px 11px;cursor:pointer;}
+.fms-vtabs button.on{background:#0f172a;color:#fff;}
+.fms-flow-head{background:linear-gradient(135deg,#1e3a8a,#1e40af);color:#fff;border-radius:14px;padding:14px 20px;margin-bottom:14px;}
+.fms-flow-head h3{margin:0;font-size:20px;font-weight:800;}
+.fms-flow-head div div{font-size:13px;opacity:.85;margin-top:2px;}
+.fms-fnum{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;color:#fff;font-weight:800;font-size:14px;flex:none;}
+.fms-flow-entry{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:14px;margin-bottom:14px;}
+.fms-fe-box,.fms-fe-form{background:#fff;border:1px solid #bfdbfe;border-radius:14px;padding:14px 16px;}
+.fms-fe-form{border-color:#fecaca;background:#fffafa;}
+.fms-fe-t{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:800;color:#0f172a;margin-bottom:12px;}
+.fms-fe-t em{font-style:normal;font-weight:500;color:#475569;font-size:13px;}
+.fms-fe-t em.req{color:#dc2626;font-weight:700;}
+.fms-fe-ways{display:flex;align-items:stretch;gap:10px;}
+.fms-fe-way{flex:1;border-radius:12px;padding:12px;text-align:center;border:1px solid #a7f3d0;background:#ecfdf5;}
+.fms-fe-way.man{border-color:#c7d2fe;background:#eef2ff;}
+.fms-fe-way .ic{font-size:26px;}
+.fms-fe-way b{display:block;font-size:14px;color:#0f172a;margin-top:4px;}
+.fms-fe-way span{font-size:12px;color:#475569;}
+.fms-fe-way p{font-size:12px;color:#334155;margin:6px 0 0;}
+.fms-fe-or{align-self:center;width:36px;height:36px;border-radius:50%;background:#1e3a8a;color:#fff;font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center;flex:none;}
+.fms-fe-form ol{margin:0;padding-left:22px;columns:3 170px;column-gap:18px;font-size:12.5px;color:#1e293b;}
+.fms-fe-form li{margin-bottom:5px;break-inside:avoid;}
+.fms-fe-form li::marker{color:#e11d48;font-weight:800;}
+.fms-fe-note{margin-top:8px;background:#ffe4e6;color:#be123c;font-weight:700;font-size:12px;border-radius:8px;padding:7px 10px;text-align:center;}
+.fms-flow-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;}
+.fms-fcard{background:#fff;border:1px solid #e2e8f0;border-top:4px solid var(--fc);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;}
+.fms-fcard.click{cursor:pointer;transition:box-shadow .15s,transform .15s;}
+.fms-fcard.click:hover{box-shadow:0 6px 18px rgba(15,23,42,.1);transform:translateY(-1px);}
+.fms-fcard.lt{box-shadow:inset 0 0 0 1px #fecaca;}
+.fms-fc-top{display:flex;align-items:center;justify-content:space-between;}
+.fms-fc-ic{font-size:22px;}
+.fms-fc-t{font-size:14px;font-weight:800;color:#0f172a;line-height:1.3;}
+.fms-fc-d{font-size:12px;color:#475569;line-height:1.45;flex:1;}
+.fms-fc-doer{align-self:stretch;text-align:center;background:var(--fc);color:#fff;font-size:12px;font-weight:700;border-radius:7px;padding:5px 8px;}
+.fms-fc-doer.auto{background:repeating-linear-gradient(135deg,var(--fc),var(--fc) 10px,color-mix(in srgb,var(--fc) 85%,#fff) 10px,color-mix(in srgb,var(--fc) 85%,#fff) 20px);}
+.fms-fc-u{font-size:11px;color:#64748b;}
+.fms-fc-s{display:flex;flex-wrap:wrap;gap:4px;}
+.fms-flow-notes{margin-top:14px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px 16px;font-size:12.5px;color:#334155;}
+.fms-flow-notes ul{margin:6px 0 0;padding-left:20px;}
+.fms-flow-notes li{margin-bottom:3px;}
+@media(max-width:768px){ .fms-flow-entry{grid-template-columns:1fr;} .fms-fe-ways{flex-direction:column;} .fms-fe-or{align-self:center;} }
 .fms-done-btn{background:#10b981;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;font-family:'Inter',sans-serif;}
 .fms-done-btn:hover{background:#059669;transform:translateY(-1px);}
 .fms-status-badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:#fef9c3;color:#854d0e;}
@@ -2114,6 +2163,10 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
       <select id="fmsTasksSelect" onchange="onFMSTasksSelect()" title="FMS chuno">
         <option value="">-- Select an FMS --</option>
       </select>
+      <div class="fms-vtabs" id="fmsVTabs" style="display:none">
+        <button type="button" data-v="tasks" class="on" onclick="fmsSetView('tasks')">📋 Tasks</button>
+        <button type="button" data-v="flow" onclick="fmsSetView('flow')">🧭 Workflow</button>
+      </div>
       <span class="sp"></span>
       <div id="fmsTasksRefreshBtn">
         <button class="btn btn-outline btn-sm" onclick="loadFMSTasks()">🔄 Refresh</button>
@@ -4744,7 +4797,7 @@ function renderFMSNotifDropdown() {
   const pend = (window._fmsAllSteps || []).filter(s => states[s.id] && states[s.id].rows.length);
   list.innerHTML = pend.length ? pend.map(s => `
     <div style="padding:10px 14px;border-bottom:1px solid #f1f5f9;">
-      <div style="font-size:13px;color:#1e293b;font-weight:600;">STEP ${s.step_order} — ${s.step_name}</div>
+      <div style="font-size:13px;color:#1e293b;font-weight:600;">STEP ${fmsNo(s)} — ${s.step_name}</div>
       <div style="font-size:11px;color:#dc2626;margin-top:3px;font-weight:700;">⏳ ${states[s.id].rows.length} pending row(s)</div>
     </div>`).join('')
     : `<div style="padding:18px 14px;text-align:center;color:#94a3b8;font-size:13px;">${Object.keys(states).length ? 'No pending FMS tasks 🎉' : 'Select an FMS first'}</div>`;
@@ -13045,6 +13098,7 @@ async function onFMSTasksSelect() {
     showToast(data.error, 'error');
     return;
   }
+  window._fmsName = (data.sheet && (data.sheet.fms_name || data.sheet.sheet_name)) || '';
   buildFMSStack(data.steps || []);
 }
 
@@ -13205,6 +13259,110 @@ let _fmsTrackFilter = 'active', _fmsTrackQ = '', _fmsAllPage = 1;
 const FMS_PAGE = 30;          // ek page par itni rows (table chhota, scroll kam)
 let _fmsLoadSeq = 0;          // FMS badla to purana loading loop ruk jaaye
 
+// ══ FMS ka final flow (Harsh, 30 Oct 2026) ══
+// Steps FMS Admin se aate hain; yahan sirf har step ka kaam (desc) aur flow
+// wala doer, step ke naam se milaa kar. Naya FMS ka flow chahiye to yahan ek
+// entry aur jodo -- match: FMS ke naam par regex.
+const FMS_FLOWS = [{
+  match: /online/i,
+  title: 'Online FMS Workflow',
+  sub: 'From Order Entry to Delivery – Complete Process Flow',
+  entry: {
+    ways: [['API Order', 'Online Order', 'Data received automatically from API.', '&#9729;&#65039;'],
+           ['Manual Order', 'Filled by Team', 'Order entered manually through the form.', '&#128221;']],
+    fields: ['PO / Order number', 'Date of Delivery', 'Timestamp', 'PO number', 'Party Name', 'Email',
+      'WhatsApp Phone Number (In Case of Website Order)', 'Billing Address', 'Shipping Address', 'Total Qty',
+      'Order Photo', 'Piece in Stock ?', 'Website Order?']
+  },
+  steps: [
+    { keys: ['personal message'], title: 'Send Personal Message to Client for Assistance', desc: 'Confirm details / support as needed.', doer: 'Automate', auto: true, icon: '&#9881;&#65039;' },
+    { keys: ['process piece'], title: 'Process piece for production', desc: 'Send to production team for manufacturing.', doer: 'PM', icon: '&#128100;' },
+    { keys: ['follow up with vendor'], title: 'Follow up with vendor', desc: 'Check status, confirm timelines, and keep vendor updated.', doer: 'PM', icon: '&#128101;' },
+    { keys: ['piece received', 'piece rec'], title: 'Piece Received Information', desc: 'Update when the piece is received from vendor.', doer: 'PM', icon: '&#128230;' },
+    { keys: ['qc ghat'], title: 'QC Ghat', desc: 'Initial quality check at QC ghat.', doer: 'Vinay', icon: '&#128269;' },
+    { keys: ['beading'], title: 'Beading Completed', desc: 'Confirm beading is completed.', doer: 'Piroi Wale', icon: '&#128255;' },
+    { keys: ['give for qc'], title: 'Give for QC', desc: 'Send the piece for detailed quality check.', doer: 'Vinay', icon: '&#128737;&#65039;' },
+    { keys: ['follow up for order'], title: 'Follow up for Order to PM', desc: 'Ensure order is ready (with beading / finishing stage).', doer: 'PC', icon: '&#9993;&#65039;' },
+    { keys: ['dispatch to naresh', 'box for dispatch'], title: 'Handover box for dispatch to Naresh', desc: 'Prepare and hand over box to Naresh for dispatch.', doer: 'PM', icon: '&#128230;' },
+    { keys: ['double cross', 'cross check'], title: 'Double Cross check QC', desc: 'Final QC verification before dispatch.', doer: 'PM', icon: '&#128203;' },
+    { keys: ['box to ashok', 'handover box to ashok'], title: 'Handover box to Ashok', desc: 'With address & Invoice / challan after tallying goods.', doer: 'Naresh', icon: '&#129309;' },
+    { keys: ['dispatch box'], title: 'Dispatch Box', desc: 'After tallying goods with challan invoice.', doer: 'Ashok', icon: '&#128666;' },
+    { keys: ['tracking'], title: 'Share tracking details with party', desc: 'Send courier / tracking information to the client.', doer: 'WhatsApp API (Automatic)', auto: true, icon: '&#128172;' },
+    { keys: ['parcel delivered', 'confirm parcel', 'delivered'], title: 'Confirm Parcel Delivered', desc: 'Verify delivery confirmation from courier / client.', doer: 'Ashok', icon: '&#9989;' },
+    { keys: ['website'], title: 'Status Update on Website', desc: 'Update order status on the website.', doer: 'Bajji', icon: '&#127760;' }
+  ],
+  notes: ['All 13 fields in the manual order form are mandatory (no optional fields).',
+    'Step 1 has two entry methods: API (online orders) and Manual (form).',
+    '"Piece in Stock?" and "Website Order?" are conditional fields (as per order type).',
+    'Follow the steps in sequence for smooth and timely order fulfilment.']
+}];
+const FMS_COLORS = ['#2563eb', '#059669', '#7c3aed', '#0284c7', '#0d9488', '#db2777', '#6d28d9', '#0369a1', '#16a34a', '#4f46e5', '#0891b2', '#d97706', '#e11d48', '#1d4ed8', '#15803d'];
+let _fmsView = 'tasks';       // 'tasks' | 'flow'
+
+function fmsFlow() { return FMS_FLOWS.find(fl => fl.match.test(window._fmsName || '')) || null; }
+// Order Entry (Step 1) FMS Admin ke steps me nahi hota -- flow me ho to number +1
+function fmsOffset() { const fl = fmsFlow(); return fl && fl.entry ? 1 : 0; }
+function fmsNo(s) { return (s ? s.step_order : 0) + fmsOffset(); }
+function fmsColor(s) { return FMS_COLORS[((s ? s.step_order : 1) - 1) % FMS_COLORS.length]; }
+// Step ke naam se flow wala step (spelling ki chhoti galti -- "Recieved" -- bhi chale)
+function fmsFlowStep(s) {
+  const fl = fmsFlow();
+  if (!fl || !s) return null;
+  const n = String(s.step_name || '').toLowerCase().replace(/recieved/g, 'received').replace(/[^a-z0-9]+/g, ' ').trim();
+  return fl.steps.find(fs => fs.keys.some(k => n.includes(k))) || null;
+}
+
+function fmsSetView(v) { _fmsView = v; fmsApplyView(); }
+function fmsApplyView() {
+  const flow = _fmsView === 'flow';
+  document.querySelectorAll('#fmsVTabs button').forEach(b => b.classList.toggle('on', b.dataset.v === _fmsView));
+  const top = document.getElementById('fmsTop'), list = document.getElementById('fmsList'), fl = document.getElementById('fmsFlow');
+  if (top) top.style.display = flow ? 'none' : '';
+  if (list) list.style.display = flow ? 'none' : '';
+  if (fl) fl.style.display = flow ? '' : 'none';
+  if (flow) fmsRenderFlow(); else if (top) fmsMeasure();
+}
+// Workflow card dabao -> us step ka table
+function fmsFlowOpen(id) { _fmsView = 'tasks'; _fmsSel = id; fmsApplyView(); fmsRender(); }
+
+function fmsRenderFlow() {
+  const el = document.getElementById('fmsFlow');
+  if (!el) return;
+  const steps = window._fmsAllSteps || [];
+  const fl = fmsFlow();
+  let h = '<div class="fms-flow-head"><div><h3>' + obE(fl ? fl.title : (window._fmsName || 'FMS') + ' Workflow') + '</h3>' +
+    '<div>' + obE(fl ? fl.sub : 'Step by step flow · har step ka doer aur pending kaam') + '</div></div></div>';
+  if (fl && fl.entry) {
+    h += '<div class="fms-flow-entry"><div class="fms-fe-box"><div class="fms-fe-t"><span class="fms-fnum" style="background:#1e3a8a">1</span>Order Entry <em>(Two Ways)</em></div>' +
+      '<div class="fms-fe-ways">' + fl.entry.ways.map((w, i) => (i ? '<div class="fms-fe-or">OR</div>' : '') +
+        '<div class="fms-fe-way ' + (i ? 'man' : 'api') + '"><div class="ic">' + w[3] + '</div><b>' + w[0] + '</b><span>(' + w[1] + ')</span><p>' + w[2] + '</p></div>').join('') + '</div></div>' +
+      '<div class="fms-fe-form"><div class="fms-fe-t">Manual Order Form &ndash; ' + fl.entry.fields.length + ' Fields <em class="req">(All Mandatory)</em></div>' +
+      '<ol>' + fl.entry.fields.map(x => '<li>' + obE(x) + '</li>').join('') + '</ol>' +
+      '<div class="fms-fe-note">All fields are mandatory. No optional fields.</div></div></div>';
+  }
+  h += '<div class="fms-flow-grid">' + steps.map(s => {
+    const fs = fmsFlowStep(s), col = fmsColor(s), mine = fmsIsMine(s), c = mine ? fmsStepCounts(s.id) : null;
+    const users = (s.doers || []).map(d => d.name).join(', ');
+    const doer = fs ? fs.doer : (users || '—');
+    let stat = '';
+    if (!mine) stat = '<span class="ob-chip na">&#128274; Not assigned</span>';
+    else if (!c) stat = '<span class="ob-chip na">&#9203; loading…</span>';
+    else stat = (c.n ? '<span class="ob-chip up">' + c.n + ' pending</span>' : '<span class="ob-chip done">&#10003; 0 pending</span>') +
+      (c.late ? ' <span class="ob-chip late">' + c.late + ' late</span>' : '') + (c.today ? ' <span class="ob-chip today">' + c.today + ' today</span>' : '');
+    return '<div class="fms-fcard' + (mine ? ' click' : '') + (c && c.late ? ' lt' : '') + '" style="--fc:' + col + '"' +
+      (mine ? ' onclick="fmsFlowOpen(' + s.id + ')" title="Is step ke pending rows kholo"' : '') + '>' +
+      '<div class="fms-fc-top"><span class="fms-fnum" style="background:' + col + '">' + fmsNo(s) + '</span>' +
+      (fs && fs.icon ? '<span class="fms-fc-ic">' + fs.icon + '</span>' : '') + '</div>' +
+      '<div class="fms-fc-t">' + obE(s.step_name) + '</div>' +
+      (fs ? '<div class="fms-fc-d">' + obE(fs.desc) + '</div>' : '') +
+      '<div class="fms-fc-doer' + (fs && fs.auto ? ' auto' : '') + '">' + (fs && fs.auto ? '&#9889; ' : '') + 'Doer: ' + obE(doer) + '</div>' +
+      (fs && users ? '<div class="fms-fc-u" title="FMS Admin me assigned">&#128100; ' + obE(users) + '</div>' : '') +
+      '<div class="fms-fc-s">' + stat + '</div></div>';
+  }).join('') + '</div>';
+  if (fl && fl.notes) h += '<div class="fms-flow-notes"><b>&#128161; Important Notes</b><ul>' + fl.notes.map(n => '<li>' + obE(n) + '</li>').join('') + '</ul></div>';
+  el.innerHTML = h;
+}
+
 function fmsIsMine(s) { return ME.role === 'admin' || !!(s && s.isMyStep); }
 function fmsStep(id) { return (window._fmsAllSteps || []).find(s => s.id === id) || null; }
 // Sheet ka plan "29/10/2026 18:23:30" ya "2026-10-29" -> "2026-10-29" (fms-dashboard wala rule)
@@ -13256,7 +13414,9 @@ function buildFMSStack(steps) {
   _fmsSel = isAdmin ? 0 : null;
 
   // KPI + pipeline ek chipki block me (patti ke saath freeze), neeche sirf table
-  stack.innerHTML = '<div class="fms-top" id="fmsTop"><div id="fmsKpis" class="ob-kpis fms-kpis overview-cards"></div><div id="fmsPipe" class="fms-pipe"></div></div><div id="fmsList"></div>';
+  stack.innerHTML = '<div class="fms-top" id="fmsTop"><div id="fmsKpis" class="ob-kpis fms-kpis overview-cards"></div><div id="fmsPipe" class="fms-pipe"></div></div><div id="fmsList"></div><div id="fmsFlow" style="display:none"></div>';
+  const vt = document.getElementById('fmsVTabs'); if (vt) vt.style.display = '';
+  fmsApplyView();
   fmsRender();
 
   // Apne steps ke rows ek-ek karke load karo (sheet API quota safe)
@@ -13277,6 +13437,7 @@ function fmsRender() {
   if (!document.getElementById('fmsKpis')) return;
   fmsRenderTop();          // isi me fmsMeasure() -- patti + KPI/pipeline ki oonchai
   fmsRenderList();
+  if (_fmsView === 'flow') fmsRenderFlow();
 }
 // KPI + pipeline (table ko nahi chhoota -- filter me likha hua bacha rahe)
 // Chipki patti + KPI/pipeline block ki oonchai CSS ko do -- table card bachi
@@ -13312,14 +13473,14 @@ function fmsRenderTop() {
     const doers = (s.doers || []).map(d => d.name).join(', ') || '—';
     if (!fmsIsMine(s)) {
       cards += '<div class="ob-pcard zero lock" title="' + obE('Doer: ' + doers) + '">' +
-        '<div class="k">STEP ' + s.step_order + '</div><div class="t">' + obE(s.step_name) + '</div>' +
+        '<div class="k">STEP ' + fmsNo(s) + '</div><div class="t">' + obE(s.step_name) + '</div>' +
         '<div class="n">&#128274; Not assigned</div></div>';
       return;
     }
     const c = fmsStepCounts(s.id);
     cards += '<div class="ob-pcard ' + (!c ? 'zero' : c.n ? 'has' : 'zero') + (c && c.late ? ' lt' : '') + (_fmsSel === s.id ? ' on' : '') + '" ' +
       'onclick="fmsPickStep(' + s.id + ')" title="' + obE('Doer: ' + doers) + '">' +
-      '<div class="k">STEP ' + s.step_order + '</div><div class="t">' + obE(s.step_name) + '</div>' +
+      '<div class="k">STEP ' + fmsNo(s) + '</div><div class="t">' + obE(s.step_name) + '</div>' +
       '<div class="n">' + (c ? '<b>' + c.n + '</b> pending' + (c.late ? ' <span class="r late">' + c.late + ' late</span>' : '') : '&#9203; loading…') + '</div></div>';
   });
   document.getElementById('fmsPipe').innerHTML =
@@ -13356,7 +13517,7 @@ function fmsRenderList() {
   if (!s) { _fmsSel = 0; el.innerHTML = fmsAllHtml(); return; }
   const doers = (s.doers || []).map(d => d.name).join(', ') || '—';
   const c = fmsStepCounts(s.id);
-  el.innerHTML = '<div class="ob-listcard"><div class="ob-listhead"><div class="ob-num sm" style="background:#2e8b65">' + s.step_order + '</div>' +
+  el.innerHTML = '<div class="ob-listcard"><div class="ob-listhead"><div class="ob-num sm" style="background:' + fmsColor(s) + '">' + fmsNo(s) + '</div>' +
     '<h4>' + obE(s.step_name) + '<span>&#128100; ' + obE(doers) + (c && c.late ? ' &middot; <b style="color:#b91c1c">' + c.late + ' late</b>' : '') + (c && c.today ? ' &middot; <b style="color:#92400e">' + c.today + ' due today</b>' : '') + '</span></h4>' +
     '<span id="fmsStepCount_' + s.id + '" style="font-size:13px;font-weight:600"></span>' +
     '<button class="btn btn-outline btn-sm" onclick="loadFMSStepRows(' + s.id + ')" id="fmsStepBtn_' + s.id + '">&#128260; Refresh</button></div>' +
@@ -13457,7 +13618,7 @@ function fmsAllRows() {
     return '<tr class="' + (stat.st === 'late' ? 'lt' : '') + (canOpen ? ' click' : '') + '"' + (canOpen ? ' onclick="fmsPickStep(' + step.id + ')" title="Is step ka table kholo"' : '') + '>' +
       cols.map((c, i) => { const v = r.data[c] || (i === 0 && cols.every(k => !r.data[k]) ? 'Row ' + r.sheetRow : '—');
         return '<td' + (i === 0 ? ' class="ob-emp"' : '') + '>' + (i === 0 ? '<b>' + obE(v) + '</b>' : obE(v)) + '</td>'; }).join('') +
-      '<td>' + (cur ? '<div class="ob-cur"><div class="ob-num sm" style="background:#2e8b65">' + cur.order + '</div><b>' + obE(cur.name) + '</b></div>' : '—') + '</td>' +
+      '<td>' + (cur ? '<div class="ob-cur"><div class="ob-num sm" style="background:' + (step ? fmsColor(step) : '#2e8b65') + '">' + (cur.order + fmsOffset()) + '</div><b>' + obE(cur.name) + '</b></div>' : '—') + '</td>' +
       '<td><div class="ob-mini"><div class="ob-pbar"><i style="width:' + pct + '%"></i></div>' + r.doneCount + '/' + r.applicable + '</div></td>' +
       '<td class="ob-dt">' + (cur && cur.planned ? fmsPlanCell(cur.planned) : '—') + '</td>' +
       '<td>' + obE(cur ? (cur.doers || []).join(', ') || '—' : '—') + '</td>' +
@@ -13482,7 +13643,7 @@ function showFMSNotifPopups() {
       <div style="font-size:20px">🔔</div>
       <div style="flex:1;min-width:0">
         <div style="font-size:11px;font-weight:700;color:#10b981;letter-spacing:.3px">FMS TASK PENDING</div>
-        <div style="font-size:13px;font-weight:700;color:#1e293b;margin-top:2px;">STEP ${s.step_order} — ${s.step_name}</div>
+        <div style="font-size:13px;font-weight:700;color:#1e293b;margin-top:2px;">STEP ${fmsNo(s)} — ${s.step_name}</div>
         <div style="font-size:12px;color:#dc2626;font-weight:600;margin-top:2px;">⏳ ${states[s.id].rows.length} pending row(s)</div>
       </div>
       <button onclick="this.closest('.fms-notif-card').remove()" style="background:none;border:none;font-size:14px;color:#94a3b8;cursor:pointer;padding:0;line-height:1">✕</button>`;
@@ -13531,13 +13692,21 @@ async function loadFMSStepRows(stepId) {
   // jo step abhi apni baari ka intezaar kar raha hai uspar halki si line --
   // teeno alag (fmsSetCountLabel). (20 Sep 2026)
   if (_fmsSel === stepId) fmsRender();
-  else fmsRenderTop();
+  else { fmsRenderTop(); if (_fmsView === 'flow') fmsRenderFlow(); }
 }
 
 // Cell me link ho to clickable bana do (Drive/photo/video ke links sheet me
 // aate hain — pehle plain text dikhte the, khul hi nahi sakte the).
 // Ek cell me kai links comma se alag ho sakte hain.
-function fmsLinkify(v) {
+// Table ka cell: lamba text 2 line me (poora hover par), kai links ho to
+// chhote chips ek line me -- ek screen par zyada orders dikhen (30 Oct 2026)
+function fmsCell(v) {
+  const t = String(v == null ? '' : v).trim();
+  if (!t) return '—';
+  if (/https?:\/\//i.test(t)) return '<div class="fms-links">' + fmsLinkify(t, true) + '</div>';
+  return '<div class="fms-cell" title="' + obE(t) + '">' + obE(t) + '</div>';
+}
+function fmsLinkify(v, compact) {
   const s = String(v == null ? '' : v).trim();
   if (!s) return '—';
   if (!/https?:\/\//i.test(s)) return s;
@@ -13546,7 +13715,8 @@ function fmsLinkify(v) {
   if (!links.length) return s;
   return links.map((u, i) => {
     const drive = /drive\.google\.com|docs\.google\.com/i.test(u);
-    const label = links.length > 1 ? `${drive ? '📎 Open' : '🔗 Open'} ${i + 1}` : (drive ? '📎 Open file' : '🔗 Open link');
+    const label = compact ? (drive ? '📎' : '🔗') + (links.length > 1 ? ' ' + (i + 1) : ' Open')
+      : links.length > 1 ? `${drive ? '📎 Open' : '🔗 Open'} ${i + 1}` : (drive ? '📎 Open file' : '🔗 Open link');
     return `<a href="${u}" target="_blank" rel="noopener" onclick="event.stopPropagation()"
       style="display:inline-block;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:6px;padding:2px 8px;font-size:12px;font-weight:600;text-decoration:none;margin:1px 3px 1px 0">${label}</a>`;
   }).join('');
@@ -13636,7 +13806,7 @@ function fmsStepBody(stepId) {
     const row = st.rows[i], rs = fmsRowStat(row.planValue);
     return `<tr class="${rs.st === 'late' ? 'fms-lt' : ''}">
       <td><button class="fms-done-btn" onclick="openFMSDoneModal(${stepId},${i})">✅ Done</button></td>
-      ${st.colKeys.map(k => `<td>${fmsLinkify(row.data[k])}</td>`).join('')}
+      ${st.colKeys.map(k => `<td>${fmsCell(row.data[k])}</td>`).join('')}
       <td style="white-space:nowrap">${fmsPlanCell(row.planValue)}</td>
       <td>${fmsChip(rs)}</td>
     </tr>`;
