@@ -779,10 +779,42 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
 .fms-notif-card.out{opacity:0;transform:translateX(40px);transition:all .3s ease;}
 @keyframes fmsNotifIn{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:translateX(0)}}
 .fms-step-rows-table{background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;margin-top:4px;}
-.fms-step-rows-scroll{max-height:65vh;overflow:auto;}
+.fms-step-rows-scroll{max-height:calc(100vh - 200px);overflow:auto;}
 .fms-step-rows-table table{width:100%;border-collapse:separate;border-spacing:0;}
-.fms-step-rows-table table th{font-size:13px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:#1e293b;padding:14px 14px;background:#f1f5f9;border-bottom:2px solid #cbd5e1;white-space:nowrap;position:sticky;top:0;z-index:3;box-shadow:0 2px 4px -2px rgba(15,23,42,.12);}
+.fms-step-rows-table table th{font-size:12px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:#1e293b;padding:10px 12px;background:#f1f5f9;border-bottom:2px solid #cbd5e1;white-space:nowrap;position:sticky;top:0;z-index:3;box-shadow:0 2px 4px -2px rgba(15,23,42,.12);}
 .fms-step-rows-table table td{padding:10px 14px;font-size:13px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
+/* FMS Tasks: patli chipki patti + chhote KPI / pipeline (30 Oct 2026) */
+.fms-bar{position:sticky;top:60px;z-index:80;display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  margin:-22px -24px 14px;padding:10px 24px;background:#f1f5f9;border-bottom:1px solid #e2e8f0;box-shadow:0 6px 12px -10px rgba(15,23,42,.25);}
+.fms-bar h2{font-size:16px;font-weight:800;color:#0f172a;margin:0;white-space:nowrap;}
+.fms-bar select{width:260px;max-width:100%;height:34px;padding:0 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-weight:600;
+  font-family:'Inter',sans-serif;outline:none;color:#1e293b;background:#fff;cursor:pointer;}
+.fms-bar select:focus{border-color:#34d399;}
+.fms-bar .sp{flex:1;}
+.fms-kpis.overview-cards{gap:10px;margin-bottom:12px;}
+.fms-kpis .ov-card{padding:10px 14px;}
+.fms-kpis .ov-card .label{font-size:11px;}
+.fms-kpis .ov-card .number{font-size:24px;line-height:1.15;}
+.fms-kpis .ob-ksub{font-size:10.5px;margin-top:0;}
+.fms-pipe .ob-pipe{margin-bottom:12px;}
+.fms-pipe .ob-pipe-head{padding:10px 16px;}
+.fms-pipe .ob-pipe-title{font-size:14px;}
+.fms-pipe .ob-arrow{width:28px;height:28px;font-size:14px;}
+.fms-pipe .ob-pipe-track{padding:12px 16px 10px;gap:10px;}
+.fms-pipe .ob-pcard{flex-basis:180px;min-height:96px;padding:10px 12px 9px;}
+.fms-pipe .ob-pcard .k{font-size:10px;}
+.fms-pipe .ob-pcard .t{font-size:12.5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.fms-pipe .ob-pcard .n{padding-top:8px;}
+.fms-pipe .ob-pcard .n b{font-size:20px;}
+.fms-pipe .ob-pipe-bar{margin:0 16px 10px;}
+#fmsList .ob-listhead{padding:10px 14px;}
+.fms-all-scroll{max-height:calc(100vh - 210px);overflow:auto;}
+.fms-all-scroll .ob-list th{position:sticky;top:0;z-index:2;}
+@media(max-width:768px){
+  .fms-bar{top:52px;margin:-14px -12px 12px;padding:8px 12px;}
+  .fms-bar select{flex:1;width:auto;min-width:0;}
+  .fms-bar .sp{display:none;}
+}
 .fms-done-btn{background:#10b981;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;font-family:'Inter',sans-serif;}
 .fms-done-btn:hover{background:#059669;transform:translateY(-1px);}
 .fms-status-badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:#fef9c3;color:#854d0e;}
@@ -2053,23 +2085,21 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
 
   <!-- ── FMS TASKS ── -->
   <div id="page-fms-tasks" class="page">
-    <div class="page-header">
+    <!-- Ek patli patti: title + FMS chuno + Refresh -- scroll par upar chipki
+         rehti hai (30 Oct 2026; pehle alag bada card tha) -->
+    <div class="fms-bar">
       <h2>FMS Tasks</h2>
-      <div id="fmsTasksRefreshBtn" style="display:none">
+      <select id="fmsTasksSelect" onchange="onFMSTasksSelect()" title="FMS chuno">
+        <option value="">-- Select an FMS --</option>
+      </select>
+      <span class="sp"></span>
+      <div id="fmsTasksRefreshBtn">
         <button class="btn btn-outline btn-sm" onclick="loadFMSTasks()">🔄 Refresh</button>
       </div>
     </div>
 
-    <!-- FMS Selector Dropdown -->
-    <div style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;padding:16px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-      <div style="font-size:13px;font-weight:600;color:#374151;white-space:nowrap">Select FMS:</div>
-      <select id="fmsTasksSelect" onchange="onFMSTasksSelect()"
-        style="flex:1;min-width:200px;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;font-weight:600;font-family:'Inter',sans-serif;outline:none;color:#1e293b;background:#fff">
-        <option value="">-- Select an FMS --</option>
-      </select>
-    </div>
-
-    <!-- Tasks / Form tabs -->
+    <!-- Tasks / Form tabs -- ab hamesha chhupa (sirf ek tab tha); Form wapas
+         chahiye to yahan display hatao -->
     <div id="fmsTasksViewTabs" style="display:none;margin-bottom:16px">
       <div class="tab-group">
         <div class="tab active" id="fmsViewTabTasks" onclick="switchFMSView('tasks',this)">Tasks</div>
@@ -12926,8 +12956,8 @@ let fmsTasksActiveFmsId = null;
 let fmsTasksActiveStepId = null;
 let fmsTasksActiveStepData = null;
 async function loadFMSTasks() {
-  document.getElementById('fmsTasksRefreshBtn').style.display = 'block';
   const sel = document.getElementById('fmsTasksSelect');
+  const prevFms = sel.value;      // Refresh par wahi FMS dobara khule
   const stack = document.getElementById('fmsStepsStack');
   const emptyEl = document.getElementById('fmsTasksEmpty');
 
@@ -12952,8 +12982,11 @@ async function loadFMSTasks() {
   sel.innerHTML = '<option value="">-- Select an FMS --</option>' +
     list.map(f => `<option value="${f.id}">${f.fms_name || f.sheet_name}</option>`).join('');
 
-  // Auto-select first
-  if (list.length === 1) {
+  // Pehle wala FMS (Refresh), warna akela ho to wahi
+  if (prevFms && list.some(f => String(f.id) === prevFms)) {
+    sel.value = prevFms;
+    onFMSTasksSelect();
+  } else if (list.length === 1) {
     sel.value = list[0].id;
     onFMSTasksSelect();
   }
@@ -12973,7 +13006,7 @@ async function onFMSTasksSelect() {
   }
 
   // FMS badla to wapas Tasks view par
-  if (viewTabs) viewTabs.style.display = 'block';
+  // Tabs ki patti nahi dikhani (sirf "Tasks" tha) -- jagah bachao
   if (formView) { formView.style.display = 'none'; formView.innerHTML = ''; }
   _fmsEntryRows = null;
   document.getElementById('fmsViewTabTasks')?.classList.add('active');
@@ -13159,6 +13192,13 @@ function fmsPlanDate(v) {
   const m2 = s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
   return m2 ? `${m2[3]}-${m2[2].padStart(2, '0')}-${m2[1].padStart(2, '0')}` : '';
 }
+// Sheet ka formula toota ho (#REF!, #N/A…) to plan date nahi hai
+function fmsIsSheetErr(v) { return /^#(REF!|N\/A|VALUE!|ERROR!|DIV\/0!|NAME\?|NUM!|NULL!)/i.test(String(v || '').trim()); }
+function fmsPlanCell(v) {
+  if (fmsIsSheetErr(v)) return '<span title="' + obE('Sheet me plan formula error: ' + String(v).trim()) + '" style="color:#d97706">&#9888;&#65039; —</span>';
+  const p = fmsPlanDate(v);
+  return p ? maintDate(p) : obE(String(v || '').trim() || '—');
+}
 function fmsRowStat(planVal) {
   const p = fmsPlanDate(planVal);
   if (!p) return { st: 'na', p: '' };
@@ -13192,7 +13232,7 @@ function buildFMSStack(steps) {
   // Admin ko ALL; doer ko apna pehla step jisme kaam ho (load hote hi tay hoga)
   _fmsSel = isAdmin ? 0 : null;
 
-  stack.innerHTML = '<div id="fmsKpis" class="ob-kpis overview-cards"></div><div id="fmsPipe"></div><div id="fmsList"></div>';
+  stack.innerHTML = '<div id="fmsKpis" class="ob-kpis fms-kpis overview-cards"></div><div id="fmsPipe" class="fms-pipe"></div><div id="fmsList"></div>';
   fmsRender();
 
   // Apne steps ke rows ek-ek karke load karo (sheet API quota safe)
@@ -13285,7 +13325,7 @@ function fmsRenderList() {
     '<h4>' + obE(s.step_name) + '<span>&#128100; ' + obE(doers) + (c && c.late ? ' &middot; <b style="color:#b91c1c">' + c.late + ' late</b>' : '') + (c && c.today ? ' &middot; <b style="color:#92400e">' + c.today + ' due today</b>' : '') + '</span></h4>' +
     '<span id="fmsStepCount_' + s.id + '" style="font-size:13px;font-weight:600"></span>' +
     '<button class="btn btn-outline btn-sm" onclick="loadFMSStepRows(' + s.id + ')" id="fmsStepBtn_' + s.id + '">&#128260; Refresh</button></div>' +
-    '<div id="fmsStepRows_' + s.id + '" style="padding:12px 16px 16px"><div style="padding:16px;text-align:center;color:#94a3b8;font-size:13px">&#9203; Loading...</div></div></div>';
+    '<div id="fmsStepRows_' + s.id + '" style="padding:8px 12px 12px"><div style="padding:16px;text-align:center;color:#94a3b8;font-size:13px">&#9203; Loading...</div></div></div>';
   fmsSetCountLabel(s.id);
   renderFMSStepTable(s.id);
 }
@@ -13323,7 +13363,7 @@ function fmsAllHtml() {
   return head('<div class="ob-fchips">' + chips + '</div>' +
     '<input type="search" class="ob-search" placeholder="&#128269; Search order, party, step…" value="' + obE(_fmsTrackQ) + '" ' +
     'oninput="_fmsTrackQ=this.value;document.getElementById(\'fmsAllRows\').innerHTML=fmsAllRows()" autocomplete="off"></div>') +
-    '<div class="ob-twrap2"><table class="ob-list"><thead><tr>' + cols.map(c => '<th>' + obE(c) + '</th>').join('') +
+    '<div class="ob-twrap2 fms-all-scroll"><table class="ob-list"><thead><tr>' + cols.map(c => '<th>' + obE(c) + '</th>').join('') +
     '<th>Current Step</th><th>Progress</th><th>Plan Date</th><th>Doer</th><th>Status</th></tr></thead>' +
     '<tbody id="fmsAllRows">' + fmsAllRows() + '</tbody></table></div></div>';
 }
@@ -13351,10 +13391,11 @@ function fmsAllRows() {
     const pct = r.applicable ? Math.round(r.doneCount * 100 / r.applicable) : 0;
     const canOpen = step && fmsIsMine(step);
     return '<tr class="' + (stat.st === 'late' ? 'lt' : '') + (canOpen ? ' click' : '') + '"' + (canOpen ? ' onclick="fmsPickStep(' + step.id + ')" title="Is step ka table kholo"' : '') + '>' +
-      cols.map((c, i) => '<td' + (i === 0 ? ' class="ob-emp"' : '') + '>' + (i === 0 ? '<b>' + obE(r.data[c] || '—') + '</b>' : obE(r.data[c] || '—')) + '</td>').join('') +
+      cols.map((c, i) => { const v = r.data[c] || (i === 0 && cols.every(k => !r.data[k]) ? 'Row ' + r.sheetRow : '—');
+        return '<td' + (i === 0 ? ' class="ob-emp"' : '') + '>' + (i === 0 ? '<b>' + obE(v) + '</b>' : obE(v)) + '</td>'; }).join('') +
       '<td>' + (cur ? '<div class="ob-cur"><div class="ob-num sm" style="background:#2e8b65">' + cur.order + '</div><b>' + obE(cur.name) + '</b></div>' : '—') + '</td>' +
       '<td><div class="ob-mini"><div class="ob-pbar"><i style="width:' + pct + '%"></i></div>' + r.doneCount + '/' + r.applicable + '</div></td>' +
-      '<td class="ob-dt">' + (cur && cur.planned ? maintDate(cur.planned) : '—') + '</td>' +
+      '<td class="ob-dt">' + (cur && cur.planned ? fmsPlanCell(cur.planned) : '—') + '</td>' +
       '<td>' + obE(cur ? (cur.doers || []).join(', ') || '—' : '—') + '</td>' +
       '<td>' + (r.complete ? '<span class="ob-chip done">&#10003; Completed</span>' : cur ? fmsChip(stat) : '<span class="ob-chip na">N/A</span>') + '</td></tr>';
   }).join('');
@@ -13487,7 +13528,7 @@ function renderFMSStepTable(stepId) {
             ${st.rows.map((row, i) => { const rs = fmsRowStat(row.planValue); return `<tr class="${rs.st === 'late' ? 'fms-lt' : ''}">
               <td><button class="fms-done-btn" onclick="openFMSDoneModal(${stepId},${i})">✅ Done</button></td>
               ${st.colKeys.map(k => `<td>${fmsLinkify(row.data[k])}</td>`).join('')}
-              <td style="white-space:nowrap">${rs.p ? maintDate(rs.p) : obE(row.planValue || '—')}</td>
+              <td style="white-space:nowrap">${fmsPlanCell(row.planValue)}</td>
               <td>${fmsChip(rs)}</td>
             </tr>`; }).join('')}
           </tbody>
@@ -13505,7 +13546,7 @@ function renderFMSStepTable(stepId) {
     const h = Math.round(head1.getBoundingClientRect().height);
     [...filtRow.children].forEach(th => {
       th.style.top = h + 'px';
-      th.style.padding = '0 14px 8px';
+      th.style.padding = '0 12px 6px';
       th.style.zIndex = '2';              // pehli heading row ke peeche
       th.style.boxShadow = 'none';
       th.style.textTransform = 'none';
