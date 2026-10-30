@@ -811,7 +811,9 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
 /* Table card screen me patti ke neeche fit -- poora page scroll karo to card
    patti ke theek neeche aa ke ruk jaata hai; heading + filter + page patti
    hilte nahi, sirf rows andar scroll hoti hain */
-#fmsList .ob-listcard{display:flex;flex-direction:column;max-height:calc(100vh - 60px - var(--fms-bar-h,55px) - 34px);min-height:260px;}
+/* KPI + pipeline bhi patti ke neeche chipke (30 Oct, Harsh: "workflow section header ke saath freeze") */
+.fms-top{position:sticky;top:calc(60px + var(--fms-bar-h,55px));z-index:79;background:#f1f5f9;margin:-14px -24px 0;padding:14px 24px 2px;}
+#fmsList .ob-listcard{display:flex;flex-direction:column;max-height:calc(100vh - 60px - var(--fms-bar-h,55px) - var(--fms-top-h,0px) - 34px);min-height:220px;}
 #fmsList .ob-listhead{flex:none;}
 .fms-all-scroll{flex:1;min-height:0;overflow:auto;}
 .fms-all-scroll .ob-list th{position:sticky;top:0;z-index:2;}
@@ -831,6 +833,9 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
   .fms-bar{top:52px;margin:-14px -12px 12px;padding:8px 12px;}
   .fms-bar select{flex:1;width:auto;min-width:0;}
   .fms-bar .sp{display:none;}
+  /* phone par screen chhoti -- KPI/pipeline normal scroll, table 80% screen */
+  .fms-top{position:static;margin:0;padding:0;}
+  #fmsList .ob-listcard{max-height:80vh;}
 }
 .fms-done-btn{background:#10b981;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;font-family:'Inter',sans-serif;}
 .fms-done-btn:hover{background:#059669;transform:translateY(-1px);}
@@ -13250,7 +13255,8 @@ function buildFMSStack(steps) {
   // Admin ko ALL; doer ko apna pehla step jisme kaam ho (load hote hi tay hoga)
   _fmsSel = isAdmin ? 0 : null;
 
-  stack.innerHTML = '<div id="fmsKpis" class="ob-kpis fms-kpis overview-cards"></div><div id="fmsPipe" class="fms-pipe"></div><div id="fmsList"></div>';
+  // KPI + pipeline ek chipki block me (patti ke saath freeze), neeche sirf table
+  stack.innerHTML = '<div class="fms-top" id="fmsTop"><div id="fmsKpis" class="ob-kpis fms-kpis overview-cards"></div><div id="fmsPipe" class="fms-pipe"></div></div><div id="fmsList"></div>';
   fmsRender();
 
   // Apne steps ke rows ek-ek karke load karo (sheet API quota safe)
@@ -13269,13 +13275,20 @@ function buildFMSStack(steps) {
 
 function fmsRender() {
   if (!document.getElementById('fmsKpis')) return;
-  // Patti ki oonchai -> table card screen me theek fit ho (CSS --fms-bar-h)
-  const bar = document.querySelector('#page-fms-tasks .fms-bar');
-  if (bar && bar.offsetHeight) document.documentElement.style.setProperty('--fms-bar-h', bar.offsetHeight + 'px');
-  fmsRenderTop();
+  fmsRenderTop();          // isi me fmsMeasure() -- patti + KPI/pipeline ki oonchai
   fmsRenderList();
 }
 // KPI + pipeline (table ko nahi chhoota -- filter me likha hua bacha rahe)
+// Chipki patti + KPI/pipeline block ki oonchai CSS ko do -- table card bachi
+// hui jagah me fit hota hai (window resize par bhi)
+function fmsMeasure() {
+  const root = document.documentElement.style;
+  const bar = document.querySelector('#page-fms-tasks .fms-bar');
+  const top = document.getElementById('fmsTop');
+  if (bar && bar.offsetHeight) root.setProperty('--fms-bar-h', bar.offsetHeight + 'px');
+  if (top && top.offsetHeight) root.setProperty('--fms-top-h', top.offsetHeight + 'px');
+}
+window.addEventListener('resize', () => { if (document.getElementById('fmsTop')) fmsMeasure(); });
 function fmsRenderTop() {
   const steps = window._fmsAllSteps || [];
   const mine = steps.filter(fmsIsMine);
@@ -13318,6 +13331,7 @@ function fmsRenderTop() {
     '<div class="ob-pipe-bar"><i id="fmsPipeBarFill"></i></div></div>';
   const t2 = document.getElementById('fmsPipeTrack');
   if (t2) { t2.style.scrollBehavior = 'auto'; t2.scrollLeft = keepScroll; t2.style.scrollBehavior = ''; fmsPipeBar(); }
+  fmsMeasure();
 }
 function fmsPipeScroll(dir) { const t = document.getElementById('fmsPipeTrack'); if (t) t.scrollLeft += dir * 460; }
 function fmsPipeBar() {
