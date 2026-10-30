@@ -808,8 +808,25 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
 .fms-pipe .ob-pcard .n b{font-size:20px;}
 .fms-pipe .ob-pipe-bar{margin:0 16px 10px;}
 #fmsList .ob-listhead{padding:10px 14px;}
-.fms-all-scroll{max-height:calc(100vh - 210px);overflow:auto;}
+/* Table card screen me patti ke neeche fit -- poora page scroll karo to card
+   patti ke theek neeche aa ke ruk jaata hai; heading + filter + page patti
+   hilte nahi, sirf rows andar scroll hoti hain */
+#fmsList .ob-listcard{display:flex;flex-direction:column;max-height:calc(100vh - 60px - var(--fms-bar-h,55px) - 34px);min-height:260px;}
+#fmsList .ob-listhead{flex:none;}
+.fms-all-scroll{flex:1;min-height:0;overflow:auto;}
 .fms-all-scroll .ob-list th{position:sticky;top:0;z-index:2;}
+#fmsList [id^="fmsStepRows_"]{flex:1;min-height:0;display:flex;flex-direction:column;}
+#fmsList .fms-step-rows-table{flex:1;min-height:0;display:flex;flex-direction:column;}
+#fmsList .fms-step-rows-scroll{flex:1;min-height:0;max-height:none;}
+.fms-pager{flex:none;display:flex;align-items:center;gap:4px;flex-wrap:wrap;padding:8px 14px;border-top:1px solid #f1f5f9;background:#fff;font-size:12px;}
+.fms-pager:empty{display:none;}
+.fms-pager .pg-info{color:#64748b;font-weight:600;}
+.fms-pager .sp{flex:1;}
+.fms-pager .pg-btn{font-family:inherit;font-size:12px;font-weight:600;min-width:30px;height:28px;padding:0 9px;border:1px solid #e2e8f0;border-radius:7px;background:#fff;color:#334155;cursor:pointer;}
+.fms-pager .pg-btn:hover:not(:disabled){border-color:#34d399;color:#047857;}
+.fms-pager .pg-btn.on{background:#0f172a;border-color:#0f172a;color:#fff;opacity:1;cursor:default !important;}
+.fms-pager .pg-btn:disabled:not(.on){opacity:.4;}
+.fms-pager .pg-gap{color:#94a3b8;padding:0 2px;}
 @media(max-width:768px){
   .fms-bar{top:52px;margin:-14px -12px 12px;padding:8px 12px;}
   .fms-bar select{flex:1;width:auto;min-width:0;}
@@ -13179,7 +13196,8 @@ async function submitFMSEntry() {
 // (30 Oct 2026; pehle har step ek ke neeche ek lamba card tha)
 let _fmsSel = 0;              // 0 = ALL card, warna stepId; null = doer ka default abhi tay nahi
 let _fmsTrack = null;         // ALL card ka data (/api/fms-tracking) -- { fmsId, data }
-let _fmsTrackFilter = 'active', _fmsTrackQ = '';
+let _fmsTrackFilter = 'active', _fmsTrackQ = '', _fmsAllPage = 1;
+const FMS_PAGE = 30;          // ek page par itni rows (table chhota, scroll kam)
 let _fmsLoadSeq = 0;          // FMS badla to purana loading loop ruk jaaye
 
 function fmsIsMine(s) { return ME.role === 'admin' || !!(s && s.isMyStep); }
@@ -13227,7 +13245,7 @@ function buildFMSStack(steps) {
   }
   window._fmsAllSteps = steps;
   window._fmsStepStates = {};
-  _fmsTrack = null; _fmsTrackFilter = 'active'; _fmsTrackQ = '';
+  _fmsTrack = null; _fmsTrackFilter = 'active'; _fmsTrackQ = ''; _fmsAllPage = 1;
   const isAdmin = ME.role === 'admin';
   // Admin ko ALL; doer ko apna pehla step jisme kaam ho (load hote hi tay hoga)
   _fmsSel = isAdmin ? 0 : null;
@@ -13251,6 +13269,9 @@ function buildFMSStack(steps) {
 
 function fmsRender() {
   if (!document.getElementById('fmsKpis')) return;
+  // Patti ki oonchai -> table card screen me theek fit ho (CSS --fms-bar-h)
+  const bar = document.querySelector('#page-fms-tasks .fms-bar');
+  if (bar && bar.offsetHeight) document.documentElement.style.setProperty('--fms-bar-h', bar.offsetHeight + 'px');
   fmsRenderTop();
   fmsRenderList();
 }
@@ -13358,14 +13379,40 @@ function fmsAllHtml() {
   const rows = d.rows || [];
   const cnt = k => rows.filter(r => fmsTrackState(r) === k).length;
   const chips = [['active', 'Active', cnt('active')], ['completed', 'Completed', cnt('completed')], ['all', 'All', rows.length]]
-    .map(c => '<button class="ob-fchip' + (_fmsTrackFilter === c[0] ? ' on' : '') + '" onclick="_fmsTrackFilter=\'' + c[0] + '\';fmsRenderList()">' + c[1] + ' <b>' + c[2] + '</b></button>').join('');
+    .map(c => '<button class="ob-fchip' + (_fmsTrackFilter === c[0] ? ' on' : '') + '" onclick="_fmsTrackFilter=\'' + c[0] + '\';_fmsAllPage=1;fmsRenderList()">' + c[1] + ' <b>' + c[2] + '</b></button>').join('');
   const cols = fmsTrackCols();
   return head('<div class="ob-fchips">' + chips + '</div>' +
     '<input type="search" class="ob-search" placeholder="&#128269; Search order, party, step…" value="' + obE(_fmsTrackQ) + '" ' +
-    'oninput="_fmsTrackQ=this.value;document.getElementById(\'fmsAllRows\').innerHTML=fmsAllRows()" autocomplete="off"></div>') +
+    'oninput="_fmsTrackQ=this.value;_fmsAllPage=1;fmsAllRedraw()" autocomplete="off"></div>') +
     '<div class="ob-twrap2 fms-all-scroll"><table class="ob-list"><thead><tr>' + cols.map(c => '<th>' + obE(c) + '</th>').join('') +
     '<th>Current Step</th><th>Progress</th><th>Plan Date</th><th>Doer</th><th>Status</th></tr></thead>' +
-    '<tbody id="fmsAllRows">' + fmsAllRows() + '</tbody></table></div></div>';
+    '<tbody id="fmsAllRows">' + fmsAllRows() + '</tbody></table></div>' +
+    '<div class="fms-pager" id="fmsAllPager">' + fmsAllPagerHtml() + '</div></div>';
+}
+function fmsAllRedraw() {
+  const b = document.getElementById('fmsAllRows'), p = document.getElementById('fmsAllPager');
+  if (b) b.innerHTML = fmsAllRows();
+  if (p) p.innerHTML = fmsAllPagerHtml();
+}
+function fmsAllGo(n) {
+  _fmsAllPage = n; fmsAllRedraw();
+  const w = document.querySelector('#fmsList .fms-all-scroll'); if (w) w.scrollTop = 0;
+}
+function fmsAllPagerHtml() { return fmsPagerHtml((_fmsTrack && _fmsTrack.shown) || 0, _fmsAllPage, 'fmsAllGo('); }
+// Page patti: "31–60 of 112  ‹ 1 2 3 ›" -- 30 tak ho to sirf ginti
+function fmsPagerHtml(total, page, call) {
+  const pages = Math.max(1, Math.ceil(total / FMS_PAGE));
+  if (total <= FMS_PAGE) return total ? '<span class="pg-info">' + total + ' row' + (total > 1 ? 's' : '') + '</span>' : '';
+  const a = (page - 1) * FMS_PAGE + 1, b = Math.min(total, page * FMS_PAGE);
+  const btn = (n, label, extra) => '<button class="pg-btn' + (extra || '') + '"' + (n < 1 || n > pages || extra === ' on' ? ' disabled' : '') +
+    ' onclick="' + call + n + ')">' + label + '</button>';
+  let lo = Math.max(1, page - 2), hi = Math.min(pages, lo + 4); lo = Math.max(1, hi - 4);
+  let nums = '';
+  if (lo > 1) nums += btn(1, '1') + (lo > 2 ? '<span class="pg-gap">…</span>' : '');
+  for (let n = lo; n <= hi; n++) nums += btn(n, String(n), n === page ? ' on' : '');
+  if (hi < pages) nums += (hi < pages - 1 ? '<span class="pg-gap">…</span>' : '') + btn(pages, String(pages));
+  return '<span class="pg-info">' + a + '–' + b + ' of ' + total + '</span><span class="sp"></span>' +
+    btn(page - 1, '&#8249; Prev') + nums + btn(page + 1, 'Next &#8250;');
 }
 function fmsTrackState(r) { return r.complete ? 'completed' : r.currentStep ? 'active' : 'na'; }
 // Pehle 3 label columns jinme data ho (Timestamp / PO / Party…)
@@ -13382,9 +13429,12 @@ function fmsAllRows() {
   const list = d.rows.filter(r => (_fmsTrackFilter === 'all' || fmsTrackState(r) === _fmsTrackFilter) &&
     (!q || Object.values(r.data).concat(r.currentStep ? [r.currentStep.name, (r.currentStep.doers || []).join(' ')] : [])
       .some(x => String(x || '').toLowerCase().includes(q))));
+  _fmsTrack.shown = list.length;
+  const pages = Math.max(1, Math.ceil(list.length / FMS_PAGE));
+  if (_fmsAllPage > pages) _fmsAllPage = pages;
   if (!list.length) return '<tr><td colspan="' + (cols.length + 5) + '"><div class="empty">' + (d.rows.length ? 'Is filter me koi order nahi' : 'Sheet me abhi koi order nahi') + '</div></td></tr>';
   const steps = window._fmsAllSteps || [];
-  return list.map(r => {
+  return list.slice((_fmsAllPage - 1) * FMS_PAGE, _fmsAllPage * FMS_PAGE).map(r => {
     const cur = r.currentStep;
     const stat = cur ? fmsRowStat(cur.planned) : { st: 'na' };
     const step = cur ? steps.find(s => s.step_order === cur.order) : null;
@@ -13457,7 +13507,10 @@ async function loadFMSStepRows(stepId) {
   const step = (window._fmsAllSteps || []).find(s => s.id === stepId) || null;
   const rows = r.rows || [];
   const colKeys = rows.length ? Object.keys(rows[0].data) : [];
-  window._fmsStepStates[stepId] = { rows, colKeys, step, emptyWhy: r.emptyWhy || '', emptyNote: r.emptyNote || '' };
+  // Refresh par filter me likha hua bacha rahe
+  const prev = window._fmsStepStates[stepId];
+  window._fmsStepStates[stepId] = { rows, colKeys, step, emptyWhy: r.emptyWhy || '', emptyNote: r.emptyNote || '',
+    filt: (prev && prev.filt) || [], page: 1 };
   // Doer ka default card: pehla apna step jisme kaam pending ho
   if (_fmsSel === null && rows.length) _fmsSel = stepId;
   // "All done!" tabhi jab kaam SACH ME ho chuka ho. Gadbad par warning, aur
@@ -13505,7 +13558,7 @@ function renderFMSStepTable(stepId) {
     + 'font-size:11px;font-family:\'Inter\',sans-serif;outline:none;box-sizing:border-box;font-weight:400';
   cont.innerHTML = `
     <div class="fms-step-rows-table">
-      <div style="padding:0 0 8px;font-size:11px;color:#94a3b8" id="fmsFiltCount_${stepId}"></div>
+      <div style="padding:0 0 6px;font-size:11px;color:#94a3b8;display:none" id="fmsFiltCount_${stepId}"></div>
       <div class="fms-step-rows-scroll">
         <table>
           <thead>
@@ -13518,23 +13571,18 @@ function renderFMSStepTable(stepId) {
             <tr class="fms-filt-row">
               <th><span onclick="fmsClearFilters(${stepId})" title="Saare filter hatao"
                 style="cursor:pointer;font-size:10px;color:#94a3b8;font-weight:600">✕ Clear</span></th>
-              ${st.colKeys.map((k, ci) => `<th><input type="text" data-fms-filt="${ci}"
+              ${st.colKeys.map((k, ci) => `<th><input type="text" data-fms-filt="${ci}" value="${obE((st.filt || [])[ci] || '')}"
                 oninput="fmsFilterRows(${stepId})" placeholder="🔍" style="${fStyle}"/></th>`).join('')}
               <th></th>
               <th></th>
             </tr>
           </thead>
-          <tbody>
-            ${st.rows.map((row, i) => { const rs = fmsRowStat(row.planValue); return `<tr class="${rs.st === 'late' ? 'fms-lt' : ''}">
-              <td><button class="fms-done-btn" onclick="openFMSDoneModal(${stepId},${i})">✅ Done</button></td>
-              ${st.colKeys.map(k => `<td>${fmsLinkify(row.data[k])}</td>`).join('')}
-              <td style="white-space:nowrap">${fmsPlanCell(row.planValue)}</td>
-              <td>${fmsChip(rs)}</td>
-            </tr>`; }).join('')}
-          </tbody>
+          <tbody id="fmsStepBody_${stepId}"></tbody>
         </table>
       </div>
+      <div class="fms-pager" id="fmsStepPager_${stepId}"></div>
     </div>`;
+  fmsStepBody(stepId);
 
   // Heading sticky hai (top:0). Filter row bhi sticky honi chahiye, warna
   // 700 rows scroll karte hi gayab ho jaati. Uski jagah JS se NAAPTE hain --
@@ -13554,47 +13602,49 @@ function renderFMSStepTable(stepId) {
   }
 }
 
-// Filter lagao — row ko chhupate/dikhate hain, list dobara nahi banate.
-// Ye JAAN-BOOJH KAR aise hai: "✅ Done" button me row ka number bandha hota
-// hai (openFMSDoneModal(stepId, i)). Agar filter par list dobara banate to
-// number badal jaate aur Done galat row par lag jaata.
+// Filter + page. Row ka asli number (st.rows me index) Done button me jaata
+// hai -- filter / page se wo nahi badalta, isliye Done sahi row par lagta hai.
+// Filter POORE data par chalta hai, sirf dikhne wale page par nahi.
+function fmsStepBody(stepId) {
+  const st = (window._fmsStepStates || {})[stepId];
+  const body = document.getElementById(`fmsStepBody_${stepId}`);
+  if (!st || !body) return;
+  const filt = (st.filt || []).map(v => String(v || '').trim().toLowerCase());
+  const koiFilter = filt.some(v => v);
+  const list = [];
+  st.rows.forEach((row, i) => {
+    const ok = filt.every((v, ci) => { const x = row.data[st.colKeys[ci]]; return !v || String(x == null ? '' : x).toLowerCase().includes(v); });
+    if (ok) list.push(i);
+  });
+  const pages = Math.max(1, Math.ceil(list.length / FMS_PAGE));
+  st.page = Math.min(Math.max(1, st.page || 1), pages);
+  body.innerHTML = list.length ? list.slice((st.page - 1) * FMS_PAGE, st.page * FMS_PAGE).map(i => {
+    const row = st.rows[i], rs = fmsRowStat(row.planValue);
+    return `<tr class="${rs.st === 'late' ? 'fms-lt' : ''}">
+      <td><button class="fms-done-btn" onclick="openFMSDoneModal(${stepId},${i})">✅ Done</button></td>
+      ${st.colKeys.map(k => `<td>${fmsLinkify(row.data[k])}</td>`).join('')}
+      <td style="white-space:nowrap">${fmsPlanCell(row.planValue)}</td>
+      <td>${fmsChip(rs)}</td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="${st.colKeys.length + 3}" style="text-align:center;padding:18px;color:#94a3b8;font-size:12px">🔍 Is filter se koi row nahi mili</td></tr>`;
+  const pg = document.getElementById(`fmsStepPager_${stepId}`);
+  if (pg) pg.innerHTML = fmsPagerHtml(list.length, st.page, `fmsStepGo(${stepId},`);
+  const c = document.getElementById(`fmsFiltCount_${stepId}`);
+  if (c) { c.textContent = koiFilter ? `🔍 ${list.length} / ${st.rows.length} rows match` : ''; c.style.display = koiFilter ? '' : 'none'; }
+}
+function fmsStepGo(stepId, n) {
+  const st = (window._fmsStepStates || {})[stepId];
+  if (!st) return;
+  st.page = n; fmsStepBody(stepId);
+  const w = document.querySelector(`#fmsStepRows_${stepId} .fms-step-rows-scroll`); if (w) w.scrollTop = 0;
+}
 function fmsFilterRows(stepId) {
   const cont = document.getElementById(`fmsStepRows_${stepId}`);
-  if (!cont) return;
-  const boxes = [...cont.querySelectorAll('input[data-fms-filt]')];
-  const filt = boxes.map(b => String(b.value || '').trim().toLowerCase());
-  const koiFilter = filt.some(v => v);
-  const body = cont.querySelector('tbody');
-  if (!body) return;
-  let dikhe = 0;
-  const rows = [...body.rows].filter(tr => !tr.dataset.fmsNoMatch);
-  rows.forEach(tr => {
-    // cell 0 = Action, isliye filter i ka cell i+1
-    const theek = filt.every((v, ci) => {
-      if (!v) return true;
-      const cell = tr.cells[ci + 1];
-      return cell && cell.textContent.toLowerCase().includes(v);
-    });
-    tr.style.display = theek ? '' : 'none';
-    if (theek) dikhe++;
-  });
-  // Kuch na mile to khali table ki jagah saaf message
-  let nm = body.querySelector('tr[data-fms-no-match]');
-  if (!dikhe && koiFilter) {
-    if (!nm) {
-      nm = body.insertRow();
-      nm.setAttribute('data-fms-no-match', '1');
-      nm.dataset.fmsNoMatch = '1';
-      const td = nm.insertCell();
-      td.colSpan = (rows[0] ? rows[0].cells.length : 3);
-      td.style.cssText = 'text-align:center;padding:18px;color:#94a3b8;font-size:12px';
-      td.textContent = '🔍 Is filter se koi row nahi mili';
-    }
-    nm.style.display = '';
-  } else if (nm) nm.style.display = 'none';
-
-  const c = document.getElementById(`fmsFiltCount_${stepId}`);
-  if (c) c.textContent = koiFilter ? `🔍 ${dikhe} / ${rows.length} rows dikh rahi hain` : '';
+  const st = (window._fmsStepStates || {})[stepId];
+  if (!cont || !st) return;
+  st.filt = [...cont.querySelectorAll('input[data-fms-filt]')].map(b => b.value || '');
+  st.page = 1;
+  fmsStepBody(stepId);
 }
 
 function fmsClearFilters(stepId) {
