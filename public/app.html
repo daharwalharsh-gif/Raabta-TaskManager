@@ -69,6 +69,10 @@ textarea.gold-inp{resize:vertical;}
 .ob-pcard.all{background:#6b6b3a;border-color:#6b6b3a;}
 .ob-pcard.all .k,.ob-pcard.all .t,.ob-pcard.all .n,.ob-pcard.all .n b{color:#fff;}
 .ob-pcard.on{box-shadow:0 0 0 2px #1c1917;}
+.ob-pcard.lock{cursor:default;background:#f8fafc;}
+.ob-pcard.lock:hover{box-shadow:none;transform:none;}
+.ob-pcard.lock .n{font-size:12px;color:#94a3b8;}
+.fms-step-rows-table tr.fms-lt td:first-child{box-shadow:inset 3px 0 0 #ef4444;}
 .ob-pcard.all.on{box-shadow:0 0 0 2px #1c1917,0 0 0 4px #fff inset;}
 .ob-pipe-bar{height:4px;margin:0 20px 16px;border-radius:4px;background:#f0eee9;overflow:hidden;}
 .ob-pipe-bar i{display:block;height:100%;width:30%;border-radius:4px;background:linear-gradient(90deg,#6b6b3a,#c2a74c);transition:width .2s,margin-left .2s;}
@@ -13137,7 +13141,44 @@ async function submitFMSEntry() {
   renderFMSEntryForm();
 }
 
-// Saare steps upar se neeche sections me — har step ka apna table (train view replaced)
+// HR Reporting jaisa layout -- KPI cards, Step-wise Pipeline (patti), neeche
+// chune hue card ka table. Har FMS par same, FMS Admin ke steps se banta hai.
+// (30 Oct 2026; pehle har step ek ke neeche ek lamba card tha)
+let _fmsSel = 0;              // 0 = ALL card, warna stepId; null = doer ka default abhi tay nahi
+let _fmsTrack = null;         // ALL card ka data (/api/fms-tracking) -- { fmsId, data }
+let _fmsTrackFilter = 'active', _fmsTrackQ = '';
+let _fmsLoadSeq = 0;          // FMS badla to purana loading loop ruk jaaye
+
+function fmsIsMine(s) { return ME.role === 'admin' || !!(s && s.isMyStep); }
+function fmsStep(id) { return (window._fmsAllSteps || []).find(s => s.id === id) || null; }
+// Sheet ka plan "29/10/2026 18:23:30" ya "2026-10-29" -> "2026-10-29" (fms-dashboard wala rule)
+function fmsPlanDate(v) {
+  const s = String(v || '').trim();
+  const m1 = s.match(/(\d{4}-\d{2}-\d{2})/);
+  if (m1) return m1[1];
+  const m2 = s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  return m2 ? `${m2[3]}-${m2[2].padStart(2, '0')}-${m2[1].padStart(2, '0')}` : '';
+}
+function fmsRowStat(planVal) {
+  const p = fmsPlanDate(planVal);
+  if (!p) return { st: 'na', p: '' };
+  const d = obDays(fmsTodayStr(), p);
+  return { st: d < 0 ? 'late' : d === 0 ? 'today' : 'up', d, p };
+}
+function fmsChip(r) {
+  if (r.st === 'late') return `<span class="ob-chip late">&#9200; Late &middot; ${-r.d} day${r.d < -1 ? 's' : ''}</span>`;
+  if (r.st === 'today') return '<span class="ob-chip today">&#128197; Due today</span>';
+  if (r.st === 'up') return `<span class="ob-chip up">In ${r.d} day${r.d > 1 ? 's' : ''}</span>`;
+  return '<span class="ob-chip na">&#9203; Pending</span>';
+}
+// Ek step ki ginti: pending / late / today (rows load na hue ho to null)
+function fmsStepCounts(id) {
+  const st = (window._fmsStepStates || {})[id];
+  if (!st) return null;
+  const stats = st.rows.map(r => fmsRowStat(r.planValue).st);
+  return { n: st.rows.length, late: stats.filter(x => x === 'late').length, today: stats.filter(x => x === 'today').length };
+}
+
 function buildFMSStack(steps) {
   const stack = document.getElementById('fmsStepsStack');
   if (!steps || !steps.length) {
@@ -13146,37 +13187,177 @@ function buildFMSStack(steps) {
   }
   window._fmsAllSteps = steps;
   window._fmsStepStates = {};
+  _fmsTrack = null; _fmsTrackFilter = 'active'; _fmsTrackQ = '';
   const isAdmin = ME.role === 'admin';
+  // Admin ko ALL; doer ko apna pehla step jisme kaam ho (load hote hi tay hoga)
+  _fmsSel = isAdmin ? 0 : null;
 
-  stack.innerHTML = steps.map(s => {
-    const isMine = isAdmin || s.isMyStep;
-    const doerNames = (s.doers || []).map(d => d.name).join(', ') || '—';
-    return `
-    <div style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:16px;overflow:hidden">
-      <div style="padding:14px 18px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap">
-        <div>
-          <div style="font-size:11px;font-weight:700;color:#94a3b8;letter-spacing:.5px">STEP ${s.step_order}</div>
-          <div style="font-size:15px;font-weight:700;color:#1e293b;margin-top:2px;text-transform:uppercase">${s.step_name}</div>
-          <div style="font-size:12px;color:#64748b;margin-top:2px">👤 ${doerNames}</div>
-        </div>
-        ${isMine ? `
-        <div style="display:flex;gap:8px;align-items:center">
-          <span id="fmsStepCount_${s.id}" style="font-size:13px;color:#ef4444;font-weight:600"></span>
-          <button class="btn btn-outline btn-sm" onclick="loadFMSStepRows(${s.id})" id="fmsStepBtn_${s.id}">🔄 Refresh</button>
-        </div>` : `<div style="font-size:12px;color:#94a3b8;padding-top:4px">🔒 Not assigned</div>`}
-      </div>
-      ${isMine ? `<div id="fmsStepRows_${s.id}" style="padding:0 18px 16px"><div style="padding:16px;text-align:center;color:#94a3b8;font-size:13px">⏳ Loading...</div></div>` : ''}
-    </div>`;
-  }).join('');
+  stack.innerHTML = '<div id="fmsKpis" class="ob-kpis overview-cards"></div><div id="fmsPipe"></div><div id="fmsList"></div>';
+  fmsRender();
 
   // Apne steps ke rows ek-ek karke load karo (sheet API quota safe)
+  const seq = ++_fmsLoadSeq;
   (async () => {
     for (const s of steps) {
-      if (isAdmin || s.isMyStep) await loadFMSStepRows(s.id);
+      if (seq !== _fmsLoadSeq) return;
+      if (fmsIsMine(s)) await loadFMSStepRows(s.id);
     }
+    if (seq !== _fmsLoadSeq) return;
+    if (_fmsSel === null) { _fmsSel = (steps.find(fmsIsMine) || {}).id || 0; fmsRender(); }
     // Sab load hone ke baad phone-style popup — sirf pending wale steps ke
     showFMSNotifPopups();
   })();
+}
+
+function fmsRender() {
+  if (!document.getElementById('fmsKpis')) return;
+  fmsRenderTop();
+  fmsRenderList();
+}
+// KPI + pipeline (table ko nahi chhoota -- filter me likha hua bacha rahe)
+function fmsRenderTop() {
+  const steps = window._fmsAllSteps || [];
+  const mine = steps.filter(fmsIsMine);
+  const cnt = mine.map(s => fmsStepCounts(s.id)).filter(Boolean);
+  const sum = k => cnt.reduce((a, c) => a + c[k], 0);
+  const loading = cnt.length < mine.length;
+  const card = (cls, label, n, sub) => '<div class="ov-card ' + cls + '"><div class="label">' + label + '</div>' +
+    '<div class="number">' + n + '</div>' + (sub ? '<div class="ob-ksub">' + sub + '</div>' : '') + '</div>';
+  document.getElementById('fmsKpis').innerHTML =
+    card('obk-blue', '&#128203; Pending Rows', sum('n'), loading ? '&#9203; loading ' + cnt.length + '/' + mine.length + ' steps…' : 'aapke steps par baaki') +
+    card('pending', '&#9200; Late', sum('late'), 'plan date nikal gayi') +
+    card('revised', '&#128197; Due Today', sum('today'), 'aaj karne hain') +
+    card('completed', '&#9989; My Steps', cnt.filter(c => c.n).length + ' / ' + mine.length, 'steps me kaam pending');
+
+  const tr = document.getElementById('fmsPipeTrack');
+  const keepScroll = tr ? tr.scrollLeft : 0;
+  let cards = '<div class="ob-pcard all' + (_fmsSel === 0 ? ' on' : '') + '" onclick="fmsPickStep(0)">' +
+    '<div class="k">ALL</div><div class="t">All Orders &middot; Full Data</div>' +
+    '<div class="n"><b>' + sum('n') + '</b> pending <span class="r pill">' + cnt.filter(c => c.n).length + ' steps</span></div></div>';
+  steps.forEach(s => {
+    const doers = (s.doers || []).map(d => d.name).join(', ') || '—';
+    if (!fmsIsMine(s)) {
+      cards += '<div class="ob-pcard zero lock" title="' + obE('Doer: ' + doers) + '">' +
+        '<div class="k">STEP ' + s.step_order + '</div><div class="t">' + obE(s.step_name) + '</div>' +
+        '<div class="n">&#128274; Not assigned</div></div>';
+      return;
+    }
+    const c = fmsStepCounts(s.id);
+    cards += '<div class="ob-pcard ' + (!c ? 'zero' : c.n ? 'has' : 'zero') + (c && c.late ? ' lt' : '') + (_fmsSel === s.id ? ' on' : '') + '" ' +
+      'onclick="fmsPickStep(' + s.id + ')" title="' + obE('Doer: ' + doers) + '">' +
+      '<div class="k">STEP ' + s.step_order + '</div><div class="t">' + obE(s.step_name) + '</div>' +
+      '<div class="n">' + (c ? '<b>' + c.n + '</b> pending' + (c.late ? ' <span class="r late">' + c.late + ' late</span>' : '') : '&#9203; loading…') + '</div></div>';
+  });
+  document.getElementById('fmsPipe').innerHTML =
+    '<div class="ob-pipe"><div class="ob-pipe-head"><div class="ob-pipe-title">&#10697; Step-wise Pipeline</div>' +
+    '<div class="ob-pipe-hint">Pending rows at each step &middot; click to view</div>' +
+    '<button class="ob-arrow" onclick="fmsPipeScroll(-1)" title="Back">&#8249;</button>' +
+    '<button class="ob-arrow" onclick="fmsPipeScroll(1)" title="Next">&#8250;</button></div>' +
+    '<div class="ob-pipe-track" id="fmsPipeTrack" onscroll="fmsPipeBar()">' + cards + '</div>' +
+    '<div class="ob-pipe-bar"><i id="fmsPipeBarFill"></i></div></div>';
+  const t2 = document.getElementById('fmsPipeTrack');
+  if (t2) { t2.style.scrollBehavior = 'auto'; t2.scrollLeft = keepScroll; t2.style.scrollBehavior = ''; fmsPipeBar(); }
+}
+function fmsPipeScroll(dir) { const t = document.getElementById('fmsPipeTrack'); if (t) t.scrollLeft += dir * 460; }
+function fmsPipeBar() {
+  const t = document.getElementById('fmsPipeTrack'), f = document.getElementById('fmsPipeBarFill');
+  if (!t || !f) return;
+  const w = t.scrollWidth > 0 ? Math.max(12, Math.round(t.clientWidth * 100 / t.scrollWidth)) : 100;
+  const max = Math.max(1, t.scrollWidth - t.clientWidth);
+  f.style.width = Math.min(100, w) + '%';
+  f.style.marginLeft = Math.round((100 - Math.min(100, w)) * (t.scrollLeft / max)) + '%';
+}
+function fmsPickStep(id) { _fmsSel = id; fmsRender(); }
+
+function fmsRenderList() {
+  const el = document.getElementById('fmsList');
+  if (!el) return;
+  if (_fmsSel === null) {
+    el.innerHTML = '<div class="ob-listcard"><div class="empty">&#9203; Aapke steps load ho rahe hain…</div></div>';
+    return;
+  }
+  if (_fmsSel === 0) { el.innerHTML = fmsAllHtml(); return; }
+  const s = fmsStep(_fmsSel);
+  if (!s) { _fmsSel = 0; el.innerHTML = fmsAllHtml(); return; }
+  const doers = (s.doers || []).map(d => d.name).join(', ') || '—';
+  const c = fmsStepCounts(s.id);
+  el.innerHTML = '<div class="ob-listcard"><div class="ob-listhead"><div class="ob-num sm" style="background:#2e8b65">' + s.step_order + '</div>' +
+    '<h4>' + obE(s.step_name) + '<span>&#128100; ' + obE(doers) + (c && c.late ? ' &middot; <b style="color:#b91c1c">' + c.late + ' late</b>' : '') + (c && c.today ? ' &middot; <b style="color:#92400e">' + c.today + ' due today</b>' : '') + '</span></h4>' +
+    '<span id="fmsStepCount_' + s.id + '" style="font-size:13px;font-weight:600"></span>' +
+    '<button class="btn btn-outline btn-sm" onclick="loadFMSStepRows(' + s.id + ')" id="fmsStepBtn_' + s.id + '">&#128260; Refresh</button></div>' +
+    '<div id="fmsStepRows_' + s.id + '" style="padding:12px 16px 16px"><div style="padding:16px;text-align:center;color:#94a3b8;font-size:13px">&#9203; Loading...</div></div></div>';
+  fmsSetCountLabel(s.id);
+  renderFMSStepTable(s.id);
+}
+// Step header ki label: "N pending row(s)" / Check setup / Not started / All done
+function fmsSetCountLabel(stepId) {
+  const countEl = document.getElementById(`fmsStepCount_${stepId}`);
+  const st = (window._fmsStepStates || {})[stepId];
+  if (!countEl || !st) return;
+  if (st.rows.length) { countEl.textContent = `${st.rows.length} pending row(s)`; countEl.style.color = '#ef4444'; }
+  else if (st.emptyWhy) { countEl.textContent = '⚠️ Check setup'; countEl.style.color = '#d97706'; }
+  else if (st.emptyNote) { countEl.textContent = '⏳ Not started yet'; countEl.style.color = '#94a3b8'; }
+  else { countEl.textContent = '✅ All done!'; countEl.style.color = '#16a34a'; }
+}
+
+// ── ALL card: har order kahan atka hai (FMS Tracking wala data) ──
+function fmsAllHtml() {
+  const fmsId = fmsTasksActiveFmsId;
+  if (!_fmsTrack || _fmsTrack.fmsId !== fmsId) {
+    _fmsTrack = { fmsId, data: null };
+    api(`/api/fms-tracking/${fmsId}`).then(d => {
+      if (!_fmsTrack || _fmsTrack.fmsId !== fmsId) return;
+      _fmsTrack.data = d || { error: 'Data nahi mila' };
+      if (_fmsSel === 0) fmsRenderList();
+    });
+  }
+  const d = _fmsTrack.data;
+  const head = t => '<div class="ob-listcard"><div class="ob-listhead"><h4>All Orders<span>poora data &middot; har order abhi kis step par hai</span></h4>' + t;
+  if (!d) return head('</div><div class="empty">&#9203; Loading…</div></div>');
+  if (d.error) return head('</div><div class="empty" style="color:#ef4444">&#9888;&#65039; ' + obE(d.error) + '</div></div>');
+  const rows = d.rows || [];
+  const cnt = k => rows.filter(r => fmsTrackState(r) === k).length;
+  const chips = [['active', 'Active', cnt('active')], ['completed', 'Completed', cnt('completed')], ['all', 'All', rows.length]]
+    .map(c => '<button class="ob-fchip' + (_fmsTrackFilter === c[0] ? ' on' : '') + '" onclick="_fmsTrackFilter=\'' + c[0] + '\';fmsRenderList()">' + c[1] + ' <b>' + c[2] + '</b></button>').join('');
+  const cols = fmsTrackCols();
+  return head('<div class="ob-fchips">' + chips + '</div>' +
+    '<input type="search" class="ob-search" placeholder="&#128269; Search order, party, step…" value="' + obE(_fmsTrackQ) + '" ' +
+    'oninput="_fmsTrackQ=this.value;document.getElementById(\'fmsAllRows\').innerHTML=fmsAllRows()" autocomplete="off"></div>') +
+    '<div class="ob-twrap2"><table class="ob-list"><thead><tr>' + cols.map(c => '<th>' + obE(c) + '</th>').join('') +
+    '<th>Current Step</th><th>Progress</th><th>Plan Date</th><th>Doer</th><th>Status</th></tr></thead>' +
+    '<tbody id="fmsAllRows">' + fmsAllRows() + '</tbody></table></div></div>';
+}
+function fmsTrackState(r) { return r.complete ? 'completed' : r.currentStep ? 'active' : 'na'; }
+// Pehle 3 label columns jinme data ho (Timestamp / PO / Party…)
+function fmsTrackCols() {
+  const d = _fmsTrack && _fmsTrack.data;
+  if (!d || !d.rows) return [];
+  return (d.labelCols || []).filter(c => d.rows.some(r => r.data[c])).slice(0, 3);
+}
+function fmsAllRows() {
+  const d = _fmsTrack && _fmsTrack.data;
+  if (!d || !d.rows) return '';
+  const cols = fmsTrackCols();
+  const q = _fmsTrackQ.trim().toLowerCase();
+  const list = d.rows.filter(r => (_fmsTrackFilter === 'all' || fmsTrackState(r) === _fmsTrackFilter) &&
+    (!q || Object.values(r.data).concat(r.currentStep ? [r.currentStep.name, (r.currentStep.doers || []).join(' ')] : [])
+      .some(x => String(x || '').toLowerCase().includes(q))));
+  if (!list.length) return '<tr><td colspan="' + (cols.length + 5) + '"><div class="empty">' + (d.rows.length ? 'Is filter me koi order nahi' : 'Sheet me abhi koi order nahi') + '</div></td></tr>';
+  const steps = window._fmsAllSteps || [];
+  return list.map(r => {
+    const cur = r.currentStep;
+    const stat = cur ? fmsRowStat(cur.planned) : { st: 'na' };
+    const step = cur ? steps.find(s => s.step_order === cur.order) : null;
+    const pct = r.applicable ? Math.round(r.doneCount * 100 / r.applicable) : 0;
+    const canOpen = step && fmsIsMine(step);
+    return '<tr class="' + (stat.st === 'late' ? 'lt' : '') + (canOpen ? ' click' : '') + '"' + (canOpen ? ' onclick="fmsPickStep(' + step.id + ')" title="Is step ka table kholo"' : '') + '>' +
+      cols.map((c, i) => '<td' + (i === 0 ? ' class="ob-emp"' : '') + '>' + (i === 0 ? '<b>' + obE(r.data[c] || '—') + '</b>' : obE(r.data[c] || '—')) + '</td>').join('') +
+      '<td>' + (cur ? '<div class="ob-cur"><div class="ob-num sm" style="background:#2e8b65">' + cur.order + '</div><b>' + obE(cur.name) + '</b></div>' : '—') + '</td>' +
+      '<td><div class="ob-mini"><div class="ob-pbar"><i style="width:' + pct + '%"></i></div>' + r.doneCount + '/' + r.applicable + '</div></td>' +
+      '<td class="ob-dt">' + (cur && cur.planned ? maintDate(cur.planned) : '—') + '</td>' +
+      '<td>' + obE(cur ? (cur.doers || []).join(', ') || '—' : '—') + '</td>' +
+      '<td>' + (r.complete ? '<span class="ob-chip done">&#10003; Completed</span>' : cur ? fmsChip(stat) : '<span class="ob-chip na">N/A</span>') + '</td></tr>';
+  }).join('');
 }
 
 // Phone-style popup notifications — doer ko sirf apne pending FMS steps ke
@@ -13213,18 +13394,22 @@ function showFMSNotifPopups() {
 }
 
 async function loadFMSStepRows(stepId) {
-  const cont = document.getElementById(`fmsStepRows_${stepId}`);
-  const countEl = document.getElementById(`fmsStepCount_${stepId}`);
   const btn = document.getElementById(`fmsStepBtn_${stepId}`);
-  if (!cont) return;
+  // Table sirf chune hue step ka DOM me hota hai -- baaki steps ke rows bhi
+  // load karo (pipeline ki ginti ke liye), bas dikhao nahi
   if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+  const fmsId = fmsTasksActiveFmsId;
 
-  const r = await api(`/api/fms-tasks/${fmsTasksActiveFmsId}/steps/${stepId}/rows`);
-  if (btn) { btn.disabled = false; btn.textContent = '🔄 Refresh'; }
+  const r = await api(`/api/fms-tasks/${fmsId}/steps/${stepId}/rows`);
+  if (fmsId !== fmsTasksActiveFmsId) return;      // beech me FMS badal gaya
+  const btn2 = document.getElementById(`fmsStepBtn_${stepId}`);
+  if (btn2) { btn2.disabled = false; btn2.textContent = '🔄 Refresh'; }
 
   if (r.error) {
-    if (countEl) countEl.textContent = '';
-    cont.innerHTML = `<div style="padding:12px;color:#ef4444;font-size:12px">⚠️ ${r.error}</div>`;
+    const cont2 = document.getElementById(`fmsStepRows_${stepId}`);
+    const countEl2 = document.getElementById(`fmsStepCount_${stepId}`);
+    if (countEl2) countEl2.textContent = '';
+    if (cont2) cont2.innerHTML = `<div style="padding:12px;color:#ef4444;font-size:12px">⚠️ ${r.error}</div>`;
     return;
   }
 
@@ -13232,16 +13417,13 @@ async function loadFMSStepRows(stepId) {
   const rows = r.rows || [];
   const colKeys = rows.length ? Object.keys(rows[0].data) : [];
   window._fmsStepStates[stepId] = { rows, colKeys, step, emptyWhy: r.emptyWhy || '', emptyNote: r.emptyNote || '' };
+  // Doer ka default card: pehla apna step jisme kaam pending ho
+  if (_fmsSel === null && rows.length) _fmsSel = stepId;
   // "All done!" tabhi jab kaam SACH ME ho chuka ho. Gadbad par warning, aur
   // jo step abhi apni baari ka intezaar kar raha hai uspar halki si line --
-  // teeno alag. (20 Sep 2026)
-  if (countEl) {
-    if (r.total) { countEl.textContent = `${r.total} pending row(s)`; countEl.style.color = '#ef4444'; }
-    else if (r.emptyWhy) { countEl.textContent = '⚠️ Check setup'; countEl.style.color = '#d97706'; }
-    else if (r.emptyNote) { countEl.textContent = '⏳ Not started yet'; countEl.style.color = '#94a3b8'; }
-    else { countEl.textContent = '✅ All done!'; countEl.style.color = '#16a34a'; }
-  }
-  renderFMSStepTable(stepId);
+  // teeno alag (fmsSetCountLabel). (20 Sep 2026)
+  if (_fmsSel === stepId) fmsRender();
+  else fmsRenderTop();
 }
 
 // Cell me link ho to clickable bana do (Drive/photo/video ke links sheet me
@@ -13289,6 +13471,7 @@ function renderFMSStepTable(stepId) {
             <tr>
               <th>Action</th>
               ${st.colKeys.map(k => `<th>${k}</th>`).join('')}
+              <th>Plan Date</th>
               <th>Status</th>
             </tr>
             <tr class="fms-filt-row">
@@ -13297,14 +13480,16 @@ function renderFMSStepTable(stepId) {
               ${st.colKeys.map((k, ci) => `<th><input type="text" data-fms-filt="${ci}"
                 oninput="fmsFilterRows(${stepId})" placeholder="🔍" style="${fStyle}"/></th>`).join('')}
               <th></th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
-            ${st.rows.map((row, i) => `<tr>
+            ${st.rows.map((row, i) => { const rs = fmsRowStat(row.planValue); return `<tr class="${rs.st === 'late' ? 'fms-lt' : ''}">
               <td><button class="fms-done-btn" onclick="openFMSDoneModal(${stepId},${i})">✅ Done</button></td>
               ${st.colKeys.map(k => `<td>${fmsLinkify(row.data[k])}</td>`).join('')}
-              <td><span class="fms-status-badge">⏳ Pending</span></td>
-            </tr>`).join('')}
+              <td style="white-space:nowrap">${rs.p ? maintDate(rs.p) : obE(row.planValue || '—')}</td>
+              <td>${fmsChip(rs)}</td>
+            </tr>`; }).join('')}
           </tbody>
         </table>
       </div>
@@ -13735,9 +13920,9 @@ async function saveFMSDone() {
   const st = (window._fmsStepStates || {})[stepId];
   if (st) {
     st.rows = st.rows.filter(row => row.sheetRowNumber !== doneRowNum);
-    const countEl = document.getElementById(`fmsStepCount_${stepId}`);
-    if (countEl) countEl.textContent = st.rows.length ? `${st.rows.length} pending row(s)` : '✅ All done!';
-    renderFMSStepTable(stepId);
+    // KPI + pipeline card ki ginti bhi ghatao; ALL wala data purana ho gaya
+    if (_fmsTrack) _fmsTrack = null;
+    fmsRender();
   }
 }
 
