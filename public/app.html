@@ -856,6 +856,39 @@ tr.fms-ent-pend td:first-child{box-shadow:inset 3px 0 0 #f59e0b;}
 .fms-ent-doers{max-height:50vh;overflow-y:auto;border:1px solid #e2e8f0;border-radius:10px;padding:6px 12px;}
 .fms-ent-doers label{display:flex;align-items:center;gap:8px;padding:7px 0;font-size:13px;cursor:pointer;border-bottom:1px solid #f1f5f9;}
 .fms-ent-doers label span{margin-left:auto;font-size:11px;color:#94a3b8;}
+/* FMS Manual Order form (sections) */
+.fms-mf-sub{font-size:12px;color:#64748b;margin:-6px 0 12px;}
+.fms-mf-body{max-height:64vh;overflow-y:auto;padding-right:4px;display:flex;flex-direction:column;gap:12px;}
+.fms-mf-sec{border:1px solid #e2e8f0;border-radius:12px;padding:10px 14px 12px;background:#fff;}
+.fms-mf-t{font-size:12px;font-weight:800;color:#334155;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;}
+.fms-mf-g{display:grid;gap:10px 14px;}
+.fms-mf-g.c3{grid-template-columns:repeat(3,minmax(0,1fr));}
+.fms-mf-g.c2{grid-template-columns:repeat(2,minmax(0,1fr));}
+.fms-mf-g.c1{grid-template-columns:1fr;}
+.fms-mf-g > div{min-width:0;}
+.fms-mf-g label{font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;}
+.fms-mf-g label b{color:#ef4444;}
+.fms-mf-g input:not([type=checkbox]):not([type=file]),.fms-mf-g textarea{width:100%;padding:8px 11px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;background:#fff;}
+.fms-mf-g input:focus,.fms-mf-g textarea:focus{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.12);}
+.fms-mf-g textarea{resize:vertical;min-height:62px;}
+.fms-mf-g textarea.ro{background:#f8fafc;color:#64748b;}
+.fms-mf .bad{border-color:#ef4444 !important;box-shadow:0 0 0 3px rgba(239,68,68,.12);}
+.fms-man-hint{font-size:11px;color:#4f46e5;font-weight:600;margin-top:3px;min-height:14px;}
+.fms-same{grid-column:1/-1;display:flex !important;align-items:center;gap:7px;font-size:12px !important;color:#475569 !important;cursor:pointer;margin:0 !important;}
+.fms-yn{display:flex;gap:8px;border-radius:10px;}
+.fms-yn button{flex:1;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;background:#fff;font-family:inherit;font-size:13px;font-weight:600;color:#475569;cursor:pointer;}
+.fms-yn button:hover{border-color:#c7d2fe;}
+.fms-yn button.on[data-v=Yes]{background:#ecfdf5;border-color:#10b981;color:#047857;}
+.fms-yn button.on[data-v=No]{background:#fef2f2;border-color:#f87171;color:#b91c1c;}
+.fms-drop{display:flex !important;align-items:center;justify-content:center;border:1.5px dashed #c7d2fe;border-radius:10px;background:#f8faff;padding:14px;cursor:pointer;text-align:center;font-size:12.5px !important;color:#475569 !important;margin:0 !important;}
+.fms-drop:hover{background:#eef2ff;}
+.fms-drop input{display:none;}
+.fms-drop b{color:#4338ca;}
+.fms-thumbs{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
+.fms-thumb{position:relative;width:64px;height:64px;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0;}
+.fms-thumb img{width:100%;height:100%;object-fit:cover;}
+.fms-thumb button{position:absolute;top:2px;right:2px;width:18px;height:18px;border:none;border-radius:50%;background:rgba(15,23,42,.7);color:#fff;font-size:12px;line-height:18px;padding:0;cursor:pointer;}
+@media(max-width:600px){ .fms-mf-g.c3,.fms-mf-g.c2{grid-template-columns:1fr;} }
 /* FMS Manual Order form */
 .fms-man-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;max-height:62vh;overflow-y:auto;padding-right:4px;}
 .fms-man-grid .full{grid-column:1/-1;}
@@ -3761,11 +3794,11 @@ tr.fms-ent-pend td:first-child{box-shadow:inset 3px 0 0 #f59e0b;}
 
 <!-- Online FMS: Manual Order (Step 1 Order Entry) -- 13 khaane, sab zaroori -->
 <div class="modal-overlay" id="fmsManualModal">
-  <div class="modal" style="max-width:640px">
+  <div class="modal fms-mf" style="max-width:720px">
     <h3>➕ Add Manual Order</h3>
-    <div style="font-size:12px;color:#64748b;margin:-4px 0 12px">All fields are mandatory. The order is added as a new row in the FMS sheet.</div>
-    <div class="alert error" id="fmsManualErr"></div>
-    <div id="fmsManualFields" class="fms-man-grid"></div>
+    <div class="fms-mf-sub">All fields are required. The order is saved to the FMS sheet and starts at Step 1 Order Entry.</div>
+    <div id="fmsManualFields" class="fms-mf-body"></div>
+    <div class="alert error" id="fmsManualErr" style="margin:10px 0 0"></div>
     <div class="modal-footer" style="justify-content:space-between">
       <button class="btn btn-outline" onclick="closeModal('fmsManualModal')">Cancel</button>
       <button class="btn btn-green" onclick="saveFMSManualOrder()" id="fmsManualSaveBtn">💾 Save Order</button>
@@ -14464,41 +14497,106 @@ async function saveFMSDone() {
 // ══ Manual Order (Online FMS, Order Entry step) ══
 // Khaane server batata hai (sheet ke header se milaa kar); koi column sheet
 // me na ho to form khulne se pehle hi bata do, bharne ke baad nahi.
-let _fmsManual = null;     // { fields }
+let _fmsManual = null;     // { fields, photos:[{url,name}] }
+// Khaane server se aate hain (sheet me jo column hai); yahan sirf unka
+// kram / hissa tay hota hai -- Order, Customer, Address, Photo, Status.
+const FMS_MAN_SECTIONS = [
+  ['&#128230; Order', ['poOrder', 'po', 'dod', 'qty']],
+  ['&#128100; Customer', ['party', 'email', 'phone']],
+  ['&#127968; Address', ['billing', 'shipping']],
+  ['&#128247; Order Photo', ['photo']],
+  ['&#9989; Status', ['stock', 'website']]
+];
 async function openFMSManualOrder() {
   const r = await api(`/api/fms-tasks/${fmsTasksActiveFmsId}/manual-order`);
   if (r.error) { showToast('⚠️ ' + r.error); return; }
   if (r.missing && r.missing.length) { showToast('⚠️ Sheet me ye columns nahi mile: ' + r.missing.join(', ')); return; }
-  _fmsManual = { fields: (r.fields || []).filter(f => f.type !== 'auto') };
-  document.getElementById('fmsManualErr').style.display = 'none';
-  document.getElementById('fmsManualFields').innerHTML = _fmsManual.fields.map(f => {
-    const id = 'fmsMan_' + f.key;
-    let inp;
-    if (f.type === 'textarea') inp = `<textarea id="${id}"></textarea>`;
-    else if (f.type === 'yesno') inp = `<select id="${id}"><option value="">-- Select --</option><option>Yes</option><option>No</option></select>`;
-    else if (f.type === 'image') inp = `<input type="hidden" id="${id}"/><input type="file" accept="image/*" id="${id}_file" onchange="fmsManualPhoto('${f.key}')"/><div class="fms-man-st" id="${id}_st"></div>`;
-    else inp = `<input type="${f.type === 'tel' ? 'tel' : f.type === 'email' ? 'email' : f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}" id="${id}"${f.type === 'number' ? ' min="1"' : ''}${f.type === 'tel' ? ' maxlength="13" inputmode="numeric"' : ''}/>`;
-    return `<div class="${f.type === 'textarea' || f.type === 'image' ? 'full' : ''}"><label>${obE(f.label)} <b>*</b></label>${inp}</div>`;
+  _fmsManual = { fields: (r.fields || []).filter(x => x.type !== 'auto'), photos: [] };
+  const byKey = {}; _fmsManual.fields.forEach(x => { byKey[x.key] = x; });
+  const inp = fl => {
+    const id = 'fmsMan_' + fl.key;
+    if (fl.type === 'textarea') return `<textarea id="${id}" rows="3" placeholder="House / street, city, state, PIN"></textarea>`;
+    if (fl.type === 'yesno') return `<input type="hidden" id="${id}"/><div class="fms-yn" id="${id}_yn">` +
+      ['Yes', 'No'].map(o => `<button type="button" data-v="${o}" onclick="fmsManYN('${fl.key}','${o}')">${o === 'Yes' ? '&#10003; Yes' : '&#10005; No'}</button>`).join('') + '</div>';
+    if (fl.type === 'image') return `<input type="hidden" id="${id}"/>
+      <label class="fms-drop" id="${id}_drop"><input type="file" accept="image/*" multiple id="${id}_file" onchange="fmsManualPhoto('${fl.key}')"/>
+        <span>&#128228; <b>Choose photos</b> &middot; one or more images, max ${FMS_UPLOAD_MAX_MB} MB each</span></label>
+      <div class="fms-thumbs" id="${id}_list"></div><div class="fms-man-st" id="${id}_st"></div>`;
+    if (fl.type === 'date') return `<input type="date" id="${id}" min="${fmsTodayStr()}" onchange="fmsManDate('${fl.key}')"/><div class="fms-man-hint" id="${id}_txt"></div>`;
+    const t = fl.type === 'tel' ? 'tel' : fl.type === 'email' ? 'email' : fl.type === 'number' ? 'number' : 'text';
+    const ph = { poOrder: 'e.g. 1245', po: 'PO number', party: 'Customer / party name', email: 'name@example.com', phone: '10-digit number', qty: '1' }[fl.key] || '';
+    return `<input type="${t}" id="${id}" placeholder="${ph}"${t === 'number' ? ' min="1" step="1"' : ''}${t === 'tel' ? ' maxlength="13" inputmode="numeric"' : ''}/>`;
+  };
+  const used = new Set();
+  let h = FMS_MAN_SECTIONS.map(([title, keys]) => {
+    const fl = keys.map(k => byKey[k]).filter(Boolean);
+    fl.forEach(x => used.add(x.key));
+    if (!fl.length) return '';
+    const cls = fl.length >= 3 ? 'c3' : fl[0].type === 'image' ? 'c1' : 'c2';
+    return `<div class="fms-mf-sec"><div class="fms-mf-t">${title}</div><div class="fms-mf-g ${cls}">` +
+      fl.map(x => `<div><label for="fmsMan_${x.key}">${obE(x.label)} <b>*</b></label>${inp(x)}</div>`).join('') +
+      (title.includes('Address') && byKey.billing && byKey.shipping
+        ? '<label class="fms-same"><input type="checkbox" id="fmsManSame" onchange="fmsManSame()"/> Shipping address same as billing</label>' : '') +
+      '</div></div>';
   }).join('');
+  // Koi naya khaana (sheet me aur column) -- aakhir me
+  const rest = _fmsManual.fields.filter(x => !used.has(x.key));
+  if (rest.length) h += '<div class="fms-mf-sec"><div class="fms-mf-t">More</div><div class="fms-mf-g c2">' +
+    rest.map(x => `<div><label>${obE(x.label)} <b>*</b></label>${inp(x)}</div>`).join('') + '</div></div>';
+  document.getElementById('fmsManualErr').style.display = 'none';
+  document.getElementById('fmsManualFields').innerHTML = h;
   document.getElementById('fmsManualModal').classList.add('open');
+  setTimeout(() => { const el = document.getElementById('fmsMan_poOrder'); if (el) el.focus(); }, 50);
+}
+function fmsManYN(key, v) {
+  document.getElementById('fmsMan_' + key).value = v;
+  document.querySelectorAll('#fmsMan_' + key + '_yn button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  document.getElementById('fmsMan_' + key + '_yn').classList.remove('bad');
+}
+// Browser date box mm/dd dikha sakta hai -- neeche saaf "15 Nov 2026"
+function fmsManDate(key) {
+  const el = document.getElementById('fmsMan_' + key), t = document.getElementById('fmsMan_' + key + '_txt');
+  if (t) t.textContent = el.value ? '📅 ' + maintDate(el.value) : '';
+}
+function fmsManSame() {
+  const on = document.getElementById('fmsManSame').checked, b = document.getElementById('fmsMan_billing'), sh = document.getElementById('fmsMan_shipping');
+  if (!b || !sh) return;
+  if (on) sh.value = b.value;
+  sh.readOnly = on; sh.classList.toggle('ro', on);
+  b.oninput = on ? () => { sh.value = b.value; } : null;
 }
 
+// Kai photo -- har ek alag upload; sheet me sab links ek cell me (nayi line se),
+// jaise website order ke photos aate hain
 async function fmsManualPhoto(key) {
-  const id = 'fmsMan_' + key, fileEl = document.getElementById(id + '_file'), hidden = document.getElementById(id), st = document.getElementById(id + '_st');
+  const id = 'fmsMan_' + key, fileEl = document.getElementById(id + '_file'), st = document.getElementById(id + '_st');
   const btn = document.getElementById('fmsManualSaveBtn');
-  const file = fileEl.files && fileEl.files[0];
-  hidden.value = '';
-  if (!file) { st.textContent = ''; return; }
-  if (file.size > FMS_UPLOAD_MAX_MB * 1024 * 1024) { st.innerHTML = `<span style="color:#ef4444">⚠️ File must be under ${FMS_UPLOAD_MAX_MB} MB</span>`; fileEl.value = ''; return; }
-  st.textContent = '⏳ Uploading…'; btn.disabled = true;
-  const dataUrl = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = () => res(null); fr.readAsDataURL(file); });
-  const r = dataUrl ? await api('/api/fms-uploads', 'POST', { fmsId: fmsTasksActiveFmsId, stepId: 'entry',
-    rowIndex: '', colLetter: '', fieldType: 'image', fileName: file.name, mimeType: file.type, dataUrl }) : { error: 'File could not be read' };
+  const files = [...(fileEl.files || [])];
+  fileEl.value = '';
+  if (!files.length) return;
+  btn.disabled = true;
+  for (const [i, file] of files.entries()) {
+    if (!/^image\//.test(file.type)) { st.innerHTML = `<span style="color:#ef4444">⚠️ ${obE(file.name)}: only images allowed</span>`; continue; }
+    if (file.size > FMS_UPLOAD_MAX_MB * 1024 * 1024) { st.innerHTML = `<span style="color:#ef4444">⚠️ ${obE(file.name)} is over ${FMS_UPLOAD_MAX_MB} MB</span>`; continue; }
+    st.textContent = `⏳ Uploading ${i + 1}/${files.length}…`;
+    const dataUrl = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = () => res(null); fr.readAsDataURL(file); });
+    const r = dataUrl ? await api('/api/fms-uploads', 'POST', { fmsId: fmsTasksActiveFmsId, stepId: 'entry',
+      rowIndex: '', colLetter: '', fieldType: 'image', fileName: file.name, mimeType: file.type, dataUrl }) : { error: 'File could not be read' };
+    if (r.error) { st.innerHTML = `<span style="color:#ef4444">⚠️ ${obE(file.name)}: ${obE(r.error)}</span>`; continue; }
+    _fmsManual.photos.push({ url: r.url, name: r.fileName, thumb: dataUrl });
+    st.textContent = '';
+  }
   btn.disabled = false;
-  if (r.error) { st.innerHTML = `<span style="color:#ef4444">⚠️ ${obE(r.error)}</span>`; fileEl.value = ''; return; }
-  hidden.value = r.url;
-  st.innerHTML = `<span style="color:#16a34a">✅ ${obE(r.fileName)} uploaded</span> — <a href="${r.url}" target="_blank">open</a>`;
+  fmsManPhotoDraw(key);
 }
+function fmsManPhotoDraw(key) {
+  const id = 'fmsMan_' + key, ph = _fmsManual.photos;
+  document.getElementById(id).value = ph.map(p => p.url).join('\n');
+  document.getElementById(id + '_drop').classList.remove('bad');
+  document.getElementById(id + '_list').innerHTML = ph.map((p, i) =>
+    `<div class="fms-thumb" title="${obE(p.name)}"><img src="${p.thumb}" alt=""/><button type="button" onclick="fmsManPhotoDel('${key}',${i})" title="Remove">&times;</button></div>`).join('');
+}
+function fmsManPhotoDel(key, i) { _fmsManual.photos.splice(i, 1); fmsManPhotoDraw(key); }
 
 async function saveFMSManualOrder() {
   if (!_fmsManual) return;
@@ -14508,11 +14606,13 @@ async function saveFMSManualOrder() {
   for (const f of _fmsManual.fields) {
     const el = document.getElementById('fmsMan_' + f.key);
     const v = el ? String(el.value || '').trim() : '';
-    const box = f.type === 'image' ? document.getElementById('fmsMan_' + f.key + '_file') : el;
+    const box = document.getElementById('fmsMan_' + f.key + (f.type === 'image' ? '_drop' : f.type === 'yesno' ? '_yn' : '')) || el;
     if (box) box.classList.toggle('bad', !v);
     if (!v) {
-      errEl.textContent = f.type === 'image' ? `Upload "${f.label}"` : `"${f.label}" is required`;
-      errEl.style.display = 'block'; if (box) box.focus(); return;
+      errEl.textContent = f.type === 'image' ? `Upload at least one "${f.label}"` : f.type === 'yesno' ? `Choose Yes or No for "${f.label}"` : `"${f.label}" is required`;
+      errEl.style.display = 'block';
+      if (box) { box.scrollIntoView({ block: 'center', behavior: 'smooth' }); if (box.focus) box.focus(); }
+      return;
     }
     order[f.key] = v;
   }
