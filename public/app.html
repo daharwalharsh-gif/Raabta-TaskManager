@@ -843,6 +843,16 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
   .fms-top{position:static;margin:0;padding:0;}
   #fmsList .ob-listcard{max-height:80vh;}
 }
+/* FMS Step 1 Order Entry */
+.fms-ent-h{background:#eef2ff !important;color:#3730a3 !important;}
+.fms-ent-miss{color:#dc2626;font-weight:700;font-size:11.5px;}
+tr.fms-ent-pend td:first-child{box-shadow:inset 3px 0 0 #f59e0b;}
+.fms-ent-info{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12.5px;}
+.fms-ent-info span{display:block;font-size:10.5px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.3px;}
+.fms-ent-info b{color:#0f172a;font-weight:600;word-break:break-word;}
+.fms-ent-doers{max-height:50vh;overflow-y:auto;border:1px solid #e2e8f0;border-radius:10px;padding:6px 12px;}
+.fms-ent-doers label{display:flex;align-items:center;gap:8px;padding:7px 0;font-size:13px;cursor:pointer;border-bottom:1px solid #f1f5f9;}
+.fms-ent-doers label span{margin-left:auto;font-size:11px;color:#94a3b8;}
 /* FMS Manual Order form */
 .fms-man-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;max-height:62vh;overflow-y:auto;padding-right:4px;}
 .fms-man-grid .full{grid-column:1/-1;}
@@ -3717,6 +3727,31 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     <div class="modal-footer" style="justify-content:space-between">
       <button class="btn btn-outline" onclick="closeModal('fmsDoneModal')">Cancel</button>
       <button class="btn btn-green" onclick="saveFMSDone()" id="fmsDoneSaveBtn">💾 Save to Sheet</button>
+    </div>
+  </div>
+</div>
+
+<!-- Online FMS Step 1 Order Entry: ek order ke 4 khaane -->
+<div class="modal-overlay" id="fmsEntryModal">
+  <div class="modal" style="max-width:520px">
+    <h3>✏️ Order Entry</h3>
+    <div class="alert error" id="fmsEntryErr"></div>
+    <div id="fmsEntryInfo" class="fms-ent-info"></div>
+    <div id="fmsEntryFields" class="fms-man-grid"></div>
+    <div style="font-size:11.5px;color:#64748b;margin-top:10px">All 4 filled = the order moves ahead. Piece in Stock = Yes → straight to Step 10.</div>
+    <div class="modal-footer" style="justify-content:space-between">
+      <button class="btn btn-outline" onclick="closeModal('fmsEntryModal')">Cancel</button>
+      <button class="btn btn-green" onclick="saveFMSEntry()" id="fmsEntrySaveBtn">💾 Save</button>
+    </div>
+  </div>
+</div>
+<div class="modal-overlay" id="fmsEntryDoersModal">
+  <div class="modal" style="max-width:420px">
+    <h3>👤 Order Entry — Assign doer</h3>
+    <div id="fmsEntryDoerList" class="fms-ent-doers"></div>
+    <div class="modal-footer" style="justify-content:space-between">
+      <button class="btn btn-outline" onclick="closeModal('fmsEntryDoersModal')">Cancel</button>
+      <button class="btn btn-green" onclick="saveFMSEntryDoers()">💾 Save</button>
     </div>
   </div>
 </div>
@@ -13299,7 +13334,6 @@ const FMS_FLOWS = [{
       'Order Photo', 'Piece in Stock ?', 'Website Order?']
   },
   steps: [
-    { keys: ['order entry'], title: 'Order Entry', desc: 'Online order: fill only Date of Delivery, WhatsApp, In Stock? and Website Order?. Manual order: 13-field form.', doer: '', icon: '&#128221;' },
     { keys: ['personal message'], title: 'Send Personal Message to Client for Assistance', desc: 'Confirm details / support as needed.', doer: 'Automate', auto: true, icon: '&#9881;&#65039;' },
     { keys: ['process piece'], title: 'Process piece for production', desc: 'Send to production team for manufacturing.', doer: 'PM', icon: '&#128100;' },
     { keys: ['follow up with vendor'], title: 'Follow up with vendor', desc: 'Check status, confirm timelines, and keep vendor updated.', doer: 'PM', icon: '&#128101;' },
@@ -13319,7 +13353,8 @@ const FMS_FLOWS = [{
   notes: ['All 13 fields in the manual order form are mandatory (no optional fields).',
     'Step 1 has two entry methods: API (online orders) and Manual (form).',
     '"Piece in Stock?" and "Website Order?" are conditional fields (as per order type).',
-    'When Date of Delivery, WhatsApp, Piece in Stock? and Website Order? are all filled, the order skips manufacturing (steps 3-9) and goes straight to Step 10 (Handover box for dispatch).',
+    'Every order (online and manual) waits in Step 1 Order Entry until Date of Delivery, Phone, Piece in Stock? and Website Order? are all filled.',
+    'Piece in Stock? = Yes: the order skips manufacturing (steps 3-9) and goes straight to Step 10 (Handover box for dispatch). No: normal flow.',
     'Follow the steps in sequence for smooth and timely order fulfilment.']
 }];
 const FMS_COLORS = ['#2563eb', '#059669', '#7c3aed', '#0284c7', '#0d9488', '#db2777', '#6d28d9', '#0369a1', '#16a34a', '#4f46e5', '#0891b2', '#d97706', '#e11d48', '#1d4ed8', '#15803d'];
@@ -13327,12 +13362,7 @@ let _fmsView = 'tasks';       // 'tasks' | 'flow'
 
 function fmsFlow() { return FMS_FLOWS.find(fl => fl.match.test(window._fmsName || '')) || null; }
 // Order Entry (Step 1) FMS Admin ke steps me nahi hota -- flow me ho to number +1
-// FMS Admin me "Order Entry" step bana diya ho to wahi Step 1 hai -- +1 nahi
-function fmsOffset() {
-  const fl = fmsFlow();
-  return fl && fl.entry && !(window._fmsAllSteps || []).some(fmsIsEntry) ? 1 : 0;
-}
-function fmsIsEntry(s) { return !!s && /order\s*entry/i.test(s.step_name || ''); }
+function fmsOffset() { const fl = fmsFlow(); return fl && fl.entry ? 1 : 0; }
 function fmsNo(s) { return (s ? s.step_order : 0) + fmsOffset(); }
 function fmsColor(s) { return FMS_COLORS[((s ? s.step_order : 1) - 1) % FMS_COLORS.length]; }
 // Step ke naam se flow wala step (spelling ki chhoti galti -- "Recieved" -- bhi chale)
@@ -13440,6 +13470,7 @@ function buildFMSStack(steps) {
   window._fmsAllSteps = steps;
   window._fmsStepStates = {};
   _fmsTrack = null; _fmsTrackFilter = 'active'; _fmsTrackQ = ''; _fmsAllPage = 1;
+  if (_fmsEntry && _fmsEntry.fmsId !== fmsTasksActiveFmsId) _fmsEntry = null;
   const isAdmin = ME.role === 'admin';
   // Admin ko ALL; doer ko apna pehla step jisme kaam ho (load hote hi tay hoga)
   _fmsSel = isAdmin ? 0 : null;
@@ -13450,9 +13481,14 @@ function buildFMSStack(steps) {
   fmsApplyView();
   fmsRender();
 
-  // Apne steps ke rows ek-ek karke load karo (sheet API quota safe)
+  // Apne steps ke rows ek-ek karke load karo (sheet API quota safe).
+  // Pehle Step 1 Order Entry (Online FMS) -- doer ka kaam wahi se shuru hota hai
   const seq = ++_fmsLoadSeq;
   (async () => {
+    await fmsLoadEntry();
+    if (seq !== _fmsLoadSeq) return;
+    if (_fmsSel === null && fmsEntryPending()) _fmsSel = 'E';
+    fmsRender();
     for (const s of steps) {
       if (seq !== _fmsLoadSeq) return;
       if (fmsIsMine(s)) await loadFMSStepRows(s.id);
@@ -13485,7 +13521,8 @@ function fmsRenderTop() {
   const steps = window._fmsAllSteps || [];
   const mine = steps.filter(fmsIsMine);
   const cnt = mine.map(s => fmsStepCounts(s.id)).filter(Boolean);
-  const sum = k => cnt.reduce((a, c) => a + c[k], 0);
+  const ePend = fmsEntryPending();
+  const sum = k => cnt.reduce((a, c) => a + c[k], 0) + (k === 'n' ? ePend : 0);
   const loading = cnt.length < mine.length;
   const card = (cls, label, n, sub) => '<div class="ov-card ' + cls + '"><div class="label">' + label + '</div>' +
     '<div class="number">' + n + '</div>' + (sub ? '<div class="ob-ksub">' + sub + '</div>' : '') + '</div>';
@@ -13499,7 +13536,16 @@ function fmsRenderTop() {
   const keepScroll = tr ? tr.scrollLeft : 0;
   let cards = '<div class="ob-pcard all' + (_fmsSel === 0 ? ' on' : '') + '" onclick="fmsPickStep(0)">' +
     '<div class="k">ALL</div><div class="t">All Orders &middot; Full Data</div>' +
-    '<div class="n"><b>' + sum('n') + '</b> pending <span class="r pill">' + cnt.filter(c => c.n).length + ' steps</span></div></div>';
+    '<div class="n"><b>' + sum('n') + '</b> pending <span class="r pill">' + (cnt.filter(c => c.n).length + (ePend ? 1 : 0)) + ' steps</span></div></div>';
+  // Step 1 Order Entry (sirf Online FMS) -- FMS Admin ka step nahi, alag card
+  if (fmsEntryOn()) {
+    const ed = _fmsEntry.data, enames = (ed.doers || []).map(d => d.name).join(', ') || 'not assigned yet';
+    cards += !ed.canEdit
+      ? '<div class="ob-pcard zero lock" title="' + obE('Doer: ' + enames) + '"><div class="k">STEP 1</div><div class="t">Order Entry</div><div class="n">&#128274; Not assigned</div></div>'
+      : '<div class="ob-pcard ' + (ePend ? 'has' : 'zero') + (_fmsSel === 'E' ? ' on' : '') + '" onclick="fmsPickStep(\'E\')" title="' + obE('Doer: ' + enames) + '">' +
+        '<div class="k">STEP 1</div><div class="t">Order Entry</div>' +
+        '<div class="n">' + (ed.rows ? '<b>' + ePend + '</b> pending' : '&#9203; loading…') + '</div></div>';
+  }
   steps.forEach(s => {
     const doers = (s.doers || []).map(d => d.name).join(', ') || '—';
     if (!fmsIsMine(s)) {
@@ -13543,6 +13589,7 @@ function fmsRenderList() {
     el.innerHTML = '<div class="ob-listcard"><div class="empty">&#9203; Aapke steps load ho rahe hain…</div></div>';
     return;
   }
+  if (_fmsSel === 'E') { el.innerHTML = fmsEntryHtml(); fmsEntryRedraw(); return; }
   if (_fmsSel === 0) { el.innerHTML = fmsAllHtml(); return; }
   const s = fmsStep(_fmsSel);
   if (!s) { _fmsSel = 0; el.innerHTML = fmsAllHtml(); return; }
@@ -13551,7 +13598,6 @@ function fmsRenderList() {
   el.innerHTML = '<div class="ob-listcard"><div class="ob-listhead"><div class="ob-num sm" style="background:' + fmsColor(s) + '">' + fmsNo(s) + '</div>' +
     '<h4>' + obE(s.step_name) + '<span>&#128100; ' + obE(doers) + (c && c.late ? ' &middot; <b style="color:#b91c1c">' + c.late + ' late</b>' : '') + (c && c.today ? ' &middot; <b style="color:#92400e">' + c.today + ' due today</b>' : '') + '</span></h4>' +
     '<span id="fmsStepCount_' + s.id + '" style="font-size:13px;font-weight:600"></span>' +
-    (fmsIsEntry(s) ? '<button class="btn btn-green btn-sm" onclick="openFMSManualOrder(' + s.id + ')">&#10133; Add Manual Order</button>' : '') +
     '<button class="btn btn-outline btn-sm" onclick="loadFMSStepRows(' + s.id + ')" id="fmsStepBtn_' + s.id + '">&#128260; Refresh</button></div>' +
     '<div id="fmsStepRows_' + s.id + '" style="padding:8px 12px 12px"><div style="padding:16px;text-align:center;color:#94a3b8;font-size:13px">&#9203; Loading...</div></div></div>';
   fmsSetCountLabel(s.id);
@@ -13566,6 +13612,145 @@ function fmsSetCountLabel(stepId) {
   else if (st.emptyWhy) { countEl.textContent = '⚠️ Check setup'; countEl.style.color = '#d97706'; }
   else if (st.emptyNote) { countEl.textContent = '⏳ Not started yet'; countEl.style.color = '#94a3b8'; }
   else { countEl.textContent = '✅ All done!'; countEl.style.color = '#16a34a'; }
+}
+
+// ══ STEP 1 ORDER ENTRY (Online FMS) ══
+// Saare order (API se aaye + manual) ek jagah. Doer har order ke 4 khaane
+// bharta / sudharta hai; chaaron bhare tabhi order aage ke steps me jaata hai.
+// Piece in Stock = Yes -> seedha Step 10 (server ka niyam). (31 Oct 2026)
+let _fmsEntry = null;       // { fmsId, data, filt, q, page }
+async function fmsLoadEntry() {
+  const fmsId = fmsTasksActiveFmsId;
+  const d = await api(`/api/fms-tasks/${fmsId}/order-entry`);
+  if (fmsId !== fmsTasksActiveFmsId) return;
+  const p = _fmsEntry && _fmsEntry.fmsId === fmsId ? _fmsEntry : null;
+  _fmsEntry = { fmsId, data: d || { error: 'Data nahi mila' }, filt: p ? p.filt : 'pending', q: p ? p.q : '', page: p ? p.page : 1 };
+}
+function fmsEntryOn() { return !!(_fmsEntry && _fmsEntry.fmsId === fmsTasksActiveFmsId && _fmsEntry.data && (_fmsEntry.data.enabled || _fmsEntry.data.error)); }
+function fmsEntryPending() {
+  if (!fmsEntryOn() || !_fmsEntry.data.canEdit) return 0;
+  return (_fmsEntry.data.rows || []).filter(r => !r.done).length;
+}
+async function fmsEntryRefresh() {
+  const b = document.getElementById('fmsEntryBtn'); if (b) { b.disabled = true; b.textContent = '⏳'; }
+  await fmsLoadEntry();
+  fmsRender();
+}
+function fmsEntryHtml() {
+  const e = _fmsEntry, d = e && e.data;
+  const enames = d && d.doers && d.doers.length ? d.doers.map(x => x.name).join(', ') : 'not assigned yet';
+  const head = '<div class="ob-listcard"><div class="ob-listhead"><div class="ob-num sm" style="background:#1e3a8a">1</div>' +
+    '<h4>Order Entry<span>&#128100; ' + obE(enames) + ' &middot; all 4 details filled = order moves ahead (In Stock = Yes &rarr; Step 10)</span></h4>' +
+    (ME.role === 'admin' ? '<button class="btn btn-outline btn-sm" onclick="openFMSEntryDoers()">&#128100; Assign doer</button>' : '') +
+    (d && d.canEdit ? '<button class="btn btn-green btn-sm" onclick="openFMSManualOrder()">&#10133; Add Manual Order</button>' : '') +
+    '<button class="btn btn-outline btn-sm" onclick="fmsEntryRefresh()" id="fmsEntryBtn">&#128260; Refresh</button></div>';
+  if (!d) return head + '<div class="empty">&#9203; Loading…</div></div>';
+  if (d.error) return head + '<div class="empty" style="color:#ef4444">&#9888;&#65039; ' + obE(d.error) + '</div></div>';
+  if (!d.canEdit) return head + '<div class="empty">&#128274; Order Entry aapko assign nahi hai</div></div>';
+  if (d.missing && d.missing.length) return head + '<div style="margin:12px;padding:14px 16px;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;color:#92400e;font-size:12.5px">' +
+    '<b>&#9888;&#65039; Sheet me ye columns nahi mile:</b> ' + obE(d.missing.join(', ')) + '<br>Sheet me ye columns jodo, phir Refresh karo.</div></div>';
+  const rows = d.rows || [];
+  const n = k => k === 'all' ? rows.length : rows.filter(r => k === 'done' ? r.done : !r.done).length;
+  const chips = [['pending', 'Pending', n('pending')], ['done', 'Complete', n('done')], ['all', 'All', n('all')]]
+    .map(c => '<button class="ob-fchip' + (e.filt === c[0] ? ' on' : '') + '" onclick="_fmsEntry.filt=\'' + c[0] + '\';_fmsEntry.page=1;fmsRenderList()">' + c[1] + ' <b>' + c[2] + '</b></button>').join('');
+  return head.replace(/<\/div>$/, '') +
+    '<div class="ob-fchips">' + chips + '</div>' +
+    '<input type="search" class="ob-search" placeholder="&#128269; Search order, party, phone…" value="' + obE(e.q) + '" ' +
+    'oninput="_fmsEntry.q=this.value;_fmsEntry.page=1;fmsEntryRedraw()" autocomplete="off"></div>' +
+    '<div class="ob-twrap2 fms-all-scroll"><table class="ob-list"><thead><tr><th>Action</th>' +
+    (d.labelCols || []).map(c => '<th>' + obE(c) + '</th>').join('') +
+    (d.fields || []).map(fl => '<th class="fms-ent-h">' + obE(fl.label) + '</th>').join('') +
+    '<th>Status</th></tr></thead><tbody id="fmsEntryRows"></tbody></table></div>' +
+    '<div class="fms-pager" id="fmsEntryPager"></div></div>';
+}
+function fmsEntryList() {
+  const e = _fmsEntry, d = e && e.data;
+  if (!d || !d.rows) return [];
+  const q = String(e.q || '').trim().toLowerCase();
+  return d.rows.filter(r => (e.filt === 'all' || (e.filt === 'done' ? r.done : !r.done)) &&
+    (!q || Object.values(r.data).concat(Object.values(r.vals)).some(x => String(x || '').toLowerCase().includes(q))));
+}
+function fmsEntryRedraw() {
+  const b = document.getElementById('fmsEntryRows'), p = document.getElementById('fmsEntryPager');
+  if (!b) return;
+  const e = _fmsEntry, d = e.data, list = fmsEntryList();
+  const pages = Math.max(1, Math.ceil(list.length / FMS_PAGE));
+  if (e.page > pages) e.page = pages;
+  const cols = d.labelCols || [], flds = d.fields || [];
+  b.innerHTML = list.length ? list.slice((e.page - 1) * FMS_PAGE, e.page * FMS_PAGE).map(r => {
+    const miss = flds.filter(fl => !r.vals[fl.key]).length;
+    return '<tr' + (r.done ? '' : ' class="fms-ent-pend"') + '><td><button class="btn btn-outline btn-sm" onclick="openFMSEntryEdit(' + r.sheetRow + ')">&#9999;&#65039; Edit</button></td>' +
+      cols.map((c, i) => '<td' + (i === 0 ? ' class="ob-emp"' : '') + '>' + fmsCell(r.data[c] || (i === 0 && cols.every(k => !r.data[k]) ? 'Row ' + r.sheetRow : '')) + '</td>').join('') +
+      flds.map(fl => '<td>' + (r.vals[fl.key] ? obE(r.vals[fl.key]) : '<span class="fms-ent-miss">missing</span>') + '</td>').join('') +
+      '<td>' + (r.done ? '<span class="ob-chip done">&#10003; Complete</span>' + (r.direct ? ' <span class="ob-chip up" title="Piece in Stock = Yes: straight to Step 10">&#128666; Direct</span>' : '')
+        : '<span class="ob-chip late">' + miss + ' missing</span>') + '</td></tr>';
+  }).join('') : '<tr><td colspan="' + (cols.length + flds.length + 2) + '"><div class="empty">' + (d.rows.length ? 'Is filter me koi order nahi' : 'Sheet me abhi koi order nahi') + '</div></td></tr>';
+  if (p) p.innerHTML = fmsPagerHtml(list.length, e.page, 'fmsEntryGo(');
+}
+function fmsEntryGo(n) {
+  _fmsEntry.page = n; fmsEntryRedraw();
+  const w = document.querySelector('#fmsList .fms-all-scroll'); if (w) w.scrollTop = 0;
+}
+
+// Ek order ke 4 khaane -- popup
+let _fmsEntryRow = null;
+function openFMSEntryEdit(sheetRow) {
+  const d = _fmsEntry && _fmsEntry.data, r = d && (d.rows || []).find(x => x.sheetRow === sheetRow);
+  if (!r) return;
+  _fmsEntryRow = r;
+  document.getElementById('fmsEntryErr').style.display = 'none';
+  document.getElementById('fmsEntryInfo').innerHTML = (d.labelCols || []).map(c =>
+    '<div><span>' + obE(c) + '</span><b>' + obE(r.data[c] || '—') + '</b></div>').join('');
+  document.getElementById('fmsEntryFields').innerHTML = (d.fields || []).map(fl => {
+    const v = r.vals[fl.key] || '', id = 'fmsEnt_' + fl.key;
+    let inp;
+    if (fl.type === 'yesno') inp = '<select id="' + id + '"><option value="">-- Select --</option>' +
+      ['Yes', 'No'].map(o => '<option' + (v.toLowerCase() === o.toLowerCase() ? ' selected' : '') + '>' + o + '</option>').join('') + '</select>';
+    else if (fl.type === 'date') { const p = fmsPlanDate(v); inp = '<input type="date" id="' + id + '" value="' + obE(p) + '"/>'; }
+    else inp = '<input type="tel" id="' + id + '" maxlength="13" inputmode="numeric" value="' + obE(v) + '"/>';
+    return '<div><label>' + obE(fl.label) + ' <b>*</b></label>' + inp + '</div>';
+  }).join('');
+  document.getElementById('fmsEntryModal').classList.add('open');
+}
+async function saveFMSEntry() {
+  const r = _fmsEntryRow, d = _fmsEntry && _fmsEntry.data;
+  if (!r || !d) return;
+  const errEl = document.getElementById('fmsEntryErr'), btn = document.getElementById('fmsEntrySaveBtn');
+  errEl.style.display = 'none';
+  const values = {};
+  (d.fields || []).forEach(fl => { const el = document.getElementById('fmsEnt_' + fl.key); values[fl.key] = el ? el.value.trim() : ''; });
+  if (!Object.values(values).some(Boolean)) { errEl.textContent = 'Kam se kam ek khaana bharo'; errEl.style.display = 'block'; return; }
+  btn.disabled = true; btn.textContent = '⏳ Saving...';
+  const res = await api(`/api/fms-tasks/${fmsTasksActiveFmsId}/order-entry/${r.sheetRow}`, 'POST', { values });
+  btn.disabled = false; btn.textContent = '💾 Save';
+  if (res.error) { errEl.textContent = res.error; errEl.style.display = 'block'; return; }
+  closeModal('fmsEntryModal');
+  // Taaza data -- order poora hua to aage ke step me chala jaata hai
+  await fmsLoadEntry();
+  const now = (_fmsEntry.data.rows || []).find(x => x.sheetRow === r.sheetRow);
+  showToast(now && now.done ? (now.direct ? '✅ Saved — order goes straight to Step 10' : '✅ Saved — order moved to the next step') : '✅ Saved');
+  _fmsTrack = null;
+  fmsRender();
+  (window._fmsAllSteps || []).filter(fmsIsMine).forEach(s => loadFMSStepRows(s.id));
+}
+
+// Admin: Order Entry ka doer chuno
+async function openFMSEntryDoers() {
+  const users = await api('/api/users');
+  if (!Array.isArray(users)) { showToast('⚠️ Users nahi mile'); return; }
+  const cur = new Set(((_fmsEntry && _fmsEntry.data && _fmsEntry.data.doers) || []).map(x => String(x.id)));
+  document.getElementById('fmsEntryDoerList').innerHTML = users.map(u =>
+    '<label><input type="checkbox" value="' + u.id + '"' + (cur.has(String(u.id)) ? ' checked' : '') + '/> ' + obE(u.name || u.email) +
+    ' <span>' + obE(u.role || '') + '</span></label>').join('');
+  document.getElementById('fmsEntryDoersModal').classList.add('open');
+}
+async function saveFMSEntryDoers() {
+  const ids = [...document.querySelectorAll('#fmsEntryDoerList input:checked')].map(c => parseInt(c.value));
+  const r = await api(`/api/fms-tasks/${fmsTasksActiveFmsId}/order-entry-doers`, 'PUT', { doers: ids });
+  if (r.error) { showToast('⚠️ ' + r.error); return; }
+  closeModal('fmsEntryDoersModal');
+  showToast('✅ Order Entry doer saved');
+  await fmsLoadEntry(); fmsRender();
 }
 
 // ── ALL card: har order kahan atka hai (FMS Tracking wala data) ──
@@ -14262,12 +14447,12 @@ async function saveFMSDone() {
 // ══ Manual Order (Online FMS, Order Entry step) ══
 // Khaane server batata hai (sheet ke header se milaa kar); koi column sheet
 // me na ho to form khulne se pehle hi bata do, bharne ke baad nahi.
-let _fmsManual = null;     // { stepId, fields }
-async function openFMSManualOrder(stepId) {
+let _fmsManual = null;     // { fields }
+async function openFMSManualOrder() {
   const r = await api(`/api/fms-tasks/${fmsTasksActiveFmsId}/manual-order`);
   if (r.error) { showToast('⚠️ ' + r.error); return; }
   if (r.missing && r.missing.length) { showToast('⚠️ Sheet me ye columns nahi mile: ' + r.missing.join(', ')); return; }
-  _fmsManual = { stepId, fields: (r.fields || []).filter(f => f.type !== 'auto') };
+  _fmsManual = { fields: (r.fields || []).filter(f => f.type !== 'auto') };
   document.getElementById('fmsManualErr').style.display = 'none';
   document.getElementById('fmsManualFields').innerHTML = _fmsManual.fields.map(f => {
     const id = 'fmsMan_' + f.key;
@@ -14290,7 +14475,7 @@ async function fmsManualPhoto(key) {
   if (file.size > FMS_UPLOAD_MAX_MB * 1024 * 1024) { st.innerHTML = `<span style="color:#ef4444">⚠️ File must be under ${FMS_UPLOAD_MAX_MB} MB</span>`; fileEl.value = ''; return; }
   st.textContent = '⏳ Uploading…'; btn.disabled = true;
   const dataUrl = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = () => res(null); fr.readAsDataURL(file); });
-  const r = dataUrl ? await api('/api/fms-uploads', 'POST', { fmsId: fmsTasksActiveFmsId, stepId: _fmsManual && _fmsManual.stepId,
+  const r = dataUrl ? await api('/api/fms-uploads', 'POST', { fmsId: fmsTasksActiveFmsId, stepId: 'entry',
     rowIndex: '', colLetter: '', fieldType: 'image', fileName: file.name, mimeType: file.type, dataUrl }) : { error: 'File could not be read' };
   btn.disabled = false;
   if (r.error) { st.innerHTML = `<span style="color:#ef4444">⚠️ ${obE(r.error)}</span>`; fileEl.value = ''; return; }
@@ -14320,8 +14505,9 @@ async function saveFMSManualOrder() {
   if (r.error) { errEl.textContent = r.error; errEl.style.display = 'block'; return; }
   closeModal('fmsManualModal');
   showToast(`✅ Manual order added (sheet row ${r.row})`);
-  // Naya order Order Entry par done likha jaata hai -- aage ke steps taaza karo
+  // Chaaron khaane bhare hain -- order seedha aage ke step me
   _fmsTrack = null;
+  await fmsLoadEntry(); fmsRender();
   (window._fmsAllSteps || []).filter(fmsIsMine).forEach(s => loadFMSStepRows(s.id));
 }
 
