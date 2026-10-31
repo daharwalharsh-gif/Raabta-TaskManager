@@ -844,6 +844,9 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
   #fmsList .ob-listcard{max-height:80vh;}
 }
 /* FMS Step 1 Order Entry */
+.fms-src{display:block;margin-top:4px;font-size:10.5px;font-weight:700;border-radius:6px;padding:1px 6px;width:max-content;}
+.fms-src.web{background:#e0f2fe;color:#0369a1;}
+.fms-src.man{background:#fef3c7;color:#92400e;}
 .fms-ent-h{background:#eef2ff !important;color:#3730a3 !important;}
 .fms-ent-miss{color:#dc2626;font-weight:700;font-size:11.5px;}
 tr.fms-ent-pend td:first-child{box-shadow:inset 3px 0 0 #f59e0b;}
@@ -13619,9 +13622,9 @@ function fmsSetCountLabel(stepId) {
 // bharta / sudharta hai; chaaron bhare tabhi order aage ke steps me jaata hai.
 // Piece in Stock = Yes -> seedha Step 10 (server ka niyam). (31 Oct 2026)
 let _fmsEntry = null;       // { fmsId, data, filt, q, page }
-async function fmsLoadEntry() {
+async function fmsLoadEntry(sync) {
   const fmsId = fmsTasksActiveFmsId;
-  const d = await api(`/api/fms-tasks/${fmsId}/order-entry`);
+  const d = await api(`/api/fms-tasks/${fmsId}/order-entry${sync ? '?sync=1' : ''}`);
   if (fmsId !== fmsTasksActiveFmsId) return;
   const p = _fmsEntry && _fmsEntry.fmsId === fmsId ? _fmsEntry : null;
   _fmsEntry = { fmsId, data: d || { error: 'Data nahi mila' }, filt: p ? p.filt : 'pending', q: p ? p.q : '', page: p ? p.page : 1 };
@@ -13631,19 +13634,31 @@ function fmsEntryPending() {
   if (!fmsEntryOn() || !_fmsEntry.data.canEdit) return 0;
   return (_fmsEntry.data.rows || []).filter(r => !r.done).length;
 }
+// Refresh = naye website order bhi abhi laao (From API -> FMS tab)
 async function fmsEntryRefresh() {
-  const b = document.getElementById('fmsEntryBtn'); if (b) { b.disabled = true; b.textContent = '⏳'; }
-  await fmsLoadEntry();
+  const b = document.getElementById('fmsEntryBtn'); if (b) { b.disabled = true; b.textContent = '⏳ Syncing…'; }
+  await fmsLoadEntry(true);
+  const sy = _fmsEntry && _fmsEntry.data && _fmsEntry.data.sync;
+  if (sy && sy.error) showToast('⚠️ Sync: ' + sy.error);
+  else if (sy && sy.added) showToast(`✅ ${sy.added} new website order(s) added`);
+  _fmsTrack = null;
   fmsRender();
+  if (sy && sy.added) (window._fmsAllSteps || []).filter(fmsIsMine).forEach(s => loadFMSStepRows(s.id));
+}
+function fmsSyncLine(sy) {
+  if (!sy || !sy.at) return '';
+  const t = new Date(sy.at), hm = String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0');
+  return sy.error ? ' &middot; <b style="color:#b91c1c" title="' + obE(sy.error) + '">&#9888;&#65039; sync failed ' + hm + '</b>'
+    : ' &middot; website orders synced ' + hm;
 }
 function fmsEntryHtml() {
   const e = _fmsEntry, d = e && e.data;
   const enames = d && d.doers && d.doers.length ? d.doers.map(x => x.name).join(', ') : 'not assigned yet';
   const head = '<div class="ob-listcard"><div class="ob-listhead"><div class="ob-num sm" style="background:#1e3a8a">1</div>' +
-    '<h4>Order Entry<span>&#128100; ' + obE(enames) + ' &middot; all 4 details filled = order moves ahead (In Stock = Yes &rarr; Step 10)</span></h4>' +
+    '<h4>Order Entry<span>&#128100; ' + obE(enames) + ' &middot; all 4 details filled = order moves ahead (In Stock = Yes &rarr; Step 10)' + fmsSyncLine(d && d.sync) + '</span></h4>' +
     (ME.role === 'admin' ? '<button class="btn btn-outline btn-sm" onclick="openFMSEntryDoers()">&#128100; Assign doer</button>' : '') +
     (d && d.canEdit ? '<button class="btn btn-green btn-sm" onclick="openFMSManualOrder()">&#10133; Add Manual Order</button>' : '') +
-    '<button class="btn btn-outline btn-sm" onclick="fmsEntryRefresh()" id="fmsEntryBtn">&#128260; Refresh</button></div>';
+    '<button class="btn btn-outline btn-sm" onclick="fmsEntryRefresh()" id="fmsEntryBtn" title="Naye website order bhi abhi laata hai">&#128260; Sync &amp; Refresh</button></div>';
   if (!d) return head + '<div class="empty">&#9203; Loading…</div></div>';
   if (d.error) return head + '<div class="empty" style="color:#ef4444">&#9888;&#65039; ' + obE(d.error) + '</div></div>';
   if (!d.canEdit) return head + '<div class="empty">&#128274; Order Entry aapko assign nahi hai</div></div>';
@@ -13679,7 +13694,9 @@ function fmsEntryRedraw() {
   const cols = d.labelCols || [], flds = d.fields || [];
   b.innerHTML = list.length ? list.slice((e.page - 1) * FMS_PAGE, e.page * FMS_PAGE).map(r => {
     const miss = flds.filter(fl => !r.vals[fl.key]).length;
-    return '<tr' + (r.done ? '' : ' class="fms-ent-pend"') + '><td><button class="btn btn-outline btn-sm" onclick="openFMSEntryEdit(' + r.sheetRow + ')">&#9999;&#65039; Edit</button></td>' +
+    const src = r.source === 'web' ? '<span class="fms-src web" title="Website order (From API)">&#127760; Web</span>'
+      : r.source === 'manual' ? '<span class="fms-src man" title="Manual order">&#9997;&#65039; Manual</span>' : '';
+    return '<tr' + (r.done ? '' : ' class="fms-ent-pend"') + '><td><button class="btn btn-outline btn-sm" onclick="openFMSEntryEdit(' + r.sheetRow + ')">&#9999;&#65039; Edit</button>' + src + '</td>' +
       cols.map((c, i) => '<td' + (i === 0 ? ' class="ob-emp"' : '') + '>' + fmsCell(r.data[c] || (i === 0 && cols.every(k => !r.data[k]) ? 'Row ' + r.sheetRow : '')) + '</td>').join('') +
       flds.map(fl => '<td>' + (r.vals[fl.key] ? obE(r.vals[fl.key]) : '<span class="fms-ent-miss">missing</span>') + '</td>').join('') +
       '<td>' + (r.done ? '<span class="ob-chip done">&#10003; Complete</span>' + (r.direct ? ' <span class="ob-chip up" title="Piece in Stock = Yes: straight to Step 10">&#128666; Direct</span>' : '')
@@ -13721,7 +13738,7 @@ async function saveFMSEntry() {
   (d.fields || []).forEach(fl => { const el = document.getElementById('fmsEnt_' + fl.key); values[fl.key] = el ? el.value.trim() : ''; });
   if (!Object.values(values).some(Boolean)) { errEl.textContent = 'Kam se kam ek khaana bharo'; errEl.style.display = 'block'; return; }
   btn.disabled = true; btn.textContent = '⏳ Saving...';
-  const res = await api(`/api/fms-tasks/${fmsTasksActiveFmsId}/order-entry/${r.sheetRow}`, 'POST', { values });
+  const res = await api(`/api/fms-tasks/${fmsTasksActiveFmsId}/order-entry/${r.sheetRow}`, 'POST', { key: r.key, values });
   btn.disabled = false; btn.textContent = '💾 Save';
   if (res.error) { errEl.textContent = res.error; errEl.style.display = 'block'; return; }
   closeModal('fmsEntryModal');

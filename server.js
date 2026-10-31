@@ -7107,6 +7107,11 @@ const FMS_ENTRY_RULES = [{
     { key: 'website', label: 'Website Order?',   type: 'yesno', names: ['website order'] }
   ],
   skipKey: 'stock',            // ye "Yes" ho to manufacturing skip
+  // Website orders API se "From API" tab me aate hain (IMPORTRANGE -- usme
+  // likh nahi sakte). App naye order wahan se FMS tab (Sales) ke A-L me
+  // copy karta hai; FMS tab ka order data sirf app badalta hai.
+  importTab: 'From API', importHeaderRow: 1,
+  keyNames: ['po order number', 'po number', 'order number', 'po no'],
   skipSteps: ['process piece', 'follow up with vendor', 'piece rec', 'qc ghat', 'beading', 'give for qc', 'follow up for order']
 }];
 const fmsNorm = s => String(s || '').toLowerCase().replace(/recieved/g, 'received').replace(/[^a-z0-9]+/g, ' ').trim();
@@ -8025,6 +8030,166 @@ const fmsManualErr = (res, err) => {
   res.status(500).json({ error: msg });
 };
 
+// ══ WEBSITE ORDERS SYNC: "From API" -> FMS tab (Sales) ══
+// FMS tab ke order columns (A-L) ka maalik ab app hai:
+//  - naya website order (jo PO abhi FMS tab me nahi) neeche nayi row ban kar
+//    jaata hai -- har ghante, aur Order Entry kholne / Refresh par
+//  - pehle se maujood row ko sync KABHI nahi chhoota (doer ne jo bhara wo bacha)
+//  - rows sirf neeche judti hain, kabhi khiskti nahi -- isliye step ke Actual
+//    hamesha sahi order ke saath rehte hain, chahe From API ka kram badle
+// Order ki pehchan PO number se (row number se nahi).
+const fmsKeyNorm = v => String(v == null ? '' : v).trim().toLowerCase();
+const _fmsSync = new Map();          // fmsId -> { at, added, total, error, keys:Set, busy:Promise }
+// Import tab ke columns -> FMS tab ke columns (FMS_MANUAL_FIELDS ke naam se)
+function fmsImportMap(rule, iHeaders) {
+  const H = (iHeaders || []).map(fmsNorm), used = new Set(), map = {};
+  const key = fmsFindCol(H, rule.keyNames, used); if (key >= 0) used.add(key);
+  for (const fl of FMS_MANUAL_FIELDS) {
+    if (fl.key === 'poOrder' || fl.key === 'po') continue;
+    const i = fmsFindCol(H, fl.names, used); if (i >= 0) used.add(i);
+    map[fl.key] = i;
+  }
+  return { key, map };
+}
+// Naye rows (fromRow..toRow, 1-based) me step ke formula. Sheet me formula
+// sirf kuch rows tak neeche bhare hote hain (live Sales me row 21 tak) --
+// uske neeche wale order ka Planned banta hi nahi aur flow ruk jaata. Upar ki
+// aakhri formula wali row se SIRF formula cells copy hote hain (value wale
+// nahi -- warna pichhle order ke Actual bhi aa jaate aur naya order "done"
+// dikhta). Order wale columns (dataCols) ko haath nahi lagta.
+function fmsFormulaReqs(fAll, sheetId, dataCols, fromRow, toRow, minIdx, maxCols) {
+  const isF = v => /^=/.test(String(v == null ? '' : v));
+  const empty = v => String(v == null ? '' : v).trim() === '';
+  const fCols = r => (r || []).map((v, ci) => (!dataCols.has(ci) && isF(v) ? ci : -1)).filter(ci => ci >= 0);
+  // Naqsha: wo aakhri row jisme sabse zyada formula hon (adhuri rows
+  // -- jaise live Sales me row 22 se neeche sirf ek bacha formula -- nahi)
+  let tpl = -1, best = 0;
+  for (let i = Math.min(fAll.length, toRow) - 1; i >= minIdx; i--) { const n = fCols(fAll[i]).length; if (n > best) { best = n; tpl = i; } }
+  if (tpl < 0) return [];
+  const tCols = fCols(fAll[tpl]).filter(ci => ci < (maxCols || 702));
+  // Har nayi row me sirf wahi khaane jahan naqshe me formula hai aur row me
+  // KUCH nahi (value / pehle se formula ho to haath nahi)
+  const plan = [];
+  for (let r = fromRow; r <= toRow; r++) {
+    const row = fAll[r - 1] || [];
+    const cols = tCols.filter(ci => empty(row[ci]));
+    if (cols.length) plan.push({ r, sig: cols.join(','), cols });
+  }
+  const groups = [];
+  plan.forEach(p => { const g = groups[groups.length - 1]; if (g && g.sig === p.sig && g.b === p.r - 1) g.b = p.r; else groups.push({ a: p.r, b: p.r, sig: p.sig, cols: p.cols }); });
+  const reqs = [];
+  groups.forEach(g => {
+    let st = g.cols[0], prev = g.cols[0];
+    const segs = [];
+    g.cols.slice(1).concat([-9]).forEach(ci => { if (ci === prev + 1) { prev = ci; return; } segs.push([st, prev + 1]); st = prev = ci; });
+    segs.forEach(([c1, c2]) => reqs.push({ copyPaste: {
+      source: { sheetId, startRowIndex: tpl, endRowIndex: tpl + 1, startColumnIndex: c1, endColumnIndex: c2 },
+      destination: { sheetId, startRowIndex: g.a - 1, endRowIndex: g.b, startColumnIndex: c1, endColumnIndex: c2 },
+      pasteType: 'PASTE_FORMULA' } }));
+  });
+  return reqs;
+}
+
+async function fmsSyncOrders(d, fms, force) {
+  const rule = fmsEntryRule(fms);
+  if (!rule || !rule.importTab) return null;
+  const st = _fmsSync.get(fms.id) || {};
+  if (st.busy) return st.busy;
+  if (!force && st.at && Date.now() - st.at < 60 * 1000) return st;     // 1 min me ek baar
+  const run = (async () => {
+    const spreadsheetId = extractSheetId(fms.sheet_id), headerRow = parseInt(fms.header_row) || 1, tab = fms.sheet_name;
+    try {
+      const [imp, cur, meta] = await Promise.all([
+        withRetry(() => d.sheets.spreadsheets.values.get({ spreadsheetId, range: `'${rule.importTab}'!A1:ZZ` })),
+        withRetry(() => d.sheets.spreadsheets.values.get({ spreadsheetId, range: `${tab}!A1:ZZ` })),
+        withRetry(() => d.sheets.spreadsheets.get({ spreadsheetId, fields: 'sheets(properties(title,sheetId,gridProperties(rowCount)))' }))
+      ]);
+      const iRows = imp.data.values || [], sRows = cur.data.values || [];
+      const im = fmsImportMap(rule, iRows[(rule.importHeaderRow || 1) - 1]);
+      const sm = fmsManualMap(sRows[headerRow - 1] || []);
+      const sKey = fmsFindCol((sRows[headerRow - 1] || []).map(fmsNorm), rule.keyNames, new Set());
+      if (im.key < 0) throw new Error(`"${rule.importTab}" tab me PO number ka column nahi mila`);
+      if (sKey < 0) throw new Error(`"${tab}" tab me PO / Order Number ka column nahi mila`);
+      const have = new Set(), keys = new Set();
+      let last = headerRow - 1;
+      for (let i = headerRow; i < sRows.length; i++) {
+        if (!fmsHasReal(sRows[i])) continue;
+        last = i;
+        const k = fmsKeyNorm(sRows[i][sKey]); if (k) have.add(k);
+      }
+      // Naye order -- From API ke kram me
+      const add = [];
+      for (const r of iRows.slice(rule.importHeaderRow || 1)) {
+        const k = fmsKeyNorm((r || [])[im.key]);
+        if (!k) continue;
+        keys.add(k);
+        if (have.has(k)) continue;
+        have.add(k);
+        const out = {};
+        out[sKey] = sheetSafeText(r[im.key]);
+        for (const fl of FMS_MANUAL_FIELDS) {
+          const si = sm.map[fl.key], ii = im.map[fl.key];
+          if (si === undefined || si < 0 || ii === undefined || ii < 0 || si === sKey) continue;
+          const v = String(r[ii] == null ? '' : r[ii]).trim();
+          if (!v || v.toUpperCase() === 'FALSE') continue;
+          out[si] = fl.type === 'date' || fl.type === 'auto' || fl.type === 'number' ? v : sheetSafeText(v);
+        }
+        if (sm.srcIdx >= 0) out[sm.srcIdx] = 'Website';
+        add.push(out);
+      }
+      if (add.length) {
+        const first = last + 2;                                   // 1-based
+        const lastRow = first + add.length - 1;
+        const sh = (meta.data.sheets || []).find(x => x.properties.title === tab);
+        const rc = sh && sh.properties.gridProperties && sh.properties.gridProperties.rowCount;
+        if (sh && rc && lastRow > rc) {
+          await withRetry(() => d.sheets.spreadsheets.batchUpdate({ spreadsheetId, requestBody: { requests: [{ appendDimension: {
+            sheetId: sh.properties.sheetId, dimension: 'ROWS', length: lastRow - rc + 100 } }] } }));
+        }
+        // Sirf order wale columns (A-L jaise) -- step ke formula columns ko haath nahi
+        const cols = [...new Set(add.flatMap(o => Object.keys(o).map(Number)))].sort((a, b) => a - b);
+        const lo = cols[0], hi = cols[cols.length - 1];
+        const values = add.map(o => { const row = []; for (let c = lo; c <= hi; c++) row.push(o[c] === undefined ? '' : o[c]); return row; });
+        // Step ke formula jin naye rows me nahi hain, unme upar se copy
+        if (sh) {
+          const fr = await withRetry(() => d.sheets.spreadsheets.values.get({ spreadsheetId, range: `${tab}!A1:ZZ${lastRow}`, valueRenderOption: 'FORMULA' }));
+          const dataCols = new Set(); for (let c = lo; c <= hi; c++) dataCols.add(c);
+          const reqs = fmsFormulaReqs(fr.data.values || [], sh.properties.sheetId, dataCols, first, lastRow, headerRow);
+          if (reqs.length) await withRetry(() => d.sheets.spreadsheets.batchUpdate({ spreadsheetId, requestBody: { requests: reqs } }));
+        }
+        await withRetry(() => d.sheets.spreadsheets.values.update({
+          spreadsheetId, range: `${tab}!${idxToColLetter(lo)}${first}:${idxToColLetter(hi)}${lastRow}`,
+          valueInputOption: 'USER_ENTERED', requestBody: { values } }));
+        clearSheetCache(spreadsheetId);
+      }
+      const done = { at: Date.now(), added: add.length, total: keys.size, keys, error: '' };
+      _fmsSync.set(fms.id, done);
+      if (add.length) console.log(`FMS sync [${fms.fms_name}]: ${add.length} naye website order`);
+      return done;
+    } catch (e) {
+      const fail = { ...st, at: Date.now(), error: e.message || String(e), busy: null };
+      _fmsSync.set(fms.id, fail);
+      console.error(`FMS sync [${fms.fms_name}] error:`, fail.error);
+      return fail;
+    }
+  })();
+  _fmsSync.set(fms.id, { ...st, busy: run });
+  return run;
+}
+// Har ghante saare Online FMS ka sync (server shuru hone ke 1 min baad pehla)
+async function fmsSyncAll() {
+  try {
+    const d = await getDB();
+    for (const r of await d.findAll('FMS_Config')) {
+      const fms = parseFMSRow(r);
+      if (fmsEntryRule(fms)) await fmsSyncOrders(d, fms, true);
+    }
+  } catch (e) { console.error('FMS sync all:', e.message); }
+}
+setTimeout(fmsSyncAll, 60 * 1000);
+setInterval(fmsSyncAll, 60 * 60 * 1000);
+const fmsSyncInfo = st => st ? { at: st.at || 0, added: st.added || 0, error: st.error || '' } : null;
+
 // ── Step 1 ORDER ENTRY: saare order (online + manual) ek jagah ──
 // Doer yahan har order ke 4 khaane bharta / sudharta hai. Baaki columns
 // sirf dikhte hain, badal nahi sakte.
@@ -8045,11 +8210,15 @@ app.get('/api/fms-tasks/:fmsId/order-entry', requireAuth, async (req, res) => {
       fields: rule.fields.map(({ key, label, type }) => ({ key, label, type })) };
     if (!canEdit) return res.json(base);       // doosron ko sirf "Not assigned"
 
+    // Naye website order pehle FMS tab me (1 min me ek baar; ?sync=1 = abhi)
+    const sync = await fmsSyncOrders(d, fms, req.query.sync === '1');
     const headerRow = parseInt(fms.header_row) || 1;
     const all = await readSheetCached(d, extractSheetId(fms.sheet_id), `${fms.sheet_name}!A1:ZZ`);
+    const kIdx = fmsFindCol((all[headerRow - 1] || []).map(fmsNorm), rule.keyNames || [], new Set());
+    const webKeys = (sync && sync.keys) || new Set();
     const headers = all[headerRow - 1] || [];
     const plan = fmsEntryPlan(fms, headers);
-    if (plan.missing.length) return res.json({ ...base, missing: plan.missing, labelCols: [], rows: [] });
+    if (plan.missing.length) return res.json({ ...base, missing: plan.missing, labelCols: [], rows: [], sync: fmsSyncInfo(sync) });
 
     // Pehchan ke columns: shuru ke header (Order Entry wale aur address chhod kar), 5 tak
     const entryIdx = new Set(Object.values(plan.cols)), seen = {}, label = [];
@@ -8067,21 +8236,35 @@ app.get('/api/fms-tasks/:fmsId/order-entry', requireAuth, async (req, res) => {
       const vals = {}, data = {};
       rule.fields.forEach(fl => { const v = row[plan.cols[fl.key]]; vals[fl.key] = fmsFilled(v) ? String(v).trim() : ''; });
       label.forEach(c => { data[c.name] = String(row[c.i] == null ? '' : row[c.i]).trim(); });
-      rows.push({ sheetRow: headerRow + k + 1, data, vals, done: fmsEntryDone(plan, row), direct: fmsRowDirect(plan, row) });
+      const key = kIdx >= 0 ? String(row[kIdx] == null ? '' : row[kIdx]).trim() : '';
+      rows.push({ sheetRow: headerRow + k + 1, key, source: rule.importTab ? (webKeys.has(fmsKeyNorm(key)) ? 'web' : 'manual') : '',
+        data, vals, done: fmsEntryDone(plan, row), direct: fmsRowDirect(plan, row) });
     });
-    res.json({ ...base, missing: [], labelCols: label.map(c => c.name), rows });
+    res.json({ ...base, missing: [], labelCols: label.map(c => c.name), rows, sync: fmsSyncInfo(sync) });
   } catch (err) { fmsManualErr(res, err); }
 });
 
 // Ek order ke 4 khaane save -- sirf yahi 4 columns likhe jaate hain, khali
-// chhoda khaana sheet me jo hai use nahi mitata
+// chhoda khaana sheet me jo hai use nahi mitata. Order PO number se dhoondha
+// jaata hai (body.key); row number sirf tab jab sheet me PO ka column hi na ho.
 app.post('/api/fms-tasks/:fmsId/order-entry/:row', requireAuth, async (req, res) => {
   try {
     const c = await fmsManualCtx(req);
     if (c.error) return res.status(c.status).json({ error: c.error });
     const { d, fms, spreadsheetId, headerRow } = c;
-    const rowNum = parseInt(req.params.row);
+    clearSheetCache(spreadsheetId);                    // taaza sheet -- purani row par na likhe
     const all = await readSheetCached(d, spreadsheetId, `${fms.sheet_name}!A1:ZZ`);
+    const kIdx = fmsFindCol((all[headerRow - 1] || []).map(fmsNorm), fmsEntryRule(fms).keyNames || [], new Set());
+    const want = fmsKeyNorm(req.body && req.body.key);
+    let rowNum = parseInt(req.params.row);
+    if (kIdx >= 0) {
+      if (!want) return res.status(400).json({ error: 'Is order ka PO number nahi hai — sheet me PO / Order Number bharo' });
+      const hits = [];
+      for (let i = headerRow; i < all.length; i++) if (fmsHasReal(all[i]) && fmsKeyNorm(all[i][kIdx]) === want) hits.push(i + 1);
+      if (!hits.length) return res.status(400).json({ error: 'Ye order sheet me nahi mila — Refresh karo' });
+      if (hits.length > 1) return res.status(400).json({ error: `PO ${req.body.key} sheet me ${hits.length} baar hai (rows ${hits.join(', ')}) — pehle sheet me theek karo` });
+      rowNum = hits[0];
+    }
     if (!(rowNum > headerRow) || !fmsHasReal(all[rowNum - 1])) return res.status(400).json({ error: 'Ye order sheet me nahi mila — Refresh karo' });
     const plan = fmsEntryPlan(fms, all[headerRow - 1] || []);
     if (plan.missing.length) return res.status(400).json({ error: `Sheet me ye columns nahi mile: ${plan.missing.join(', ')}` });
@@ -8108,6 +8291,17 @@ app.post('/api/fms-tasks/:fmsId/order-entry/:row', requireAuth, async (req, res)
     await withRetry(() => d.sheets.spreadsheets.values.batchUpdate({ spreadsheetId, requestBody: { valueInputOption: 'USER_ENTERED', data } }));
     clearSheetCache(spreadsheetId);
     res.json({ success: true });
+  } catch (err) { fmsManualErr(res, err); }
+});
+
+// "Sync now" -- naye website order abhi laao
+app.post('/api/fms-tasks/:fmsId/order-entry-sync', requireAuth, async (req, res) => {
+  try {
+    const c = await fmsManualCtx(req);
+    if (c.error) return res.status(c.status).json({ error: c.error });
+    const st = await fmsSyncOrders(c.d, c.fms, true);
+    if (st && st.error) return res.status(500).json({ error: st.error });
+    res.json({ success: true, sync: fmsSyncInfo(st) });
   } catch (err) { fmsManualErr(res, err); }
 });
 
@@ -8182,6 +8376,13 @@ app.post('/api/fms-tasks/:fmsId/manual-order', requireAuth, async (req, res) => 
     const m = fmsManualMap(headers);
     if (m.missing.length) return res.status(400).json({ error: `Sheet me ye columns nahi mile: ${m.missing.join(', ')}` });
 
+    // Ek PO ek hi baar -- FMS tab me ho, ya website order (From API) me
+    const newKey = fmsKeyNorm(val.poOrder);
+    const dupRow = all.findIndex((r, i) => i >= headerRow && fmsHasReal(r) && fmsKeyNorm(r[m.map.poOrder]) === newKey);
+    if (dupRow >= 0) return res.status(400).json({ error: `PO / Order number ${val.poOrder} pehle se hai (sheet row ${dupRow + 1})` });
+    const syncSt = _fmsSync.get(fms.id);
+    if (syncSt && syncSt.keys && syncSt.keys.has(newKey)) return res.status(400).json({ error: `PO / Order number ${val.poOrder} website order me pehle se hai` });
+
     // Aakhri ASLI row (FALSE/TRUE wale checkbox data nahi) -- wahi naqsha bhi
     const isReal = r => (r || []).slice(0, 10).some(v => { const s = String(v || '').trim().toUpperCase(); return s && s !== 'FALSE' && s !== 'TRUE'; });
     let last = -1;
@@ -8201,25 +8402,8 @@ app.post('/api/fms-tasks/:fmsId/manual-order', requireAuth, async (req, res) => 
     }
     if (m.srcIdx >= 0) cells[m.srcIdx] = 'Manual';
 
-    // Upar wali row ke SIRF formula cells copy (value wale nahi -- warna
-    // pichhle order ke Actual bhi aa jaate aur naya order "done" dikhta)
-    const reqs = [];
-    if (last >= 0) {
-      const fr = fAll[last] || [];
-      const width = Math.min(Math.max(headers.length, fr.length), grid.columnCount || 702);
-      let s = -1;
-      for (let ci = 0; ci <= width; ci++) {
-        const isF = ci < width && cells[ci] === undefined && /^=/.test(String(fr[ci] == null ? '' : fr[ci]));
-        if (isF && s < 0) s = ci;
-        if (!isF && s >= 0) {
-          reqs.push({ copyPaste: {
-            source: { sheetId: sh.properties.sheetId, startRowIndex: last, endRowIndex: last + 1, startColumnIndex: s, endColumnIndex: ci },
-            destination: { sheetId: sh.properties.sheetId, startRowIndex: newRow - 1, endRowIndex: newRow, startColumnIndex: s, endColumnIndex: ci },
-            pasteType: 'PASTE_FORMULA' } });
-          s = -1;
-        }
-      }
-    }
+    // Step ke formula (row me na hon to upar ki aakhri formula wali row se)
+    const reqs = fmsFormulaReqs(fAll, sh.properties.sheetId, new Set(Object.keys(cells).map(Number)), newRow, newRow, headerRow, grid.columnCount);
     if (reqs.length) await withRetry(() => d.sheets.spreadsheets.batchUpdate({ spreadsheetId, requestBody: { requests: reqs } }));
     await withRetry(() => d.sheets.spreadsheets.values.batchUpdate({ spreadsheetId, requestBody: {
       valueInputOption: 'USER_ENTERED',
