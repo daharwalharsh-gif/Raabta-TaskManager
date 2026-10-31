@@ -7082,6 +7082,59 @@ function clearSheetCache(spreadsheetId) {
   }
 }
 
+// ══════════════════════════════════════════════════════
+// ONLINE FMS: "seedha Delivery" niyam + Manual Order (31 Oct 2026)
+// ══════════════════════════════════════════════════════
+// Order Entry par ye 4 cheezein bhar gayin (Date of Delivery, WhatsApp, Piece
+// in Stock?, Website Order?) to order manufacturing (flow ke step 3-9) nahi
+// jaata -- seedha Step 10 (Handover box for dispatch to Naresh) par aata hai.
+// Steps aur columns NAAM se pehchaane jaate hain, isliye FMS Admin me step
+// aage-peeche hon to bhi niyam chalta hai. Sheet me 4 me se koi column hi na
+// ho to niyam band rehta hai (sab pehle jaisa).
+const FMS_SKIP_RULES = [{
+  match: /online/i,
+  whenFilled: ['date of delivery', 'whatsapp', 'stock', 'website order'],
+  skipSteps: ['process piece', 'follow up with vendor', 'piece rec', 'qc ghat', 'beading', 'give for qc', 'follow up for order']
+}];
+const fmsNorm = s => String(s || '').toLowerCase().replace(/recieved/g, 'received').replace(/[^a-z0-9]+/g, ' ').trim();
+const fmsFilled = v => { const s = String(v == null ? '' : v).trim(); return s !== '' && s.toUpperCase() !== 'FALSE'; };
+function fmsSkipPlan(fms, headers) {
+  const rule = FMS_SKIP_RULES.find(r => r.match.test(fms.fms_name || ''));
+  if (!rule) return null;
+  const H = (headers || []).map(fmsNorm);
+  const cols = rule.whenFilled.map(k => H.findIndex(h => h.includes(k)));
+  if (cols.some(c => c < 0)) return null;
+  const skip = new Set();
+  fms.steps.forEach((s, i) => { const n = fmsNorm(s.stepName); if (rule.skipSteps.some(k => n.includes(k))) skip.add(i); });
+  if (!skip.size) return null;
+  // Skip ke baad wala pehla step (Step 10). Sheet me uska Planned pichhle
+  // (skip hue) step ke Actual se banta hai, to wo khali hoga -- isliye is
+  // row par wo step zabardasti "lagu" maana jaata hai.
+  const target = Math.max(...skip) + 1;
+  return { cols, skip, target: target < fms.steps.length ? target : -1 };
+}
+// Ye row "seedha Delivery" wali hai? (chaaron khaane bhare)
+const fmsRowSkips = (plan, row) => !!plan && plan.cols.every(c => fmsFilled(row[c]));
+// Planned khali = step lagu nahi -- upar wala niyam isse pehle lagta hai
+function fmsStepRelevant(plan, row, s, si) {
+  if (plan && fmsRowSkips(plan, row)) {
+    if (plan.skip.has(si)) return false;
+    if (si === plan.target) return true;
+  }
+  const p = colLetterToIdx(s.planCol || '');
+  return p < 0 || String(row[p] || '').trim() !== '';
+}
+// Order Entry wala step (FMS Admin me naam "Order Entry")
+const fmsEntryStepIdx = fms => fms.steps.findIndex(s => /order\s*entry/i.test(s.stepName || ''));
+// Step ke extra-input columns (A, B…) -- doer sirf inhi me likh sakta hai
+function fmsStepCols(step) {
+  const set = new Set();
+  (step.extraRows || []).forEach(r => {
+    [r.col_letter, r.sub_col_letter].forEach(c => { const x = String(c || '').trim().toUpperCase(); if (x) set.add(x); });
+  });
+  return set;
+}
+
 // GET /api/fms-tasks/:fmsId/steps/:stepId/rows — fetch pending rows from external sheet
 app.get('/api/fms-tasks/:fmsId/steps/:stepId/rows', requireAuth, async (req, res) => {
   try {
@@ -7166,10 +7219,9 @@ app.get('/api/fms-tasks/:fmsId/steps/:stepId/rows', requireAuth, async (req, res
       const pi = colLetterToIdx(s.planCol || '');
       planHasAny[i] = pi >= 0 && rawDataRows.some(r => String(r[pi] || '').trim() !== '');
     });
-    const isRelevant = (row, s) => {
-      const pIdx = colLetterToIdx(s.planCol || '');
-      return pIdx < 0 || (row[pIdx] || '').trim() !== '';
-    };
+    // Online FMS: 4 khaane bhare hon to step 3-9 lagu nahi, Step 10 lagu
+    const skipPlan = fmsSkipPlan(fms, headers);
+    const isRelevant = (row, s, si) => fmsStepRelevant(skipPlan, row, s, si);
     // Jis step ka ACTUAL column set hi nahi hai, uska "Done" kahin likha hi
     // nahi ja sakta -- wo step chal hi nahi sakta. Pehle aisa step HAR row ko
     // pending dikha deta tha (PMS ka Step-21 aise hi 97 phantom rows dikha
@@ -7180,12 +7232,12 @@ app.get('/api/fms-tasks/:fmsId/steps/:stepId/rows', requireAuth, async (req, res
       .filter(({ row }) => {
         if (!hasRealData(row)) return false;
         // Ye row is step par apply hi nahi hoti to yahan pending nahi dikhegi
-        if (!isRelevant(row, step)) return false;
+        if (!isRelevant(row, step, stepIdx)) return false;
         // Sirf un previous steps ko "done hona chahiye" treat karo jo IS ROW par
         // relevant hain — jo step row par lagu hi nahi, wo block nahi karega
         for (let i = 0; i < stepIdx; i++) {
           const prevStep = fms.steps[i];
-          if (!isRelevant(row, prevStep)) continue;
+          if (!isRelevant(row, prevStep, i)) continue;
           const prevIdx = colLetterToIdx(prevStep.actualCol || '');
           if (prevIdx >= 0 && !isDone(row[prevIdx])) return false;
         }
@@ -7220,13 +7272,18 @@ app.get('/api/fms-tasks/:fmsId/steps/:stepId/rows', requireAuth, async (req, res
     });
 
     // Build response in format frontend expects: {sheetRowNumber, planValue, data:{...}}
+    // Extra-input columns ki abhi ki value -- Done form me pehle se bhari
+    // aati hai (Order Entry me WhatsApp waghera edit karne ke liye)
+    const extraCols = [...fmsStepCols(step)];
     const rows = pending.map(({ row, sheetRow }) => {
       const data = {};
       cols.forEach(c => { data[c.key] = row[c.idx] !== undefined ? String(row[c.idx]) : ''; });
+      const cells = {};
+      extraCols.forEach(c => { const i = colLetterToIdx(c); if (i >= 0) cells[c] = String(row[i] == null ? '' : row[i]); });
       return {
         sheetRowNumber: sheetRow,
         planValue: planIdx >= 0 ? (row[planIdx] || '') : '',
-        data
+        data, cells
       };
     });
 
@@ -7262,7 +7319,10 @@ app.get('/api/fms-tasks/:fmsId/steps/:stepId/rows', requireAuth, async (req, res
         }
       }
     }
-    res.json({ rows, headers: cols.map(c => c.key), total: rows.length, allHeaders: headers, emptyWhy, emptyNote });
+    // Order Entry step par "Add Manual Order" ka button dikhana hai ya nahi
+    const isEntry = stepIdx === fmsEntryStepIdx(fms);
+    res.json({ rows, headers: cols.map(c => c.key), total: rows.length, allHeaders: headers, emptyWhy, emptyNote,
+      isEntry, skipRule: !!skipPlan });
   } catch(err) {
     let msg = err.message || 'Unknown error';
     if (msg.includes('403')) msg = 'Access denied — FMS sheet ko service account ke saath share karo';
@@ -7690,7 +7750,12 @@ app.get('/api/fms-tracking/:fmsId', requireAuth, async (req, res) => {
     let lastCol = 8;   // pehle 8 columns entry ki pehchan ke liye
     for (const s of fms.steps) {
       lastCol = Math.max(lastCol, colLetterToIdx(s.planCol || '') + 1, colLetterToIdx(s.actualCol || '') + 1);
+      // Order Entry ke 4 khaane bhi chahiye ("seedha Delivery" niyam ke liye)
+      for (const c of fmsStepCols(s)) lastCol = Math.max(lastCol, colLetterToIdx(c) + 1);
     }
+    // Niyam wale khaane kisi step me set na hon to bhi sheet ke shuru ke
+    // 30 columns me milne chahiye
+    if (FMS_SKIP_RULES.some(r => r.match.test(fms.fms_name || ''))) lastCol = Math.max(lastCol, 30);
     const endCol = idxToColLetter(Math.max(7, lastCol - 1));
 
     const [allUsers, response] = await Promise.all([
@@ -7710,10 +7775,9 @@ app.get('/api/fms-tracking/:fmsId', requireAuth, async (req, res) => {
     const isDone = v => { const s = String(v || '').trim(); return s !== '' && s.toUpperCase() !== 'FALSE'; };
     // Wahi rule jo pending-rows endpoint me hai: jis step ka Planned column
     // is row me khali hai, wo step is row par lagu hi nahi hota.
-    const isRelevant = (row, s) => {
-      const p = colLetterToIdx(s.planCol || '');
-      return p < 0 || String(row[p] || '').trim() !== '';
-    };
+    // (Online FMS ka "seedha Delivery" niyam bhi yahi lagta hai)
+    const skipPlan = fmsSkipPlan(fms, headers);
+    const isRelevant = (row, s, si) => fmsStepRelevant(skipPlan, row, s, si);
     const hasRealData = row => {
       for (let i = 0; i < Math.min(10, headers.length); i++) {
         const v = String(row[i] || '').trim();
@@ -7744,7 +7808,7 @@ app.get('/api/fms-tracking/:fmsId', requireAuth, async (req, res) => {
       const per = [];
       let current = null, doneCount = 0, applicable = 0;
       fms.steps.forEach((s, si) => {
-        const rel = isRelevant(row, s);
+        const rel = isRelevant(row, s, si);
         const aIdx = colLetterToIdx(s.actualCol || '');
         const done = rel && aIdx >= 0 && isDone(row[aIdx]);
         if (rel) { applicable++; if (done) doneCount++; }
@@ -7762,7 +7826,8 @@ app.get('/api/fms-tracking/:fmsId', requireAuth, async (req, res) => {
       rows.push({
         sheetRow: headerRow + i + 1, data, steps: per,
         currentStep: current, doneCount, applicable,
-        complete: applicable > 0 && doneCount === applicable
+        complete: applicable > 0 && doneCount === applicable,
+        direct: fmsRowSkips(skipPlan, row)     // manufacturing chhod kar seedha Delivery
       });
     });
 
@@ -7789,6 +7854,19 @@ app.post('/api/fms-tasks/:fmsId/steps/:stepId/done', requireAuth, async (req, re
 
     const { rowIndex, actualValue, delayReason, doerName, extraFields } = req.body;
     if (!rowIndex) return res.status(400).json({ error: 'rowIndex required' });
+
+    // Sirf us step ka doer (ya admin) -- screen par bhi step usi ko dikhta hai
+    if (req.session.role !== 'admin' && !(Array.isArray(step.doers) ? step.doers : []).map(String).includes(String(req.session.userId)))
+      return res.status(403).json({ error: 'Ye step aapko assign nahi hai' });
+
+    // Doer sirf apne step ke columns me likh sakta hai (FMS Admin me us step
+    // ke extra-input columns). Pehle browser jo bhi column bhejta, wahi likh
+    // jaata -- Order Entry ka doer online order ka koi bhi khaana badal sakta tha.
+    if (Array.isArray(extraFields) && extraFields.length) {
+      const allowed = fmsStepCols(step);
+      const bad = extraFields.map(ef => String((ef && ef.col) || '').trim().toUpperCase()).filter(c => c && !allowed.has(c));
+      if (bad.length) return res.status(400).json({ error: `Column ${bad.join(', ')} is step me edit nahi ho sakta` });
+    }
 
     const spreadsheetId = extractSheetId(fms.sheet_id);
     const updates = [];
@@ -7864,6 +7942,169 @@ app.post('/api/fms-tasks/:fmsId/steps/:stepId/done', requireAuth, async (req, re
     if (msg.includes('403')) msg = 'Access denied — sheet ko service account ke saath Editor access de';
     res.status(500).json({ error: msg });
   }
+});
+
+// ══════════════════════════════════════════════════════
+// MANUAL ORDER (Online FMS, Step 1 Order Entry) -- 13 khaane, sab zaroori
+// ══════════════════════════════════════════════════════
+// Online (API) order sheet me khud aate hain; jo order team haath se leti hai
+// wo yahan se FMS tab me NAYI ROW ban kar jaata hai. Column sheet ke header
+// ke NAAM se milte hain (pehle bilkul same naam, phir "naam me shaamil").
+const FMS_MANUAL_FIELDS = [
+  { key: 'poOrder',  label: 'PO / Order number', names: ['po order number', 'order number', 'po order no'] },
+  { key: 'dod',      label: 'Date of Delivery', type: 'date', names: ['date of delivery', 'delivery date'] },
+  { key: 'timestamp', label: 'Timestamp', type: 'auto', names: ['timestamp'] },
+  { key: 'po',       label: 'PO number', names: ['po number', 'po no'] },
+  { key: 'party',    label: 'Party Name', names: ['party name', 'party'] },
+  { key: 'email',    label: 'Email', type: 'email', names: ['email', 'email id'] },
+  { key: 'phone',    label: 'WhatsApp Phone Number', type: 'tel', names: ['whatsapp phone number', 'whatsapp'] },
+  { key: 'billing',  label: 'Billing Address', type: 'textarea', names: ['billing address'] },
+  { key: 'shipping', label: 'Shipping Address', type: 'textarea', names: ['shipping address'] },
+  { key: 'qty',      label: 'Total Qty', type: 'number', names: ['total qty', 'total quantity', 'qty'] },
+  { key: 'photo',    label: 'Order Photo', type: 'image', names: ['order photo', 'photo'] },
+  { key: 'stock',    label: 'Piece in Stock ?', type: 'yesno', names: ['piece in stock', 'in stock', 'stock'] },
+  { key: 'website',  label: 'Website Order?', type: 'yesno', names: ['website order'] }
+];
+// Har field ka column (index) -- ek column do field ko nahi milta
+function fmsManualMap(headers) {
+  const H = (headers || []).map(fmsNorm), used = new Set(), map = {};
+  for (const f of FMS_MANUAL_FIELDS) {
+    let idx = -1;
+    for (const n of f.names) { idx = H.findIndex((h, i) => !used.has(i) && h === n); if (idx >= 0) break; }
+    if (idx < 0) for (const n of f.names) { idx = H.findIndex((h, i) => !used.has(i) && h.includes(n)); if (idx >= 0) break; }
+    if (idx >= 0) used.add(idx);
+    map[f.key] = idx;
+  }
+  const srcIdx = H.findIndex((h, i) => !used.has(i) && (h === 'order source' || h === 'source'));
+  return { map, srcIdx, missing: FMS_MANUAL_FIELDS.filter(f => map[f.key] < 0).map(f => f.label) };
+}
+// FMS, uska Order Entry step, aur kya ye banda use chala sakta hai
+async function fmsManualCtx(req) {
+  const d = await getDB();
+  const fmsRow = await d.findOne('FMS_Config', { id: String(req.params.fmsId) });
+  if (!fmsRow) return { status: 404, error: 'FMS not found' };
+  const fms = parseFMSRow(fmsRow);
+  const ei = fmsEntryStepIdx(fms);
+  if (ei < 0) return { status: 400, error: 'Is FMS me "Order Entry" naam ka step nahi hai — FMS Admin me pehla step "Order Entry" banao' };
+  const step = fms.steps[ei];
+  if (req.session.role !== 'admin' && !(Array.isArray(step.doers) ? step.doers : []).map(String).includes(String(req.session.userId)))
+    return { status: 403, error: 'Order Entry aapko assign nahi hai' };
+  return { d, fms, step, spreadsheetId: extractSheetId(fms.sheet_id), headerRow: parseInt(fms.header_row) || 1 };
+}
+const fmsManualErr = (res, err) => {
+  let msg = err.message || 'Unknown error';
+  if (msg.includes('403')) msg = 'Access denied — sheet ko service account ke saath Editor access do';
+  if (msg.includes('404')) msg = 'Sheet not found — FMS config me Sheet ID/Tab check karo';
+  res.status(500).json({ error: msg });
+};
+
+// GET — form ke khaane + sheet me kaunse column nahi mile
+app.get('/api/fms-tasks/:fmsId/manual-order', requireAuth, async (req, res) => {
+  try {
+    const c = await fmsManualCtx(req);
+    if (c.error) return res.status(c.status).json({ error: c.error });
+    const all = await readSheetCached(c.d, c.spreadsheetId, `${c.fms.sheet_name}!A${c.headerRow}:ZZ${c.headerRow}`);
+    const m = fmsManualMap(all[0] || []);
+    res.json({ fields: FMS_MANUAL_FIELDS.map(({ key, label, type }) => ({ key, label, type: type || 'text' })), missing: m.missing });
+  } catch (err) { fmsManualErr(res, err); }
+});
+
+// POST — naya manual order FMS tab me nayi row
+app.post('/api/fms-tasks/:fmsId/manual-order', requireAuth, async (req, res) => {
+  try {
+    const c = await fmsManualCtx(req);
+    if (c.error) return res.status(c.status).json({ error: c.error });
+    const { d, fms, step, spreadsheetId, headerRow } = c;
+    const body = (req.body && req.body.order) || {};
+
+    // Sab zaroori -- koi khaana khali nahi
+    const val = {};
+    for (const f of FMS_MANUAL_FIELDS) {
+      if (f.type === 'auto') continue;
+      const v = String(body[f.key] == null ? '' : body[f.key]).trim();
+      if (!v) return res.status(400).json({ error: `"${f.label}" bharna zaroori hai` });
+      if (f.type === 'date') {
+        const m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (!m) return res.status(400).json({ error: `"${f.label}" ki date galat hai` });
+        val[f.key] = `${m[3]}/${m[2]}/${m[1]}`;          // sheet jaisa dd/mm/yyyy
+        continue;
+      }
+      if (f.type === 'tel' && !/^\+?\d{10,13}$/.test(v.replace(/[\s-]/g, '')))
+        return res.status(400).json({ error: `"${f.label}" me 10 digit ka number daalo` });
+      if (f.type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v))
+        return res.status(400).json({ error: `"${f.label}" sahi email nahi hai` });
+      if (f.type === 'number' && !(parseFloat(v) > 0))
+        return res.status(400).json({ error: `"${f.label}" 0 se zyada hona chahiye` });
+      if (f.type === 'yesno' && !['Yes', 'No'].includes(v))
+        return res.status(400).json({ error: `"${f.label}" me Yes ya No chuno` });
+      if (f.type === 'image' && !/^https?:\/\//i.test(v))
+        return res.status(400).json({ error: `"${f.label}" ki photo upload karo` });
+      val[f.key] = f.type === 'tel' ? v.replace(/[\s-]/g, '') : v;
+    }
+    val.timestamp = fmsEntryTimestamp();
+
+    // Poori sheet (header, aakhri row, formulas) -- formula wale columns nayi
+    // row me copy karne hain, warna aage ke steps ka Planned nahi banega
+    const tab = fms.sheet_name;
+    const [meta, valResp, fResp] = await Promise.all([
+      withRetry(() => d.sheets.spreadsheets.get({ spreadsheetId, fields: 'sheets(properties(title,sheetId,gridProperties(rowCount,columnCount)))' })),
+      withRetry(() => d.sheets.spreadsheets.values.get({ spreadsheetId, range: `${tab}!A1:ZZ` })),
+      withRetry(() => d.sheets.spreadsheets.values.get({ spreadsheetId, range: `${tab}!A1:ZZ`, valueRenderOption: 'FORMULA' }))
+    ]);
+    const sh = (meta.data.sheets || []).find(s => s.properties.title === tab);
+    if (!sh) return res.status(404).json({ error: `Sheet me "${tab}" tab nahi mila` });
+    const all = valResp.data.values || [], fAll = fResp.data.values || [];
+    const headers = all[headerRow - 1] || [];
+    const m = fmsManualMap(headers);
+    if (m.missing.length) return res.status(400).json({ error: `Sheet me ye columns nahi mile: ${m.missing.join(', ')}` });
+
+    // Aakhri ASLI row (FALSE/TRUE wale checkbox data nahi) -- wahi naqsha bhi
+    const isReal = r => (r || []).slice(0, 10).some(v => { const s = String(v || '').trim().toUpperCase(); return s && s !== 'FALSE' && s !== 'TRUE'; });
+    let last = -1;
+    for (let i = headerRow; i < all.length; i++) if (isReal(all[i])) last = i;
+    const newRow = (last >= 0 ? last : headerRow - 1) + 2;           // 1-based
+    const grid = sh.properties.gridProperties || {};
+    if (grid.rowCount && newRow > grid.rowCount) {
+      await withRetry(() => d.sheets.spreadsheets.batchUpdate({ spreadsheetId, requestBody: { requests: [{ appendDimension: {
+        sheetId: sh.properties.sheetId, dimension: 'ROWS', length: newRow - grid.rowCount + 100 } }] } }));
+    }
+
+    // Likhne wale khaane: 13 field + Order Entry ka Actual + Source
+    const cells = {};
+    for (const f of FMS_MANUAL_FIELDS) cells[m.map[f.key]] = f.type === 'date' || f.type === 'auto' ? val[f.key] : sheetSafeText(val[f.key]);
+    const now = new Date(Date.now() + 5.5 * 3600 * 1000);
+    const today = `${String(now.getUTCDate()).padStart(2, '0')}/${String(now.getUTCMonth() + 1).padStart(2, '0')}/${now.getUTCFullYear()}`;
+    const aIdx = colLetterToIdx(step.actualCol || '');
+    if (aIdx >= 0 && cells[aIdx] === undefined) cells[aIdx] = today;
+    if (m.srcIdx >= 0) cells[m.srcIdx] = 'Manual';
+
+    // Upar wali row ke SIRF formula cells copy (value wale nahi -- warna
+    // pichhle order ke Actual bhi aa jaate aur naya order "done" dikhta)
+    const reqs = [];
+    if (last >= 0) {
+      const fr = fAll[last] || [];
+      const width = Math.min(Math.max(headers.length, fr.length), grid.columnCount || 702);
+      let s = -1;
+      for (let ci = 0; ci <= width; ci++) {
+        const isF = ci < width && cells[ci] === undefined && /^=/.test(String(fr[ci] == null ? '' : fr[ci]));
+        if (isF && s < 0) s = ci;
+        if (!isF && s >= 0) {
+          reqs.push({ copyPaste: {
+            source: { sheetId: sh.properties.sheetId, startRowIndex: last, endRowIndex: last + 1, startColumnIndex: s, endColumnIndex: ci },
+            destination: { sheetId: sh.properties.sheetId, startRowIndex: newRow - 1, endRowIndex: newRow, startColumnIndex: s, endColumnIndex: ci },
+            pasteType: 'PASTE_FORMULA' } });
+          s = -1;
+        }
+      }
+    }
+    if (reqs.length) await withRetry(() => d.sheets.spreadsheets.batchUpdate({ spreadsheetId, requestBody: { requests: reqs } }));
+    await withRetry(() => d.sheets.spreadsheets.values.batchUpdate({ spreadsheetId, requestBody: {
+      valueInputOption: 'USER_ENTERED',
+      data: Object.keys(cells).map(ci => ({ range: `${tab}!${idxToColLetter(+ci)}${newRow}`, values: [[cells[ci]]] }))
+    } }));
+    clearSheetCache(spreadsheetId);
+    res.json({ success: true, row: newRow });
+  } catch (err) { fmsManualErr(res, err); }
 });
 
 // ══════════════════════════════════════════════════════

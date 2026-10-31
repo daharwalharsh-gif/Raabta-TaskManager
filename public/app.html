@@ -843,6 +843,16 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
   .fms-top{position:static;margin:0;padding:0;}
   #fmsList .ob-listcard{max-height:80vh;}
 }
+/* FMS Manual Order form */
+.fms-man-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;max-height:62vh;overflow-y:auto;padding-right:4px;}
+.fms-man-grid .full{grid-column:1/-1;}
+.fms-man-grid label{font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;}
+.fms-man-grid label b{color:#ef4444;}
+.fms-man-grid input,.fms-man-grid select,.fms-man-grid textarea{width:100%;padding:8px 11px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;background:#fff;}
+.fms-man-grid textarea{resize:vertical;min-height:54px;}
+.fms-man-grid .bad{border-color:#ef4444;}
+.fms-man-st{font-size:11px;margin-top:4px;color:#64748b;}
+@media(max-width:600px){ .fms-man-grid{grid-template-columns:1fr;} }
 /* FMS Workflow view */
 .fms-vtabs{display:inline-flex;background:#fff;border:1.5px solid #e2e8f0;border-radius:9px;padding:2px;gap:2px;}
 .fms-vtabs button{font-family:inherit;font-size:12.5px;font-weight:600;color:#475569;background:none;border:none;border-radius:7px;padding:5px 11px;cursor:pointer;}
@@ -3707,6 +3717,20 @@ button:disabled{opacity:.65;cursor:not-allowed !important;}
     <div class="modal-footer" style="justify-content:space-between">
       <button class="btn btn-outline" onclick="closeModal('fmsDoneModal')">Cancel</button>
       <button class="btn btn-green" onclick="saveFMSDone()" id="fmsDoneSaveBtn">💾 Save to Sheet</button>
+    </div>
+  </div>
+</div>
+
+<!-- Online FMS: Manual Order (Step 1 Order Entry) -- 13 khaane, sab zaroori -->
+<div class="modal-overlay" id="fmsManualModal">
+  <div class="modal" style="max-width:640px">
+    <h3>➕ Add Manual Order</h3>
+    <div style="font-size:12px;color:#64748b;margin:-4px 0 12px">All fields are mandatory. The order is added as a new row in the FMS sheet.</div>
+    <div class="alert error" id="fmsManualErr"></div>
+    <div id="fmsManualFields" class="fms-man-grid"></div>
+    <div class="modal-footer" style="justify-content:space-between">
+      <button class="btn btn-outline" onclick="closeModal('fmsManualModal')">Cancel</button>
+      <button class="btn btn-green" onclick="saveFMSManualOrder()" id="fmsManualSaveBtn">💾 Save Order</button>
     </div>
   </div>
 </div>
@@ -13275,6 +13299,7 @@ const FMS_FLOWS = [{
       'Order Photo', 'Piece in Stock ?', 'Website Order?']
   },
   steps: [
+    { keys: ['order entry'], title: 'Order Entry', desc: 'Online order: fill only Date of Delivery, WhatsApp, In Stock? and Website Order?. Manual order: 13-field form.', doer: '', icon: '&#128221;' },
     { keys: ['personal message'], title: 'Send Personal Message to Client for Assistance', desc: 'Confirm details / support as needed.', doer: 'Automate', auto: true, icon: '&#9881;&#65039;' },
     { keys: ['process piece'], title: 'Process piece for production', desc: 'Send to production team for manufacturing.', doer: 'PM', icon: '&#128100;' },
     { keys: ['follow up with vendor'], title: 'Follow up with vendor', desc: 'Check status, confirm timelines, and keep vendor updated.', doer: 'PM', icon: '&#128101;' },
@@ -13294,6 +13319,7 @@ const FMS_FLOWS = [{
   notes: ['All 13 fields in the manual order form are mandatory (no optional fields).',
     'Step 1 has two entry methods: API (online orders) and Manual (form).',
     '"Piece in Stock?" and "Website Order?" are conditional fields (as per order type).',
+    'When Date of Delivery, WhatsApp, Piece in Stock? and Website Order? are all filled, the order skips manufacturing (steps 3-9) and goes straight to Step 10 (Handover box for dispatch).',
     'Follow the steps in sequence for smooth and timely order fulfilment.']
 }];
 const FMS_COLORS = ['#2563eb', '#059669', '#7c3aed', '#0284c7', '#0d9488', '#db2777', '#6d28d9', '#0369a1', '#16a34a', '#4f46e5', '#0891b2', '#d97706', '#e11d48', '#1d4ed8', '#15803d'];
@@ -13301,7 +13327,12 @@ let _fmsView = 'tasks';       // 'tasks' | 'flow'
 
 function fmsFlow() { return FMS_FLOWS.find(fl => fl.match.test(window._fmsName || '')) || null; }
 // Order Entry (Step 1) FMS Admin ke steps me nahi hota -- flow me ho to number +1
-function fmsOffset() { const fl = fmsFlow(); return fl && fl.entry ? 1 : 0; }
+// FMS Admin me "Order Entry" step bana diya ho to wahi Step 1 hai -- +1 nahi
+function fmsOffset() {
+  const fl = fmsFlow();
+  return fl && fl.entry && !(window._fmsAllSteps || []).some(fmsIsEntry) ? 1 : 0;
+}
+function fmsIsEntry(s) { return !!s && /order\s*entry/i.test(s.step_name || ''); }
 function fmsNo(s) { return (s ? s.step_order : 0) + fmsOffset(); }
 function fmsColor(s) { return FMS_COLORS[((s ? s.step_order : 1) - 1) % FMS_COLORS.length]; }
 // Step ke naam se flow wala step (spelling ki chhoti galti -- "Recieved" -- bhi chale)
@@ -13343,7 +13374,7 @@ function fmsRenderFlow() {
   h += '<div class="fms-flow-grid">' + steps.map(s => {
     const fs = fmsFlowStep(s), col = fmsColor(s), mine = fmsIsMine(s), c = mine ? fmsStepCounts(s.id) : null;
     const users = (s.doers || []).map(d => d.name).join(', ');
-    const doer = fs ? fs.doer : (users || '—');
+    const doer = fs && fs.doer ? fs.doer : (users || '—');
     let stat = '';
     if (!mine) stat = '<span class="ob-chip na">&#128274; Not assigned</span>';
     else if (!c) stat = '<span class="ob-chip na">&#9203; loading…</span>';
@@ -13520,6 +13551,7 @@ function fmsRenderList() {
   el.innerHTML = '<div class="ob-listcard"><div class="ob-listhead"><div class="ob-num sm" style="background:' + fmsColor(s) + '">' + fmsNo(s) + '</div>' +
     '<h4>' + obE(s.step_name) + '<span>&#128100; ' + obE(doers) + (c && c.late ? ' &middot; <b style="color:#b91c1c">' + c.late + ' late</b>' : '') + (c && c.today ? ' &middot; <b style="color:#92400e">' + c.today + ' due today</b>' : '') + '</span></h4>' +
     '<span id="fmsStepCount_' + s.id + '" style="font-size:13px;font-weight:600"></span>' +
+    (fmsIsEntry(s) ? '<button class="btn btn-green btn-sm" onclick="openFMSManualOrder(' + s.id + ')">&#10133; Add Manual Order</button>' : '') +
     '<button class="btn btn-outline btn-sm" onclick="loadFMSStepRows(' + s.id + ')" id="fmsStepBtn_' + s.id + '">&#128260; Refresh</button></div>' +
     '<div id="fmsStepRows_' + s.id + '" style="padding:8px 12px 12px"><div style="padding:16px;text-align:center;color:#94a3b8;font-size:13px">&#9203; Loading...</div></div></div>';
   fmsSetCountLabel(s.id);
@@ -13622,7 +13654,8 @@ function fmsAllRows() {
       '<td><div class="ob-mini"><div class="ob-pbar"><i style="width:' + pct + '%"></i></div>' + r.doneCount + '/' + r.applicable + '</div></td>' +
       '<td class="ob-dt">' + (cur && cur.planned ? fmsPlanCell(cur.planned) : '—') + '</td>' +
       '<td>' + obE(cur ? (cur.doers || []).join(', ') || '—' : '—') + '</td>' +
-      '<td>' + (r.complete ? '<span class="ob-chip done">&#10003; Completed</span>' : cur ? fmsChip(stat) : '<span class="ob-chip na">N/A</span>') + '</td></tr>';
+      '<td>' + (r.complete ? '<span class="ob-chip done">&#10003; Completed</span>' : cur ? fmsChip(stat) : '<span class="ob-chip na">N/A</span>') +
+        (r.direct && !r.complete ? ' <span class="ob-chip up" title="All 4 Order Entry fields are filled: manufacturing (steps 3-9) is skipped">&#128666; Direct</span>' : '') + '</td></tr>';
   }).join('');
 }
 
@@ -13940,12 +13973,37 @@ function openFMSDoneModal(stepId, rowIdx) {
       </div>`;
     }).join('');
     extraSection.style.display = 'block';
+    fmsPrefillExtra(extraRows, row.cells || {});
   } else {
     extraSection.style.display = 'none';
     extraFieldsEl.innerHTML = '';
   }
 
   document.getElementById('fmsDoneModal').classList.add('open');
+}
+
+// Sheet me pehle se jo likha hai wahi form me bhar do -- Order Entry par
+// online order ka WhatsApp / Date of Delivery dobara type nahi karna padta,
+// sirf badalna ho to badlo. (31 Oct 2026)
+function fmsPrefillExtra(extraRows, cells) {
+  extraRows.forEach((r, i) => {
+    const v = String(cells[String(r.col_letter || '').trim().toUpperCase()] || '').trim();
+    const el = document.getElementById(`fmsExtra_${i}`);
+    if (!v || !el || el.type === 'hidden' || v.toUpperCase() === 'FALSE') return;
+    if (el.tagName === 'SELECT') {
+      const opt = [...el.options].find(o => o.value && o.value !== '__OTHER__' && o.value.toLowerCase() === v.toLowerCase());
+      if (opt) el.value = opt.value;
+      else { el.value = '__OTHER__'; onFMSDropChange(i); const o = document.getElementById(`fmsExtraOther_${i}`); if (o) o.value = v; }
+      return;
+    }
+    if (el.type === 'date') {
+      const m = v.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/);
+      if (m) el.value = `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+      else if (/^\d{4}-\d{2}-\d{2}/.test(v)) el.value = v.slice(0, 10);
+      return;
+    }
+    el.value = v;
+  });
 }
 
 // Done modal me is field ka config nikaalo
@@ -14199,6 +14257,72 @@ async function saveFMSDone() {
     if (_fmsTrack) _fmsTrack = null;
     fmsRender();
   }
+}
+
+// ══ Manual Order (Online FMS, Order Entry step) ══
+// Khaane server batata hai (sheet ke header se milaa kar); koi column sheet
+// me na ho to form khulne se pehle hi bata do, bharne ke baad nahi.
+let _fmsManual = null;     // { stepId, fields }
+async function openFMSManualOrder(stepId) {
+  const r = await api(`/api/fms-tasks/${fmsTasksActiveFmsId}/manual-order`);
+  if (r.error) { showToast('⚠️ ' + r.error); return; }
+  if (r.missing && r.missing.length) { showToast('⚠️ Sheet me ye columns nahi mile: ' + r.missing.join(', ')); return; }
+  _fmsManual = { stepId, fields: (r.fields || []).filter(f => f.type !== 'auto') };
+  document.getElementById('fmsManualErr').style.display = 'none';
+  document.getElementById('fmsManualFields').innerHTML = _fmsManual.fields.map(f => {
+    const id = 'fmsMan_' + f.key;
+    let inp;
+    if (f.type === 'textarea') inp = `<textarea id="${id}"></textarea>`;
+    else if (f.type === 'yesno') inp = `<select id="${id}"><option value="">-- Select --</option><option>Yes</option><option>No</option></select>`;
+    else if (f.type === 'image') inp = `<input type="hidden" id="${id}"/><input type="file" accept="image/*" id="${id}_file" onchange="fmsManualPhoto('${f.key}')"/><div class="fms-man-st" id="${id}_st"></div>`;
+    else inp = `<input type="${f.type === 'tel' ? 'tel' : f.type === 'email' ? 'email' : f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}" id="${id}"${f.type === 'number' ? ' min="1"' : ''}${f.type === 'tel' ? ' maxlength="13" inputmode="numeric"' : ''}/>`;
+    return `<div class="${f.type === 'textarea' || f.type === 'image' ? 'full' : ''}"><label>${obE(f.label)} <b>*</b></label>${inp}</div>`;
+  }).join('');
+  document.getElementById('fmsManualModal').classList.add('open');
+}
+
+async function fmsManualPhoto(key) {
+  const id = 'fmsMan_' + key, fileEl = document.getElementById(id + '_file'), hidden = document.getElementById(id), st = document.getElementById(id + '_st');
+  const btn = document.getElementById('fmsManualSaveBtn');
+  const file = fileEl.files && fileEl.files[0];
+  hidden.value = '';
+  if (!file) { st.textContent = ''; return; }
+  if (file.size > FMS_UPLOAD_MAX_MB * 1024 * 1024) { st.innerHTML = `<span style="color:#ef4444">⚠️ File must be under ${FMS_UPLOAD_MAX_MB} MB</span>`; fileEl.value = ''; return; }
+  st.textContent = '⏳ Uploading…'; btn.disabled = true;
+  const dataUrl = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = () => res(null); fr.readAsDataURL(file); });
+  const r = dataUrl ? await api('/api/fms-uploads', 'POST', { fmsId: fmsTasksActiveFmsId, stepId: _fmsManual && _fmsManual.stepId,
+    rowIndex: '', colLetter: '', fieldType: 'image', fileName: file.name, mimeType: file.type, dataUrl }) : { error: 'File could not be read' };
+  btn.disabled = false;
+  if (r.error) { st.innerHTML = `<span style="color:#ef4444">⚠️ ${obE(r.error)}</span>`; fileEl.value = ''; return; }
+  hidden.value = r.url;
+  st.innerHTML = `<span style="color:#16a34a">✅ ${obE(r.fileName)} uploaded</span> — <a href="${r.url}" target="_blank">open</a>`;
+}
+
+async function saveFMSManualOrder() {
+  if (!_fmsManual) return;
+  const errEl = document.getElementById('fmsManualErr'), btn = document.getElementById('fmsManualSaveBtn');
+  errEl.style.display = 'none';
+  const order = {};
+  for (const f of _fmsManual.fields) {
+    const el = document.getElementById('fmsMan_' + f.key);
+    const v = el ? String(el.value || '').trim() : '';
+    const box = f.type === 'image' ? document.getElementById('fmsMan_' + f.key + '_file') : el;
+    if (box) box.classList.toggle('bad', !v);
+    if (!v) {
+      errEl.textContent = f.type === 'image' ? `Upload "${f.label}"` : `"${f.label}" is required`;
+      errEl.style.display = 'block'; if (box) box.focus(); return;
+    }
+    order[f.key] = v;
+  }
+  btn.disabled = true; btn.textContent = '⏳ Saving...';
+  const r = await api(`/api/fms-tasks/${fmsTasksActiveFmsId}/manual-order`, 'POST', { order });
+  btn.disabled = false; btn.textContent = '💾 Save Order';
+  if (r.error) { errEl.textContent = r.error; errEl.style.display = 'block'; return; }
+  closeModal('fmsManualModal');
+  showToast(`✅ Manual order added (sheet row ${r.row})`);
+  // Naya order Order Entry par done likha jaata hai -- aage ke steps taaza karo
+  _fmsTrack = null;
+  (window._fmsAllSteps || []).filter(fmsIsMine).forEach(s => loadFMSStepRows(s.id));
 }
 
 // ══════════════════════════════════════════════════════
