@@ -874,7 +874,45 @@ tr.fms-ent-pend td:first-child{box-shadow:inset 3px 0 0 #f59e0b;}
 .fms-mf-g textarea.ro{background:#f8fafc;color:#64748b;}
 .fms-mf .bad{border-color:#ef4444 !important;box-shadow:0 0 0 3px rgba(239,68,68,.12);}
 .fms-man-hint{font-size:11px;color:#4f46e5;font-weight:600;margin-top:3px;min-height:14px;}
-.fms-same{grid-column:1/-1;display:flex !important;align-items:center;gap:7px;font-size:12px !important;color:#475569 !important;cursor:pointer;margin:0 !important;}
+.fms-man-hint.err{color:#dc2626;}
+.fms-lbl{display:flex;align-items:center;gap:8px;margin-bottom:4px;}
+.fms-lbl > label{margin:0 !important;}
+.fms-same{margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:#4338ca;font-weight:600;background:#eef2ff;border-radius:6px;padding:2px 8px;}
+.fms-same input{width:13px;height:13px;margin:0;accent-color:#4f46e5;cursor:pointer;}
+.fms-same label{margin:0 !important;font-size:11.5px !important;color:#4338ca !important;cursor:pointer;}
+.fms-mf-head{display:flex;align-items:center;gap:10px;}
+.fms-mf-head h3{margin:0;}
+.fms-mf-draft{font-size:11.5px;font-weight:600;color:#92400e;background:#fef3c7;border-radius:6px;padding:2px 8px;}
+.fms-mf-clear{margin-left:auto;background:none;border:1px solid #e2e8f0;border-radius:7px;padding:4px 10px;font-family:inherit;font-size:12px;color:#64748b;cursor:pointer;}
+.fms-mf-clear:hover{color:#b91c1c;border-color:#fecaca;}
+.fms-mf-sub{margin-top:6px !important;}
+.fms-drop{gap:10px;}
+.fms-drop .ic{font-size:24px;}
+.fms-drop small{color:#94a3b8;font-size:11px;}
+.fms-drop.over{background:#e0e7ff;border-color:#6366f1;}
+.fms-thumbs{display:grid !important;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:10px !important;}
+.fms-ph{position:relative;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;background:#fff;display:flex;flex-direction:column;}
+.fms-ph img,.fms-ph .ph-ph{width:100%;height:96px;object-fit:cover;background:#f1f5f9;cursor:zoom-in;display:flex;align-items:center;justify-content:center;font-size:26px;color:#94a3b8;}
+.fms-ph.up img{opacity:.55;}
+.fms-ph.err{border-color:#fecaca;}
+.ph-cover{position:absolute;top:5px;left:5px;background:#4f46e5;color:#fff;font-size:10px;font-weight:700;border-radius:5px;padding:1px 6px;z-index:1;}
+.ph-name{font-size:11px;color:#334155;padding:4px 7px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ph-up{padding:4px 7px 7px;display:flex;align-items:center;gap:6px;font-size:11px;color:#475569;flex-wrap:wrap;}
+.ph-bar{flex:1 1 100%;height:5px;background:#e2e8f0;border-radius:4px;overflow:hidden;}
+.ph-bar i{display:block;height:100%;background:#6366f1;transition:width .2s;}
+.ph-x{margin-left:auto;background:none;border:none;color:#b91c1c;font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;padding:0;}
+.ph-err{font-size:11px;color:#b91c1c;padding:3px 7px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ph-acts{display:flex;gap:2px;padding:5px 5px 6px;justify-content:space-between;}
+.ph-acts button{flex:1;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;padding:3px 0;cursor:pointer;font-family:inherit;color:#334155;}
+.ph-acts button:hover{background:#eef2ff;border-color:#c7d2fe;}
+.ph-acts button.del:hover{background:#fef2f2;border-color:#fecaca;color:#b91c1c;}
+.fms-imgview{position:fixed;inset:0;background:rgba(15,23,42,.88);z-index:3000;display:none;align-items:center;justify-content:center;}
+.fms-imgview.open{display:flex;}
+.fms-imgview img{max-width:88vw;max-height:84vh;border-radius:8px;box-shadow:0 10px 40px rgba(0,0,0,.5);background:#fff;}
+.iv-x{position:absolute;top:14px;right:18px;background:none;border:none;color:#fff;font-size:34px;cursor:pointer;line-height:1;}
+.iv-nav{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;border:none;background:rgba(255,255,255,.15);color:#fff;font-size:28px;cursor:pointer;}
+.iv-nav.l{left:16px;} .iv-nav.r{right:16px;}
+.iv-name{position:absolute;bottom:16px;left:0;right:0;text-align:center;color:#e2e8f0;font-size:13px;}
 .fms-yn{display:flex;gap:8px;border-radius:10px;}
 .fms-yn button{flex:1;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;background:#fff;font-family:inherit;font-size:13px;font-weight:600;color:#475569;cursor:pointer;}
 .fms-yn button:hover{border-color:#c7d2fe;}
@@ -3792,15 +3830,28 @@ tr.fms-ent-pend td:first-child{box-shadow:inset 3px 0 0 #f59e0b;}
   </div>
 </div>
 
+<!-- Manual order ki photo ka bada preview -->
+<div class="fms-imgview" id="fmsImgView" onclick="if(event.target===this)fmsImgClose()">
+  <button type="button" class="iv-x" onclick="fmsImgClose()" title="Close (Esc)">&times;</button>
+  <button type="button" class="iv-nav l" onclick="fmsImgStep(-1)" title="Previous">&#8249;</button>
+  <img id="fmsImgViewImg" alt=""/>
+  <button type="button" class="iv-nav r" onclick="fmsImgStep(1)" title="Next">&#8250;</button>
+  <div class="iv-name" id="fmsImgViewName"></div>
+</div>
+
 <!-- Online FMS: Manual Order (Step 1 Order Entry) -- 13 khaane, sab zaroori -->
 <div class="modal-overlay" id="fmsManualModal">
-  <div class="modal fms-mf" style="max-width:720px">
-    <h3>➕ Add Manual Order</h3>
-    <div class="fms-mf-sub">All fields are required. The order is saved to the FMS sheet and starts at Step 1 Order Entry.</div>
+  <div class="modal fms-mf" style="max-width:740px">
+    <div class="fms-mf-head"><h3>➕ Add Manual Order</h3>
+      <span id="fmsManDraftNote" class="fms-mf-draft" style="display:none">📝 Draft restored</span>
+      <button type="button" class="fms-mf-clear" onclick="fmsManClear()">↺ Clear form</button></div>
+    <div class="fms-mf-sub">All fields are required. The order is saved to the FMS sheet and starts at Step 1 Order Entry. Unsaved work is kept as a draft.</div>
     <div id="fmsManualFields" class="fms-mf-body"></div>
     <div class="alert error" id="fmsManualErr" style="margin:10px 0 0"></div>
-    <div class="modal-footer" style="justify-content:space-between">
-      <button class="btn btn-outline" onclick="closeModal('fmsManualModal')">Cancel</button>
+    <div class="modal-footer" style="justify-content:space-between;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-outline" onclick="fmsManClose()">Cancel</button>
+      <span style="flex:1"></span>
+      <button class="btn btn-outline" onclick="saveFMSManualOrder(true)" id="fmsManualSaveNextBtn">💾 Save &amp; add another</button>
       <button class="btn btn-green" onclick="saveFMSManualOrder()" id="fmsManualSaveBtn">💾 Save Order</button>
     </div>
   </div>
@@ -14497,35 +14548,46 @@ async function saveFMSDone() {
 // ══ Manual Order (Online FMS, Order Entry step) ══
 // Khaane server batata hai (sheet ke header se milaa kar); koi column sheet
 // me na ho to form khulne se pehle hi bata do, bharne ke baad nahi.
-let _fmsManual = null;     // { fields, photos:[{url,name}] }
+let _fmsManual = null;     // { fields, photos:[{id,name,st,pct,url,thumb,xhr,err}], dirty }
 // Khaane server se aate hain (sheet me jo column hai); yahan sirf unka
 // kram / hissa tay hota hai -- Order, Customer, Address, Photo, Status.
 const FMS_MAN_SECTIONS = [
   ['&#128230; Order', ['poOrder', 'po', 'dod', 'qty']],
   ['&#128100; Customer', ['party', 'email', 'phone']],
   ['&#127968; Address', ['billing', 'shipping']],
-  ['&#128247; Order Photo', ['photo']],
+  ['&#128247; Order Photos', ['photo']],
   ['&#9989; Status', ['stock', 'website']]
 ];
+const FMS_MAN_PH_MAX = 1600;          // photo badi ho to is px tak chhoti (upload tez, DB halka)
+const fmsManDraftKey = () => 'fmsManDraft_' + fmsTasksActiveFmsId;
+let _fmsManSeq = 0;
+
 async function openFMSManualOrder() {
   const r = await api(`/api/fms-tasks/${fmsTasksActiveFmsId}/manual-order`);
   if (r.error) { showToast('⚠️ ' + r.error); return; }
   if (r.missing && r.missing.length) { showToast('⚠️ Sheet me ye columns nahi mile: ' + r.missing.join(', ')); return; }
-  _fmsManual = { fields: (r.fields || []).filter(x => x.type !== 'auto'), photos: [] };
+  _fmsManual = { fields: (r.fields || []).filter(x => x.type !== 'auto'), photos: [], dirty: false };
   const byKey = {}; _fmsManual.fields.forEach(x => { byKey[x.key] = x; });
   const inp = fl => {
     const id = 'fmsMan_' + fl.key;
-    if (fl.type === 'textarea') return `<textarea id="${id}" rows="3" placeholder="House / street, city, state, PIN"></textarea>`;
+    if (fl.type === 'textarea') return `<textarea id="${id}" rows="3" placeholder="House / street, area, city, state, PIN" oninput="fmsManTouch()"></textarea>`;
     if (fl.type === 'yesno') return `<input type="hidden" id="${id}"/><div class="fms-yn" id="${id}_yn">` +
       ['Yes', 'No'].map(o => `<button type="button" data-v="${o}" onclick="fmsManYN('${fl.key}','${o}')">${o === 'Yes' ? '&#10003; Yes' : '&#10005; No'}</button>`).join('') + '</div>';
     if (fl.type === 'image') return `<input type="hidden" id="${id}"/>
-      <label class="fms-drop" id="${id}_drop"><input type="file" accept="image/*" multiple id="${id}_file" onchange="fmsManualPhoto('${fl.key}')"/>
-        <span>&#128228; <b>Choose photos</b> &middot; one or more images, max ${FMS_UPLOAD_MAX_MB} MB each</span></label>
-      <div class="fms-thumbs" id="${id}_list"></div><div class="fms-man-st" id="${id}_st"></div>`;
-    if (fl.type === 'date') return `<input type="date" id="${id}" min="${fmsTodayStr()}" onchange="fmsManDate('${fl.key}')"/><div class="fms-man-hint" id="${id}_txt"></div>`;
+      <label class="fms-drop" id="${id}_drop" ondragover="event.preventDefault();this.classList.add('over')" ondragleave="this.classList.remove('over')"
+        ondrop="event.preventDefault();this.classList.remove('over');fmsManAddFiles(event.dataTransfer.files)">
+        <input type="file" accept="image/*" multiple id="${id}_file" onchange="fmsManAddFiles(this.files);this.value=''"/>
+        <span class="ic">&#128228;</span><span><b>Click to choose</b>, drag &amp; drop, or paste (Ctrl+V) photos<br>
+        <small>JPG / PNG / WEBP &middot; max ${FMS_UPLOAD_MAX_MB} MB each &middot; big photos are resized automatically</small></span></label>
+      <div class="fms-thumbs" id="fmsManPhotos"></div>
+      <input type="file" accept="image/*" id="fmsManReplace" style="display:none" onchange="fmsManReplaceGo(this.files);this.value=''"/>`;
+    if (fl.type === 'date') return `<input type="date" id="${id}" min="${fmsTodayStr()}" onchange="fmsManDate('${fl.key}');fmsManTouch()"/><div class="fms-man-hint" id="${id}_txt"></div>`;
     const t = fl.type === 'tel' ? 'tel' : fl.type === 'email' ? 'email' : fl.type === 'number' ? 'number' : 'text';
-    const ph = { poOrder: 'e.g. 1245', po: 'PO number', party: 'Customer / party name', email: 'name@example.com', phone: '10-digit number', qty: '1' }[fl.key] || '';
-    return `<input type="${t}" id="${id}" placeholder="${ph}"${t === 'number' ? ' min="1" step="1"' : ''}${t === 'tel' ? ' maxlength="13" inputmode="numeric"' : ''}/>`;
+    const ph = { poOrder: 'e.g. 1245', po: 'PO number', party: 'Customer / party name', email: 'name@example.com', phone: '10-digit mobile number', qty: '1' }[fl.key] || '';
+    const ev = fl.key === 'poOrder' ? ' onblur="fmsManCheckPO()"' : t === 'tel' ? ' oninput="this.value=this.value.replace(/[^0-9+]/g,\'\');fmsManPhoneHint()"'
+      : t === 'email' ? ' onblur="this.value=this.value.trim().toLowerCase();fmsManEmailHint()"' : '';
+    return `<input type="${t}" id="${id}" placeholder="${ph}" autocomplete="off"${t === 'number' ? ' min="1" step="1"' : ''}${t === 'tel' ? ' maxlength="13" inputmode="numeric"' : ''}${ev} oninput="fmsManTouch()"/>` +
+      (fl.key === 'poOrder' || t === 'tel' || t === 'email' ? `<div class="fms-man-hint" id="${id}_txt"></div>` : '');
   };
   const used = new Set();
   let h = FMS_MAN_SECTIONS.map(([title, keys]) => {
@@ -14534,98 +14596,319 @@ async function openFMSManualOrder() {
     if (!fl.length) return '';
     const cls = fl.length >= 3 ? 'c3' : fl[0].type === 'image' ? 'c1' : 'c2';
     return `<div class="fms-mf-sec"><div class="fms-mf-t">${title}</div><div class="fms-mf-g ${cls}">` +
-      fl.map(x => `<div><label for="fmsMan_${x.key}">${obE(x.label)} <b>*</b></label>${inp(x)}</div>`).join('') +
-      (title.includes('Address') && byKey.billing && byKey.shipping
-        ? '<label class="fms-same"><input type="checkbox" id="fmsManSame" onchange="fmsManSame()"/> Shipping address same as billing</label>' : '') +
-      '</div></div>';
+      fl.map(x => {
+        // Shipping ke label me hi "Same as billing" -- jahan zaroorat hai wahin
+        const same = x.key === 'shipping' && byKey.billing
+          ? '<span class="fms-same"><input type="checkbox" id="fmsManSame" onchange="fmsManSame()"/><label for="fmsManSame">Same as billing</label></span>' : '';
+        return `<div><div class="fms-lbl"><label for="fmsMan_${x.key}">${obE(x.label)} <b>*</b></label>${same}</div>${inp(x)}</div>`;
+      }).join('') + '</div></div>';
   }).join('');
-  // Koi naya khaana (sheet me aur column) -- aakhir me
   const rest = _fmsManual.fields.filter(x => !used.has(x.key));
   if (rest.length) h += '<div class="fms-mf-sec"><div class="fms-mf-t">More</div><div class="fms-mf-g c2">' +
-    rest.map(x => `<div><label>${obE(x.label)} <b>*</b></label>${inp(x)}</div>`).join('') + '</div></div>';
+    rest.map(x => `<div><div class="fms-lbl"><label>${obE(x.label)} <b>*</b></label></div>${inp(x)}</div>`).join('') + '</div></div>';
   document.getElementById('fmsManualErr').style.display = 'none';
   document.getElementById('fmsManualFields').innerHTML = h;
+  fmsManDraftLoad();
+  fmsManPhotoDraw();
+  fmsManBtns();
   document.getElementById('fmsManualModal').classList.add('open');
-  setTimeout(() => { const el = document.getElementById('fmsMan_poOrder'); if (el) el.focus(); }, 50);
+  setTimeout(() => { const el = document.getElementById('fmsMan_poOrder'); if (el && el.focus) el.focus(); }, 50);
 }
+
+// ── Chhote helpers ──
+function fmsManTouch() { if (!_fmsManual) return; _fmsManual.dirty = true; clearTimeout(_fmsManual.t); _fmsManual.t = setTimeout(fmsManDraftSave, 600); }
 function fmsManYN(key, v) {
   document.getElementById('fmsMan_' + key).value = v;
   document.querySelectorAll('#fmsMan_' + key + '_yn button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
   document.getElementById('fmsMan_' + key + '_yn').classList.remove('bad');
+  fmsManTouch();
 }
-// Browser date box mm/dd dikha sakta hai -- neeche saaf "15 Nov 2026"
+// Browser date box mm/dd dikha sakta hai -- neeche saaf dd-mm-yyyy
 function fmsManDate(key) {
   const el = document.getElementById('fmsMan_' + key), t = document.getElementById('fmsMan_' + key + '_txt');
   if (t) t.textContent = el.value ? '📅 ' + maintDate(el.value) : '';
 }
 function fmsManSame() {
-  const on = document.getElementById('fmsManSame').checked, b = document.getElementById('fmsMan_billing'), sh = document.getElementById('fmsMan_shipping');
-  if (!b || !sh) return;
+  const box = document.getElementById('fmsManSame'), b = document.getElementById('fmsMan_billing'), sh = document.getElementById('fmsMan_shipping');
+  if (!box || !b || !sh) return;
+  const on = box.checked;
   if (on) sh.value = b.value;
   sh.readOnly = on; sh.classList.toggle('ro', on);
-  b.oninput = on ? () => { sh.value = b.value; } : null;
+  b.oninput = on ? () => { sh.value = b.value; fmsManTouch(); } : fmsManTouch;
+  fmsManTouch();
+}
+function fmsManHint(id, msg, bad) {
+  const t = document.getElementById(id + '_txt'), el = document.getElementById(id);
+  if (t) { t.textContent = msg; t.className = 'fms-man-hint' + (bad ? ' err' : ''); }
+  if (el) el.classList.toggle('bad', !!bad);
+}
+function fmsManPhoneHint() {
+  const v = document.getElementById('fmsMan_phone').value, n = v.replace(/\D/g, '').length;
+  fmsManHint('fmsMan_phone', !v ? '' : n < 10 ? `${n}/10 digits` : `✓ ${n} digits`, v && n < 10);
+}
+function fmsManEmailHint() {
+  const v = document.getElementById('fmsMan_email').value;
+  fmsManHint('fmsMan_email', v && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? 'Not a valid email' : '', v && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v));
+}
+// PO pehle se hai? -- Order Entry ki list se turant (server bhi dobara jaanchta hai)
+function fmsManCheckPO() {
+  const el = document.getElementById('fmsMan_poOrder');
+  if (!el) return true;
+  el.value = el.value.trim();
+  const k = el.value.toLowerCase(), rows = (_fmsEntry && _fmsEntry.data && _fmsEntry.data.rows) || [];
+  const hit = k && rows.find(r => String(r.key || '').trim().toLowerCase() === k);
+  fmsManHint('fmsMan_poOrder', hit ? `Already exists (sheet row ${hit.sheetRow})` : '', !!hit);
+  return !hit;
 }
 
-// Kai photo -- har ek alag upload; sheet me sab links ek cell me (nayi line se),
-// jaise website order ke photos aate hain
-async function fmsManualPhoto(key) {
-  const id = 'fmsMan_' + key, fileEl = document.getElementById(id + '_file'), st = document.getElementById(id + '_st');
-  const btn = document.getElementById('fmsManualSaveBtn');
-  const files = [...(fileEl.files || [])];
-  fileEl.value = '';
-  if (!files.length) return;
-  btn.disabled = true;
-  for (const [i, file] of files.entries()) {
-    if (!/^image\//.test(file.type)) { st.innerHTML = `<span style="color:#ef4444">⚠️ ${obE(file.name)}: only images allowed</span>`; continue; }
-    if (file.size > FMS_UPLOAD_MAX_MB * 1024 * 1024) { st.innerHTML = `<span style="color:#ef4444">⚠️ ${obE(file.name)} is over ${FMS_UPLOAD_MAX_MB} MB</span>`; continue; }
-    st.textContent = `⏳ Uploading ${i + 1}/${files.length}…`;
-    const dataUrl = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = () => res(null); fr.readAsDataURL(file); });
-    const r = dataUrl ? await api('/api/fms-uploads', 'POST', { fmsId: fmsTasksActiveFmsId, stepId: 'entry',
-      rowIndex: '', colLetter: '', fieldType: 'image', fileName: file.name, mimeType: file.type, dataUrl }) : { error: 'File could not be read' };
-    if (r.error) { st.innerHTML = `<span style="color:#ef4444">⚠️ ${obE(file.name)}: ${obE(r.error)}</span>`; continue; }
-    _fmsManual.photos.push({ url: r.url, name: r.fileName, thumb: dataUrl });
-    st.textContent = '';
-  }
-  btn.disabled = false;
-  fmsManPhotoDraw(key);
-}
-function fmsManPhotoDraw(key) {
-  const id = 'fmsMan_' + key, ph = _fmsManual.photos;
-  document.getElementById(id).value = ph.map(p => p.url).join('\n');
-  document.getElementById(id + '_drop').classList.remove('bad');
-  document.getElementById(id + '_list').innerHTML = ph.map((p, i) =>
-    `<div class="fms-thumb" title="${obE(p.name)}"><img src="${p.thumb}" alt=""/><button type="button" onclick="fmsManPhotoDel('${key}',${i})" title="Remove">&times;</button></div>`).join('');
-}
-function fmsManPhotoDel(key, i) { _fmsManual.photos.splice(i, 1); fmsManPhotoDraw(key); }
-
-async function saveFMSManualOrder() {
+// ── Draft: form galti se band ho jaaye to bhara hua na jaaye ──
+function fmsManDraftSave() {
   if (!_fmsManual) return;
-  const errEl = document.getElementById('fmsManualErr'), btn = document.getElementById('fmsManualSaveBtn');
+  const d = { v: {}, photos: _fmsManual.photos.filter(p => p.st === 'done').map(p => ({ name: p.name, url: p.url })),
+    same: !!(document.getElementById('fmsManSame') || {}).checked };
+  _fmsManual.fields.forEach(f => { const el = document.getElementById('fmsMan_' + f.key); if (el && f.type !== 'image') d.v[f.key] = el.value; });
+  try { localStorage.setItem(fmsManDraftKey(), JSON.stringify(d)); } catch (e) {}
+}
+function fmsManDraftLoad() {
+  let d = null;
+  try { d = JSON.parse(localStorage.getItem(fmsManDraftKey()) || 'null'); } catch (e) {}
+  const note = document.getElementById('fmsManDraftNote');
+  const has = d && (Object.values(d.v || {}).some(Boolean) || (d.photos || []).length);
+  if (note) note.style.display = has ? '' : 'none';
+  if (!has) return;
+  _fmsManual.fields.forEach(f => {
+    const v = (d.v || {})[f.key]; if (!v) return;
+    if (f.type === 'yesno') fmsManYN(f.key, v);
+    else { const el = document.getElementById('fmsMan_' + f.key); if (el) el.value = v; }
+    if (f.type === 'date') fmsManDate(f.key);
+  });
+  (d.photos || []).forEach(p => _fmsManual.photos.push({ id: ++_fmsManSeq, name: p.name, st: 'done', pct: 100, url: p.url, thumb: p.url }));
+  const same = document.getElementById('fmsManSame'); if (same && d.same) { same.checked = true; fmsManSame(); }
+  if (document.getElementById('fmsMan_phone')) fmsManPhoneHint();
+  _fmsManual.dirty = true;
+}
+function fmsManClear() {
+  if (!_fmsManual) return;
+  if (_fmsManual.dirty && !confirm('Clear the whole form?')) return;
+  _fmsManual.photos.forEach(p => { if (p.xhr) p.xhr.abort(); });
+  try { localStorage.removeItem(fmsManDraftKey()); } catch (e) {}
+  openFMSManualOrder();
+}
+function fmsManClose() {
+  // Bhara hua draft me bacha rehta hai -- agli baar wahi se shuru
+  if (_fmsManual) { _fmsManual.photos.forEach(p => { if (p.xhr) { p.xhr.abort(); } }); fmsManDraftSave(); }
+  closeModal('fmsManualModal');
+  fmsImgClose();
+}
+function fmsManBtns() {
+  const up = _fmsManual && _fmsManual.photos.some(p => p.st === 'up');
+  ['fmsManualSaveBtn', 'fmsManualSaveNextBtn'].forEach(id => {
+    const b = document.getElementById(id); if (!b) return;
+    b.disabled = !!up; b.title = up ? 'Wait for photos to finish uploading' : '';
+  });
+}
+
+// ── Photos: upload (progress + Cancel), Preview, Rotate, Replace, Remove, Retry ──
+document.addEventListener('paste', e => {
+  const m = document.getElementById('fmsManualModal');
+  if (!m || !m.classList.contains('open') || !_fmsManual) return;
+  const files = [...((e.clipboardData && e.clipboardData.files) || [])].filter(f => /^image\//.test(f.type));
+  if (files.length) { e.preventDefault(); fmsManAddFiles(files); }
+});
+function fmsManAddFiles(list) {
+  if (!_fmsManual) return;
+  [...(list || [])].forEach(file => {
+    const p = { id: ++_fmsManSeq, name: file.name || 'photo.jpg', st: 'up', pct: 0 };
+    _fmsManual.photos.push(p);
+    fmsManUpload(p, file);
+  });
+  fmsManPhotoDraw();
+}
+// Badi photo ko FMS_MAN_PH_MAX px tak chhota (JPEG) -- chhoti ho to waisi hi
+function fmsManShrink(file, rotate) {
+  return new Promise(res => {
+    const fr = new FileReader();
+    fr.onerror = () => res(null);
+    fr.onload = () => {
+      const img = new Image();
+      img.onerror = () => res(null);
+      img.onload = () => {
+        const big = Math.max(img.width, img.height) > FMS_MAN_PH_MAX || file.size > 1.5 * 1048576;
+        if (!big && !rotate) { res({ dataUrl: fr.result, type: file.type }); return; }
+        const k = Math.min(1, FMS_MAN_PH_MAX / Math.max(img.width, img.height));
+        const w = Math.round(img.width * k), h = Math.round(img.height * k);
+        const c = document.createElement('canvas'), turn = rotate && rotate % 180 !== 0;
+        c.width = turn ? h : w; c.height = turn ? w : h;
+        const g = c.getContext('2d');
+        g.translate(c.width / 2, c.height / 2); g.rotate((rotate || 0) * Math.PI / 180);
+        g.drawImage(img, -w / 2, -h / 2, w, h);
+        res({ dataUrl: c.toDataURL('image/jpeg', 0.85), type: 'image/jpeg' });
+      };
+      img.src = fr.result;
+    };
+    fr.readAsDataURL(file);
+  });
+}
+async function fmsManUpload(p, file, rotate) {
+  p.st = 'up'; p.pct = 0; p.err = ''; p.file = file;
+  fmsManPhotoDraw();
+  if (!/^image\//.test(file.type || '')) { p.st = 'err'; p.err = 'Only images allowed'; fmsManPhotoDraw(); return; }
+  const sm = await fmsManShrink(file, rotate);
+  if (!_fmsManual || !_fmsManual.photos.includes(p) || p.st !== 'up') return;     // beech me Cancel/Remove
+  if (!sm) { p.st = 'err'; p.err = 'Could not read this image'; fmsManPhotoDraw(); return; }
+  if (sm.dataUrl.length * 0.75 > FMS_UPLOAD_MAX_MB * 1048576) { p.st = 'err'; p.err = `Over ${FMS_UPLOAD_MAX_MB} MB`; fmsManPhotoDraw(); return; }
+  p.thumb = sm.dataUrl;
+  const xhr = new XMLHttpRequest();
+  p.xhr = xhr;
+  xhr.open('POST', '/api/fms-uploads');
+  xhr.setRequestHeader('Content-Type', 'application/json');
+  const tok = localStorage.getItem('authToken'); if (tok) xhr.setRequestHeader('Authorization', 'Bearer ' + tok);
+  xhr.withCredentials = true;
+  xhr.upload.onprogress = e => { if (e.lengthComputable) { p.pct = Math.round(e.loaded * 100 / e.total); fmsManPhotoBar(p); } };
+  xhr.onload = () => {
+    p.xhr = null;
+    let r = {}; try { r = JSON.parse(xhr.responseText || '{}'); } catch (e) {}
+    if (xhr.status >= 200 && xhr.status < 300 && r.url) { p.st = 'done'; p.url = r.url; p.pct = 100; fmsManTouch(); }
+    else { p.st = 'err'; p.err = r.error || `Upload failed (${xhr.status})`; }
+    fmsManPhotoDraw();
+  };
+  xhr.onerror = () => { p.xhr = null; p.st = 'err'; p.err = 'Network error'; fmsManPhotoDraw(); };
+  xhr.send(JSON.stringify({ fmsId: fmsTasksActiveFmsId, stepId: 'entry', rowIndex: '', colLetter: '', fieldType: 'image',
+    fileName: p.name.replace(/\.\w+$/, '') + (sm.type === 'image/jpeg' ? '.jpg' : (p.name.match(/\.\w+$/) || ['.jpg'])[0]), mimeType: sm.type, dataUrl: sm.dataUrl }));
+}
+function fmsManPhoto(id) { return _fmsManual && _fmsManual.photos.find(p => p.id === id); }
+function fmsManPhotoCancel(id) {
+  const p = fmsManPhoto(id); if (!p) return;
+  if (p.xhr) p.xhr.abort();
+  _fmsManual.photos = _fmsManual.photos.filter(x => x !== p);
+  fmsManPhotoDraw();
+}
+function fmsManPhotoDel(id) {
+  const p = fmsManPhoto(id); if (!p) return;
+  if (p.xhr) p.xhr.abort();
+  _fmsManual.photos = _fmsManual.photos.filter(x => x !== p);
+  fmsManPhotoDraw(); fmsManTouch();
+}
+function fmsManPhotoRetry(id) { const p = fmsManPhoto(id); if (p && p.file) fmsManUpload(p, p.file, p.rot); }
+// Ghumao -- nayi (ghumi hui) photo upload, purani ki jagah
+async function fmsManPhotoRotate(id) {
+  const p = fmsManPhoto(id); if (!p || p.st === 'up') return;
+  let file = p.file;
+  if (!file && p.url) {
+    try { const b = await (await fetch(p.url)).blob(); file = new File([b], p.name, { type: b.type || 'image/jpeg' }); } catch (e) { showToast('⚠️ Could not load photo'); return; }
+  }
+  if (!file) return;
+  p.rot = ((p.rot || 0) + 90) % 360;
+  fmsManUpload(p, file, p.rot);
+}
+// Badlo -- nayi file isi jagah
+let _fmsManReplaceId = 0;
+function fmsManPhotoReplace(id) { _fmsManReplaceId = id; document.getElementById('fmsManReplace').click(); }
+function fmsManReplaceGo(files) {
+  const p = fmsManPhoto(_fmsManReplaceId), file = files && files[0];
+  if (!p || !file) return;
+  if (p.xhr) p.xhr.abort();
+  p.name = file.name; p.rot = 0; p.url = '';
+  fmsManUpload(p, file);
+}
+// Pehli photo = cover (sheet me sabse pehle link)
+function fmsManPhotoFirst(id) {
+  const p = fmsManPhoto(id); if (!p) return;
+  _fmsManual.photos = [p].concat(_fmsManual.photos.filter(x => x !== p));
+  fmsManPhotoDraw(); fmsManTouch();
+}
+function fmsManPhotoBar(p) {
+  const el = document.getElementById('fmsPh_' + p.id + '_bar'), t = document.getElementById('fmsPh_' + p.id + '_pct');
+  if (el) el.style.width = p.pct + '%';
+  if (t) t.textContent = p.pct + '%';
+}
+function fmsManPhotoDraw() {
+  if (!_fmsManual) return;
+  const ph = _fmsManual.photos, list = document.getElementById('fmsManPhotos'), hid = document.getElementById('fmsMan_photo');
+  if (hid) hid.value = ph.filter(p => p.st === 'done').map(p => p.url).join('\n');
+  const drop = document.getElementById('fmsMan_photo_drop');
+  if (drop && ph.some(p => p.st === 'done')) drop.classList.remove('bad');
+  if (list) list.innerHTML = ph.map((p, i) => {
+    const img = p.thumb ? `<img src="${p.thumb}" alt="" onclick="fmsImgOpen(${p.id})"/>` : '<div class="ph-ph">&#128247;</div>';
+    let body;
+    if (p.st === 'up') body = `<div class="ph-up"><div class="ph-bar"><i id="fmsPh_${p.id}_bar" style="width:${p.pct}%"></i></div>
+      <span id="fmsPh_${p.id}_pct">${p.pct ? p.pct + '%' : 'Preparing…'}</span><button type="button" class="ph-x" onclick="fmsManPhotoCancel(${p.id})">Cancel</button></div>`;
+    else if (p.st === 'err') body = `<div class="ph-err" title="${obE(p.err)}">&#9888;&#65039; ${obE(p.err)}</div><div class="ph-acts">
+      ${p.file ? `<button type="button" onclick="fmsManPhotoRetry(${p.id})">&#8635; Retry</button>` : ''}<button type="button" onclick="fmsManPhotoDel(${p.id})">&#10005; Remove</button></div>`;
+    else body = `<div class="ph-acts"><button type="button" onclick="fmsImgOpen(${p.id})" title="Preview">&#128269;</button>
+      <button type="button" onclick="fmsManPhotoRotate(${p.id})" title="Rotate 90°">&#10227;</button>
+      <button type="button" onclick="fmsManPhotoReplace(${p.id})" title="Replace with another photo">&#9998;</button>
+      ${i ? `<button type="button" onclick="fmsManPhotoFirst(${p.id})" title="Make first photo">&#9733;</button>` : ''}
+      <button type="button" class="del" onclick="fmsManPhotoDel(${p.id})" title="Remove">&#128465;</button></div>`;
+    return `<div class="fms-ph ${p.st}">${i === 0 && p.st === 'done' ? '<span class="ph-cover">Cover</span>' : ''}${img}
+      <div class="ph-name" title="${obE(p.name)}">${obE(p.name)}</div>${body}</div>`;
+  }).join('');
+  fmsManBtns();
+}
+// Bada preview (aage/peeche, Esc se band)
+let _fmsImgAt = -1;
+function fmsImgOpen(id) {
+  const list = _fmsManual ? _fmsManual.photos.filter(p => p.thumb) : [];
+  _fmsImgAt = list.findIndex(p => p.id === id);
+  if (_fmsImgAt < 0) return;
+  fmsImgShow();
+  document.getElementById('fmsImgView').classList.add('open');
+}
+function fmsImgShow() {
+  const list = _fmsManual ? _fmsManual.photos.filter(p => p.thumb) : [], p = list[_fmsImgAt];
+  if (!p) return fmsImgClose();
+  document.getElementById('fmsImgViewImg').src = p.thumb;
+  document.getElementById('fmsImgViewName').textContent = `${p.name} · ${_fmsImgAt + 1}/${list.length}`;
+}
+function fmsImgStep(d) {
+  const n = _fmsManual ? _fmsManual.photos.filter(p => p.thumb).length : 0;
+  if (!n) return; _fmsImgAt = (_fmsImgAt + d + n) % n; fmsImgShow();
+}
+function fmsImgClose() { const v = document.getElementById('fmsImgView'); if (v) v.classList.remove('open'); }
+document.addEventListener('keydown', e => {
+  const v = document.getElementById('fmsImgView');
+  if (!v || !v.classList.contains('open')) return;
+  if (e.key === 'Escape') fmsImgClose();
+  if (e.key === 'ArrowRight') fmsImgStep(1);
+  if (e.key === 'ArrowLeft') fmsImgStep(-1);
+});
+
+async function saveFMSManualOrder(next) {
+  if (!_fmsManual) return;
+  const errEl = document.getElementById('fmsManualErr');
+  const btn = document.getElementById(next ? 'fmsManualSaveNextBtn' : 'fmsManualSaveBtn');
   errEl.style.display = 'none';
+  const fail = (msg, box) => {
+    errEl.textContent = msg; errEl.style.display = 'block';
+    if (box) { box.classList.add('bad'); box.scrollIntoView({ block: 'center', behavior: 'smooth' }); if (box.focus) box.focus(); }
+  };
+  if (_fmsManual.photos.some(p => p.st === 'up')) return fail('Wait for the photos to finish uploading');
+  if (_fmsManual.photos.some(p => p.st === 'err')) return fail('Remove or retry the photos that failed', document.getElementById('fmsManPhotos'));
   const order = {};
   for (const f of _fmsManual.fields) {
     const el = document.getElementById('fmsMan_' + f.key);
     const v = el ? String(el.value || '').trim() : '';
     const box = document.getElementById('fmsMan_' + f.key + (f.type === 'image' ? '_drop' : f.type === 'yesno' ? '_yn' : '')) || el;
-    if (box) box.classList.toggle('bad', !v);
-    if (!v) {
-      errEl.textContent = f.type === 'image' ? `Upload at least one "${f.label}"` : f.type === 'yesno' ? `Choose Yes or No for "${f.label}"` : `"${f.label}" is required`;
-      errEl.style.display = 'block';
-      if (box) { box.scrollIntoView({ block: 'center', behavior: 'smooth' }); if (box.focus) box.focus(); }
-      return;
-    }
+    if (box) box.classList.remove('bad');
+    if (!v) return fail(f.type === 'image' ? `Upload at least one "${f.label}"` : f.type === 'yesno' ? `Choose Yes or No for "${f.label}"` : `"${f.label}" is required`, box);
+    if (f.type === 'tel' && v.replace(/\D/g, '').length < 10) return fail(`"${f.label}" needs at least 10 digits`, box);
+    if (f.type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return fail(`"${f.label}" is not a valid email`, box);
+    if (f.type === 'number' && !(parseInt(v) > 0)) return fail(`"${f.label}" must be 1 or more`, box);
+    if (f.key === 'poOrder' && !fmsManCheckPO()) return fail('This PO / Order number already exists', el);
     order[f.key] = v;
   }
+  const label = btn.innerHTML;
   btn.disabled = true; btn.textContent = '⏳ Saving...';
   const r = await api(`/api/fms-tasks/${fmsTasksActiveFmsId}/manual-order`, 'POST', { order });
-  btn.disabled = false; btn.textContent = '💾 Save Order';
-  if (r.error) { errEl.textContent = r.error; errEl.style.display = 'block'; return; }
-  closeModal('fmsManualModal');
-  showToast(`✅ Manual order added (sheet row ${r.row})`);
-  // Chaaron khaane bhare hain -- order seedha aage ke step me
+  btn.disabled = false; btn.innerHTML = label;
+  if (r.error) return fail(r.error);
+  try { localStorage.removeItem(fmsManDraftKey()); } catch (e) {}
+  showToast(`✅ Order ${order.poOrder} added (sheet row ${r.row})`);
   _fmsTrack = null;
   await fmsLoadEntry(); fmsRender();
   (window._fmsAllSteps || []).filter(fmsIsMine).forEach(s => loadFMSStepRows(s.id));
+  if (next) openFMSManualOrder();                  // "Save & add another"
+  else { _fmsManual = null; closeModal('fmsManualModal'); }
 }
 
 // ══════════════════════════════════════════════════════

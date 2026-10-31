@@ -8453,7 +8453,11 @@ app.post('/api/fms-uploads', requireAuth, async (req, res) => {
       uploaded_by: String(req.session.userId), created_at: nowStr
     });
 
-    const base = (process.env.APP_URL || '').replace(/\/+$/, '');
+    // Sheet me poora link jaata hai. APP_URL set na ho (ya .env.example wala
+    // "your-…" placeholder ho) to jis site se request aayi wahi pata
+    let base = (process.env.APP_URL || '').replace(/\/+$/, '');
+    if (!/^https?:\/\//i.test(base) || /your-/i.test(base))
+      base = `${String(req.get('x-forwarded-proto') || req.protocol || 'https').split(',')[0].trim()}://${req.get('host')}`;
     res.json({
       success: true, id: parseInt(saved.id),
       url: `${base}/f/${saved.id}`,          // sheet me yahi link jaata hai
