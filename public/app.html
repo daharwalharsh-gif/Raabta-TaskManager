@@ -4414,6 +4414,7 @@ async function init() {
     const r = await fetch('/api/me', { credentials: 'include', headers });
     if (!r.ok) {
       localStorage.removeItem('authToken');
+      try { if (location.pathname.length > 5) sessionStorage.setItem('afterLogin', location.pathname); } catch (e) {}
       window.location.replace('/');
       return;
     }
@@ -4502,7 +4503,7 @@ async function init() {
       if (mMob) mMob.style.display = 'flex';
     }
     setMinDates();
-    loadDashboard();
+    routeApply(true);            // address bar wala page + tab (khali = Dashboard)
     festCheckToday();            // aaj tyohaar ho to greeting (din me ek baar)
     loadApprovalBadge();
     loadTransferBadge();
@@ -4609,7 +4610,107 @@ function navigate(page, el) {
   if (page==='gold') loadGold();
   if (page==='casting') loadCasting();
   window.scrollTo(0,0);
+  routeSync();
 }
+
+// ══════════════════════════════════════════════════════
+// ADDRESS BAR (URL) -- har menu aur tab ka apna link
+// ══════════════════════════════════════════════════════
+// /app/users, /app/users/admin, /app/gold/silver ... Refresh, Back/Forward
+// aur link share karne par wahi page + tab khulta hai.
+// tabs: [url me naam, app ki value, tab button ki id]. Pehla tab = default (url me nahi aata).
+// set  = page khulne SE PEHLE value rakh do (load usi ko padhta hai)
+// go   = tab button dabane jaisa (page khula ho tab)
+// ok   = is user ko ye tab mil sakta hai?
+const ROUTES = [
+  { slug: 'dashboard', page: 'dashboard', get: () => dashType, set: v => { dashType = v; }, go: (v, el) => dashTab(v, el),
+    tabs: [['', 'all', 'dashTabAll'], ['delegation', 'delegation', 'dashTabDel'], ['checklist', 'checklist', 'dashTabChl']] },
+  { slug: 'tasks', page: 'alltasks', get: () => tasksType, set: v => { tasksType = v; }, go: (v, el) => tasksTab(v, el),
+    tabs: [['', 'delegation', 'tasksTabDel'], ['checklist', 'checklist', 'tasksTabChl']] },
+  { slug: 'approvals', page: 'approvals',
+    get: () => { const p = document.getElementById('transferApprovalsPanel'); return p && p.style.display === 'block' ? 'transfer' : 'task'; },
+    go: (v, el) => switchApprovalTab(v, el), ok: v => v !== 'transfer' || ['admin', 'hod', 'pc'].includes(ME.role),
+    tabs: [['', 'task', 'apprTabTask'], ['transfers', 'transfer', 'apprTabTransfer']] },
+  { slug: 'users', page: 'users', get: () => _usersRoleTab, set: v => { _usersRoleTab = v; }, go: v => setUsersRoleTab(v),
+    tabs: [['', ''], ['admin', 'admin'], ['hod', 'hod'], ['pc', 'pc'], ['user', 'user']] },
+  { slug: 'mis', page: 'mis', get: () => misType, go: (v, el) => switchMisTab(v, el), ok: (v, el) => !el || el.style.display !== 'none',
+    tabs: [['', 'delegation', 'misTabDel'], ['checklist', 'checklist', 'misTabChl'], ['fms', 'fms', 'misTabFMS'], ['all', 'all', 'misTabAll']] },
+  { slug: 'records', page: 'records' },
+  { slug: 'fms-admin', page: 'fms' },
+  { slug: 'fms-tasks', page: 'fms-tasks', get: () => _fmsView, set: v => { _fmsView = v; }, go: v => fmsSetView(v),
+    tabs: [['', 'tasks'], ['workflow', 'flow']] },
+  { slug: 'fms-tracking', page: 'fms-tracking', get: () => _ftView, set: v => { _ftView = v; }, go: v => ftSetView(v),
+    tabs: [['', 'all'], ['in-progress', 'pending'], ['completed', 'done'], ['delayed', 'delayed']] },
+  { slug: 'leave', page: 'leave' },
+  { slug: 'pc', page: 'crm', get: () => _crmTab, set: v => { _crmTab = v; }, go: (v, el) => switchCRMTab(v, el),
+    tabs: [['', 'upcoming', 'crmTabUncompleted'], ['overdue', 'overdue', 'crmTabOverdue']] },
+  { slug: 'hr-reporting', page: 'hrreport', get: () => _obView, set: v => { _obView = v; _obOpenId = ''; }, go: v => obSetView(v),
+    ok: v => !(_ob && !_ob.canManage && (v === 'pipeline' || v === 'tracking')),
+    tabs: [['', ''], ['pipeline', 'pipeline'], ['my-steps', 'mine'], ['tracking', 'tracking'], ['workflow', 'workflow']] },
+  { slug: 'maintenance', page: 'maintenance', get: () => _maintView, go: (v, el) => switchMaintView(v, el), ok: (v, el) => !el || el.style.display !== 'none',
+    tabs: [['', 1, 'maintTab1'], ['maintenance-2', 2, 'maintTab2']] },
+  { slug: 'gold', page: 'gold', get: () => _goldKind, set: v => { _goldKind = v; }, go: (v, el) => switchGoldTab(v, el),
+    tabs: [['', 'stock', 'goldTabStock'], ['wire', 'wire', 'goldTabWire'], ['silver', 'silver', 'goldTabSilver']] },
+  { slug: 'casting', page: 'casting', get: () => _castKind, set: v => { _castKind = v; }, go: (v, el) => switchCastTab(v, el),
+    tabs: [['', 'settlement', 'castTabSettlement'], ['stone', 'stone', 'castTabStone'], ['casting', 'casting', 'castTabCasting']] },
+  { slug: 'profile', page: 'profile' },
+];
+let _routeApplying = false;
+
+function routeNavEl(page) { return document.querySelector('.nav-item[onclick^="navigate(\'' + page + '\'"]'); }
+// Sidebar me menu dikhta hai = user ko ye page milta hai
+function routePageOK(page) { const n = routeNavEl(page); return !!n && n.style.display !== 'none'; }
+
+// Abhi jo page + tab khula hai uska link
+function routeUrl() {
+  const r = ROUTES.find(x => x.page === window._currentPage);
+  if (!r) return '/app';
+  let tab = '';
+  if (r.tabs) { const v = r.get(); const t = r.tabs.find(x => x[1] === v); tab = t ? t[0] : ''; }
+  return '/app/' + r.slug + (tab ? '/' + tab : '');
+}
+
+// Page/tab badla -> address bar bhi badlo (Back button ke liye history me daalo)
+function routeSync() {
+  if (!ME) return;
+  const url = routeUrl();
+  document.title = (pageTitles[window._currentPage] || 'Raabta') + ' · Raabta Task Manager';
+  if (location.pathname === url) return;
+  try { history[_routeApplying ? 'replaceState' : 'pushState']({}, '', url); } catch (e) {}
+}
+
+// Address bar ka link -> wahi page + tab kholo (pehli baar, refresh, Back/Forward)
+function routeApply(initial) {
+  const parts = location.pathname.replace(/^\/app\/?/, '').split('/').filter(Boolean).map(p => p.toLowerCase());
+  let r = ROUTES.find(x => x.slug === parts[0]) || ROUTES.find(x => x.page === parts[0]) || ROUTES[0];
+  if (!routePageOK(r.page)) {
+    if (parts[0]) showToast("You don't have access to that page", 'error');
+    r = ROUTES[0];
+  }
+  let t = null;
+  if (r.tabs) {
+    t = r.tabs.find(x => x[0] === (r.slug === parts[0] || r.page === parts[0] ? (parts[1] || '') : '')) || r.tabs[0];
+    const el = t[2] ? document.getElementById(t[2]) : null;
+    if (r.ok && !r.ok(t[1], el)) t = r.tabs[0];
+  }
+  _routeApplying = true;
+  try {
+    const el = t && t[2] ? document.getElementById(t[2]) : null;
+    if (!initial && window._currentPage === r.page) {
+      if (t && r.get() !== t[1]) r.go(t[1], el);
+    } else {
+      if (t && r.set) r.set(t[1]);
+      navigate(r.page, routeNavEl(r.page));
+      if (t) {
+        if (r.set) {
+          if (el && el.parentElement) { el.parentElement.querySelectorAll('.tab').forEach(x => x.classList.remove('active')); el.classList.add('active'); }
+        } else if (!r.ok || r.ok(t[1], el)) r.go(t[1], el);
+      }
+    }
+    routeSync();
+  } finally { _routeApplying = false; }
+}
+window.addEventListener('popstate', () => { if (ME) routeApply(false); });
 
 // ══════════════════════════════════════════════════════
 // DASHBOARD
@@ -5084,6 +5185,7 @@ function dashTab(type, el) {
   dashType = type;
   document.querySelectorAll('#dashTypeTabGroup .tab').forEach(t=>t.classList.remove('active'));
   if(el) el.classList.add('active');
+  routeSync();
   // Re-render table without full API reload
   if (window._lastDashTasks) {
     renderDashTable(window._lastDashTasks, dashType);
@@ -6093,7 +6195,8 @@ async function viewReportAttachments(id) {
 function tasksTab(type, el) {
   tasksType = type;
   document.querySelectorAll('#tasksTypeTabGroup .tab').forEach(t=>t.classList.remove('active'));
-  el.classList.add('active');
+  if (el) el.classList.add('active');
+  routeSync();
   loadAllTasks();
 }
 
@@ -6908,6 +7011,7 @@ function setUsersRoleTab(role) {
   _usersRoleTab = role || '';
   renderUsersTabs();
   filterUsers();
+  routeSync();
 }
 
 // Ek cell me password dikha do (eye "chhupao" ban jaye, Copy button aa jaye)
@@ -7201,6 +7305,7 @@ function switchApprovalTab(tab, el) {
   const gb = document.getElementById('apprGroupBtn');
   if (gb) gb.style.display = tab==='task' ? '' : 'none';
   if (tab==='transfer') loadTransferApprovals();
+  routeSync();
 }
 
 async function loadApprovals() {
@@ -7488,7 +7593,7 @@ async function ftFetch() {
   ftRender();
 }
 
-function ftSetView(v) { _ftView = v; ftRender(); }
+function ftSetView(v) { _ftView = v; ftRender(); routeSync(); }
 function ftClearFilters() {
   document.getElementById('ftDoer').value = 'all';
   document.getElementById('ftStep').value = 'all';
@@ -7497,6 +7602,7 @@ function ftClearFilters() {
   document.getElementById('ftSearch').value = '';
   _ftView = 'all';
   ftRender();
+  routeSync();
 }
 
 // Row me jo bhi date jaisi value ho usse compare karo (sheet me DD/MM/YYYY hota hai)
@@ -7513,6 +7619,36 @@ function ftClearFilters() {
 // "delivery" dhoondhte hain (DATE OF DELIVERY, Delivery Date, wagairah).
 // Na mile to delay ka hisaab hi nahi lagta -- galat rows laal karne se
 // behtar hai kuch na dikhana.
+// Har tarah ki date ko YYYY-MM-DD banao (sheet DD/MM/YYYY, ISO ya Excel serial deti hai).
+// HR Reporting badalte waqt ye function hat gaya tha par FMS Tracking isi par chalta hai.
+function hrNormDate(s) {
+  s = String(s || '').trim();
+  if (!s) return '';
+  let m = s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);           // 2026-07-01 ya 2026/7/1
+  if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+  m = s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})$/);              // D-M-YYYY ya M/D/YYYY
+  if (m) {
+    let a = parseInt(m[1]), b = parseInt(m[2]);
+    let day = a, mon = b;
+    if (a <= 12 && b > 12) { day = b; mon = a; }                      // pakka M/D tha
+    if (mon > 12 || day > 31) return '';
+    return `${m[3]}-${String(mon).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  }
+  m = s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{2})$/);              // D/M/YY
+  if (m) {
+    let a = parseInt(m[1]), b = parseInt(m[2]);
+    let day = a, mon = b;
+    if (a <= 12 && b > 12) { day = b; mon = a; }
+    if (mon > 12 || day > 31) return '';
+    return `20${m[3]}-${String(mon).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  }
+  if (/^\d{5}$/.test(s)) {                                            // Excel serial date
+    const d = new Date(Math.round((parseInt(s) - 25569) * 86400 * 1000));
+    return isNaN(d) ? '' : d.toISOString().split('T')[0];
+  }
+  return '';
+}
+
 function ftDeliveryKey(row) {
   const keys = Object.keys(row && row.data || {});
   return keys.find(k => /deliver/i.test(k)) || '';
@@ -7932,7 +8068,7 @@ async function loadOnboarding(force) {
   if (_obDrawerId) { if (obJoinee(_obDrawerId)) obRenderDrawer(); else obCloseDrawer(); }
 }
 
-function obSetView(v) { _obView = v; _obOpenId = ''; obRender(); }
+function obSetView(v) { _obView = v; _obOpenId = ''; obRender(); routeSync(); }
 function obOpen(id) { if (!_ob || !_ob.canManage) return; _obOpenId = String(id); obRender(); window.scrollTo(0, 0); }
 function obBack() { _obOpenId = ''; obRender(); }
 
@@ -9300,6 +9436,7 @@ function switchCRMTab(tab, el) {
   document.querySelectorAll('#page-crm .tab-group .tab').forEach(t => t.classList.remove('active'));
   if (el) el.classList.add('active');
   renderCRM();
+  routeSync();
 }
 
 // Due date ko compare ke liye YYYY-MM-DD me normalize karo — sheet me kuch
@@ -10341,6 +10478,7 @@ function switchGoldTab(kind, el) {
   // this date range" dikhta hai aur lagta hai data hi nahi hai
   GOLD_FILT_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   loadGold();
+  routeSync();
 }
 
 async function loadGold(force) {
@@ -10732,6 +10870,7 @@ function switchCastTab(kind, el) {
   document.getElementById('castBody').innerHTML = '<tr><td class="empty">Loading…</td></tr>';
   document.getElementById('castCount').textContent = '';
   loadCasting();
+  routeSync();
 }
 
 async function loadCasting(force) {
@@ -10862,6 +11001,7 @@ function switchMaintView(n, el) {
   if (el) el.classList.add('active');
   // Data dono ka ek hi hai — bas dobara render, nayi API call nahi
   if (n === 2) renderMaintenance2(); else renderMaintenance();
+  routeSync();
 }
 
 // Refresh button jis view par ho usi ko taaza kare
@@ -11241,7 +11381,8 @@ function getSelectedMISDoer() {
 function switchMisTab(type, el) {
   misType = type;
   document.querySelectorAll('#page-mis .tab').forEach(t=>t.classList.remove('active'));
-  el.classList.add('active');
+  if (el) el.classList.add('active');
+  routeSync();
   // Department dropdown: show only on 'all' and delegation/checklist tabs for admin
   const deptWrap = document.getElementById('misDeptFilterWrap');
   if (deptWrap && ME && ME.role === 'admin') {
@@ -13460,7 +13601,7 @@ function fmsFlowStep(s) {
   return fl.steps.find(fs => fs.keys.some(k => n.includes(k))) || null;
 }
 
-function fmsSetView(v) { _fmsView = v; fmsApplyView(); }
+function fmsSetView(v) { _fmsView = v; fmsApplyView(); routeSync(); }
 function fmsApplyView() {
   const flow = _fmsView === 'flow';
   document.querySelectorAll('#fmsVTabs button').forEach(b => b.classList.toggle('on', b.dataset.v === _fmsView));
@@ -13471,7 +13612,7 @@ function fmsApplyView() {
   if (flow) fmsRenderFlow(); else if (top) fmsMeasure();
 }
 // Workflow card dabao -> us step ka table
-function fmsFlowOpen(id) { _fmsView = 'tasks'; _fmsSel = id; fmsApplyView(); fmsRender(); }
+function fmsFlowOpen(id) { _fmsView = 'tasks'; _fmsSel = id; fmsApplyView(); fmsRender(); routeSync(); }
 
 function fmsRenderFlow() {
   const el = document.getElementById('fmsFlow');

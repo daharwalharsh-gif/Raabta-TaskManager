@@ -266,11 +266,21 @@
 </div>
 
 <script>
+// Login se pehle jo link khola tha (jaise /app/users) -- login ke baad wahin
+function afterLoginUrl() {
+  try {
+    const p = sessionStorage.getItem('afterLogin') || '';
+    sessionStorage.removeItem('afterLogin');
+    if (/^\/app(\/[\w-]+){0,2}\/?$/.test(p)) return p;
+  } catch (e) {}
+  return '/app';
+}
+
 // Agar already logged in hai toh seedha /app pe bhejo
 (async function checkExistingSession() {
   try {
     const r = await fetch('/api/me', { credentials: 'include' });
-    if (r.ok) { window.location.replace('/app'); }
+    if (r.ok) { window.location.replace(afterLoginUrl()); }
   } catch(e) {}
 })();
 
@@ -308,7 +318,7 @@ async function login(){
     }
     // Token backup for cookie-blocked environments
     if(d.token) localStorage.setItem('authToken', d.token);
-    window.location.replace('/app');
+    window.location.replace(afterLoginUrl());
   } catch(e) {
     err.textContent = 'Server error. Please try again.';
     err.style.display = 'block';

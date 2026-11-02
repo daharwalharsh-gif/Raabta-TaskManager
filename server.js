@@ -10912,7 +10912,9 @@ app.get('/', (req, res) => {
   res.set('Cache-Control', 'no-cache, must-revalidate');
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
-app.get('/app', (req, res) => {
+// /app/users, /app/gold/silver ... -- sab wahi app.html; kaunsa page/tab
+// khulega ye browser me address bar se tay hota hai
+app.get(/^\/app(\/[\w-]*)*\/?$/, (req, res) => {
   res.set('Cache-Control', 'no-cache, must-revalidate');
   res.sendFile(path.join(__dirname, 'public', 'app.html'));
 });
