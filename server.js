@@ -16,6 +16,9 @@ app.use(cookieParser());
 // Base64 payload asli file se ~33% bada hota hai, isliye 15 MB ki FMS upload
 // limit ke liye body limit 30mb rakhi hai (report attachments bhi isi se jaate).
 app.use(express.json({ limit: '30mb' }));
+// API ke jawab kabhi cache na hon (browser / Hostinger CDN) -- save ke baad
+// purana data na dikhe. Jo route khud header de (photo 1 din) wo use badal deta hai.
+app.use('/api', (req, res, next) => { res.setHeader('Cache-Control', 'private, no-store'); next(); });
 app.use(express.urlencoded({ extended: true, limit: '30mb' }));
 // Har request par reminder slot check (minute me ek baar) — app so kar uthe to
 // bhi missed reminder chala jaata hai, bina kisi bahri cron ke.
@@ -7086,6 +7089,10 @@ app.get('/api/fms-tasks/:id', requireAuth, async (req, res) => {
 // bahut der tak purana na dikhe.
 const _sheetCache = new Map();
 const SHEET_CACHE_MS = 30 * 1000;
+// Har sheet ki "pidhi": likhne par badhti hai. Likhne se PEHLE shuru hui read
+// baad me lauti to uska purana data cache me wapas na baithe (warna save ke
+// baad bhi 30 sec purana dikhta). (3 Nov 2026)
+const _sheetGen = new Map();
 async function readSheetCached(d, spreadsheetId, range) {
   const key = `${spreadsheetId}|${range}`;
   const hit = _sheetCache.get(key);
@@ -7095,19 +7102,22 @@ async function readSheetCached(d, spreadsheetId, range) {
   // aur step "0 pending" dikhta. 2 min se purana intezaar = atka hua, chhodo.)
   if (hit && hit.wait && (Date.now() - hit.at) < 2 * 60 * 1000) return hit.wait;
   if (hit && !hit.wait && (Date.now() - hit.at) < SHEET_CACHE_MS) return hit.rows;
+  const gen = _sheetGen.get(spreadsheetId) || 0;
   const p = withRetry(() => d.sheets.spreadsheets.values.get({ spreadsheetId, range }))
     .then(r => {
       const rows = r.data.values || [];
-      _sheetCache.set(key, { rows, at: Date.now() });
+      if ((_sheetGen.get(spreadsheetId) || 0) === gen) _sheetCache.set(key, { rows, at: Date.now() });
       return rows;
     })
-    .catch(e => { _sheetCache.delete(key); throw e; });
+    .catch(e => { if (_sheetCache.get(key) && _sheetCache.get(key).wait === p) _sheetCache.delete(key); throw e; });
   _sheetCache.set(key, { wait: p, at: Date.now(), rows: (hit && hit.rows) || [] });
   return p;
 }
 // Sheet me kuch likhne ke baad cache purana ho jaata hai -- turant hata do,
 // warna doer ko apna hi kiya hua Done 30 sec tak pending dikhta rehta.
 function clearSheetCache(spreadsheetId) {
+  if (spreadsheetId) _sheetGen.set(spreadsheetId, (_sheetGen.get(spreadsheetId) || 0) + 1);
+  else for (const k of _sheetGen.keys()) _sheetGen.set(k, _sheetGen.get(k) + 1);
   for (const k of _sheetCache.keys()) {
     if (!spreadsheetId || k.startsWith(spreadsheetId + '|')) _sheetCache.delete(k);
   }

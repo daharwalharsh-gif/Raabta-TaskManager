@@ -927,6 +927,9 @@ tr.fms-ent-pend td:first-child{box-shadow:inset 3px 0 0 #f59e0b;}
 .fms-thumb img{width:100%;height:100%;object-fit:cover;}
 .fms-thumb button{position:absolute;top:2px;right:2px;width:18px;height:18px;border:none;border-radius:50%;background:rgba(15,23,42,.7);color:#fff;font-size:12px;line-height:18px;padding:0;cursor:pointer;}
 @media(max-width:600px){ .fms-mf-g.c3,.fms-mf-g.c2{grid-template-columns:1fr;} }
+.fms-auto-note{font-size:11.5px;color:#94a3b8;margin-right:8px;white-space:nowrap;}
+#fmsTasksRefreshBtn{display:flex;align-items:center;}
+@media(max-width:600px){ .fms-auto-note{display:none;} }
 /* Manual Order form v3 (3 Nov 2026): .modal ki fixed 480px chaudai me 3
    khaane pis rahe the. Ab chauda modal, upar patti / beech me sections /
    neeche buttons; har section ka number + ek line; har khaane ki oonchai
@@ -2310,7 +2313,8 @@ tr.fms-ent-pend td:first-child{box-shadow:inset 3px 0 0 #f59e0b;}
       <span class="sp"></span>
       <a id="fmsSheetLink" class="btn btn-outline btn-sm" target="_blank" rel="noopener" style="display:none;text-decoration:none" title="Is FMS ki Google Sheet naye tab me kholo">📄 Open Sheet</a>
       <div id="fmsTasksRefreshBtn">
-        <button class="btn btn-outline btn-sm" onclick="loadFMSTasks()">🔄 Refresh</button>
+        <span id="fmsAutoNote" class="fms-auto-note" title="Har 1 minute me apne aap taaza hota hai"></span>
+        <button class="btn btn-outline btn-sm" id="fmsRefreshNow" onclick="window._fmsAllSteps && fmsTasksActiveFmsId ? fmsRefreshAll(true) : loadFMSTasks()">🔄 Refresh</button>
       </div>
     </div>
 
@@ -7633,7 +7637,7 @@ async function ftFetch() {
   const area = document.getElementById('ftTableArea');
   if (!id) { area.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:24px;font-size:13px">Select an FMS above to see tracking</div>'; return; }
   area.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:24px;font-size:13px">⏳ Loading from Google Sheet…</div>';
-  const r = await api(`/api/fms-tracking/${id}`);
+  const r = await apiFresh(`/api/fms-tracking/${id}`);
   if (r && r.error) {
     area.innerHTML = `<div style="text-align:center;color:#ef4444;padding:24px;font-size:13px">⚠️ ${r.error}</div>`;
     return;
@@ -9672,12 +9676,15 @@ const _apiInflight = new Map();     // url -> Promise (dedupe concurrent GETs)
 const API_STALE_MS = 15 * 1000;     // <15s old: pure cache, no background refresh
 const API_HARD_TTL = 5 * 60 * 1000; // >5min old: force a fresh blocking fetch
 
-function bustApiCache() { _apiCache.clear(); _apiInflight.clear(); }
+// _apiGen: save (POST/PUT) par badhta hai -- save se pehle shuru hua GET baad
+// me lauta to purana data cache me wapas na rakhe (3 Nov 2026)
+let _apiGen = 0;
+function bustApiCache() { _apiGen++; _apiCache.clear(); _apiInflight.clear(); }
 
 // Raw network call — keeps the original auth / 401 / 503-retry behaviour.
 async function _apiFetch(url, method, body, _retries) {
   const token = localStorage.getItem('authToken');
-  const opts={method, headers:{'Content-Type':'application/json'}, credentials:'include'};
+  const opts={method, headers:{'Content-Type':'application/json'}, credentials:'include', cache:'no-store'};
   if (token) opts.headers['Authorization'] = 'Bearer ' + token;
   if (body) opts.body=JSON.stringify(body);
   // Jawab na aaye to hamesha "loading..." nahi -- 90 sec baad saaf error
@@ -9725,13 +9732,17 @@ async function _apiFetch(url, method, body, _retries) {
 // Kick off a network fetch, store the result in cache, dedupe concurrent calls.
 function _apiRevalidate(url, _retries) {
   if (_apiInflight.has(url)) return _apiInflight.get(url);
+  const gen = _apiGen;
   const p = _apiFetch(url, 'GET', null, _retries).then(fresh => {
-    if (fresh && !fresh.error) _apiCache.set(url, { data: fresh, ts: Date.now() });
+    if (fresh && !fresh.error && gen === _apiGen) _apiCache.set(url, { data: fresh, ts: Date.now() });
     return fresh;
-  }).finally(() => _apiInflight.delete(url));
+  }).finally(() => { if (_apiInflight.get(url) === p) _apiInflight.delete(url); });
   _apiInflight.set(url, p);
   return p;
 }
+// Hamesha server se (browser ki 5 min wali copy nahi) -- FMS ka data sheet
+// me kahin se bhi badal sakta hai. Server khud 30 sec Google read baant leta hai.
+function apiFresh(url) { return _apiRevalidate(url, 2); }
 
 async function api(url,method='GET',body=null,_retries=2) {
   const isGet = (method || 'GET').toUpperCase() === 'GET';
@@ -13887,6 +13898,7 @@ function buildFMSStack(steps) {
     }
     if (seq !== _fmsLoadSeq) return;
     if (_fmsSel === null) { _fmsSel = (steps.find(fmsIsMine) || {}).id || 0; fmsRender(); routeReplace(); }
+    _fmsAutoAt = Date.now(); fmsAutoNote('');
     // Sab load hone ke baad phone-style popup — sirf pending wale steps ke
     showFMSNotifPopups();
   })();
@@ -14021,7 +14033,7 @@ function fmsSetCountLabel(stepId) {
 let _fmsEntry = null;       // { fmsId, data, filt, q, page }
 async function fmsLoadEntry(sync) {
   const fmsId = fmsTasksActiveFmsId;
-  const d = await api(`/api/fms-tasks/${fmsId}/order-entry${sync ? '?sync=1' : ''}`);
+  const d = await apiFresh(`/api/fms-tasks/${fmsId}/order-entry${sync ? '?sync=1' : ''}`);
   if (fmsId !== fmsTasksActiveFmsId) return;
   const p = _fmsEntry && _fmsEntry.fmsId === fmsId ? _fmsEntry : null;
   _fmsEntry = { fmsId, data: d || { error: 'Data nahi mila' }, filt: p ? p.filt : 'pending', q: p ? p.q : '', page: p ? p.page : 1 };
@@ -14038,9 +14050,8 @@ async function fmsEntryRefresh() {
   const sy = _fmsEntry && _fmsEntry.data && _fmsEntry.data.sync;
   if (sy && sy.error) showToast('⚠️ Sync: ' + sy.error);
   else if (sy && sy.added) showToast(`✅ ${sy.added} new website order(s) added`);
-  _fmsTrack = null;
   fmsRender();
-  if (sy && sy.added) (window._fmsAllSteps || []).filter(fmsIsMine).forEach(s => loadFMSStepRows(s.id));
+  if (sy && sy.added) fmsRefreshAll(true);
 }
 function fmsSyncLine(sy) {
   if (!sy || !sy.at) return '';
@@ -14143,9 +14154,8 @@ async function saveFMSEntry() {
   await fmsLoadEntry();
   const now = (_fmsEntry.data.rows || []).find(x => x.sheetRow === r.sheetRow);
   showToast(now && now.done ? (now.direct ? '✅ Saved — order goes straight to Step 10' : '✅ Saved — order moved to the next step') : '✅ Saved');
-  _fmsTrack = null;
   fmsRender();
-  (window._fmsAllSteps || []).filter(fmsIsMine).forEach(s => loadFMSStepRows(s.id));
+  fmsRefreshAll(true);
 }
 
 // Admin: Order Entry ka doer chuno
@@ -14172,7 +14182,7 @@ function fmsAllHtml() {
   const fmsId = fmsTasksActiveFmsId;
   if (!_fmsTrack || _fmsTrack.fmsId !== fmsId) {
     _fmsTrack = { fmsId, data: null };
-    api(`/api/fms-tracking/${fmsId}`).then(d => {
+    apiFresh(`/api/fms-tracking/${fmsId}`).then(d => {
       if (!_fmsTrack || _fmsTrack.fmsId !== fmsId) return;
       _fmsTrack.data = d || { error: 'Data nahi mila' };
       if (_fmsSel === 0) fmsRenderList();
@@ -14291,18 +14301,20 @@ function showFMSNotifPopups() {
   }
 }
 
-async function loadFMSStepRows(stepId) {
+async function loadFMSStepRows(stepId, quiet) {
   const btn = document.getElementById(`fmsStepBtn_${stepId}`);
   // Table sirf chune hue step ka DOM me hota hai -- baaki steps ke rows bhi
-  // load karo (pipeline ki ginti ke liye), bas dikhao nahi
-  if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+  // load karo (pipeline ki ginti ke liye), bas dikhao nahi.
+  // quiet = auto refresh: button / page / scroll mat chhedo, error par purana data rehne do
+  if (btn && !quiet) { btn.disabled = true; btn.textContent = '⏳'; }
   const fmsId = fmsTasksActiveFmsId;
 
-  const r = await api(`/api/fms-tasks/${fmsId}/steps/${stepId}/rows`);
+  const r = await apiFresh(`/api/fms-tasks/${fmsId}/steps/${stepId}/rows`);
   if (fmsId !== fmsTasksActiveFmsId) return;      // beech me FMS badal gaya
   const btn2 = document.getElementById(`fmsStepBtn_${stepId}`);
-  if (btn2) { btn2.disabled = false; btn2.textContent = '🔄 Refresh'; }
+  if (btn2 && !quiet) { btn2.disabled = false; btn2.textContent = '🔄 Refresh'; }
 
+  if (r.error && quiet && window._fmsStepStates[stepId]) return;
   if (r.error) {
     const cont2 = document.getElementById(`fmsStepRows_${stepId}`);
     const countEl2 = document.getElementById(`fmsStepCount_${stepId}`);
@@ -14321,15 +14333,76 @@ async function loadFMSStepRows(stepId) {
   // Refresh par filter me likha hua bacha rahe
   const prev = window._fmsStepStates[stepId];
   window._fmsStepStates[stepId] = { rows, colKeys, step, emptyWhy: r.emptyWhy || '', emptyNote: r.emptyNote || '',
-    filt: (prev && prev.filt) || [], page: 1 };
+    filt: (prev && prev.filt) || [], page: quiet && prev ? prev.page : 1 };
   // Doer ka default card: pehla apna step jisme kaam pending ho
   if (_fmsSel === null && rows.length) { _fmsSel = stepId; routeReplace(); }
   // "All done!" tabhi jab kaam SACH ME ho chuka ho. Gadbad par warning, aur
   // jo step abhi apni baari ka intezaar kar raha hai uspar halki si line --
   // teeno alag (fmsSetCountLabel). (20 Sep 2026)
-  if (_fmsSel === stepId) fmsRender();
+  if (_fmsSel === stepId) { if (quiet) fmsKeepScroll(fmsRender); else fmsRender(); }
   else { fmsRenderTop(); if (_fmsView === 'flow') fmsRenderFlow(); }
 }
+
+// ══ AUTO REFRESH (3 Nov 2026) ══
+// Save / Done ke baad, aur har 1 minute (page khula ho, popup band ho, kuch
+// type na ho raha ho) -- Order Entry + apne saare steps + All Orders chupchaap
+// taaza. Chuna hua step, filter, page aur scroll wahi rehta hai. Dusre ne ya
+// seedha sheet me kiya badlav bhi dikh jaata hai.
+const FMS_AUTO_MS = 60 * 1000;
+let _fmsAutoAt = 0, _fmsAutoBusy = null, _fmsAutoAgain = false;
+function fmsKeepScroll(fn) {
+  const els = [...document.querySelectorAll('#fmsList .fms-all-scroll, #fmsList .fms-step-rows-scroll')];
+  const pos = els.map(e => [e.scrollTop, e.scrollLeft]);
+  fn();
+  [...document.querySelectorAll('#fmsList .fms-all-scroll, #fmsList .fms-step-rows-scroll')]
+    .forEach((e, i) => { if (pos[i]) { e.scrollTop = pos[i][0]; e.scrollLeft = pos[i][1]; } });
+}
+function fmsAutoNote(t) {
+  const n = document.getElementById('fmsAutoNote');
+  if (n) n.textContent = t;
+}
+function fmsBusyUser() {
+  if (document.querySelector('.modal-overlay.open')) return true;
+  const a = document.activeElement;
+  return !!(a && a.closest && a.closest('#page-fms-tasks') && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName));
+}
+// manual = Refresh button / save ke baad (busy check nahi)
+async function fmsRefreshAll(manual) {
+  // Chal rahi refresh save se pehle ka data padh rahi ho sakti hai -- khatam hote hi ek aur
+  if (_fmsAutoBusy) { if (manual) _fmsAutoAgain = true; return _fmsAutoBusy; }
+  const fid = fmsTasksActiveFmsId, seq = _fmsLoadSeq, steps = window._fmsAllSteps || [];
+  if (!fid || !steps.length) return;
+  const b = document.getElementById('fmsRefreshNow');
+  if (manual && b) { b.disabled = true; b.textContent = '⏳ Refreshing…'; }
+  fmsAutoNote('⏳ updating…');
+  _fmsAutoBusy = (async () => {
+    const live = () => fid === fmsTasksActiveFmsId && seq === _fmsLoadSeq;
+    if (fmsEntryOn()) { await fmsLoadEntry(); if (!live()) return; fmsKeepScroll(fmsRender); }
+    for (const s of steps.filter(fmsIsMine)) { if (!live()) return; await loadFMSStepRows(s.id, true); }
+    // All Orders: purana data dikhta rahe jab tak naya na aa jaaye (Loading… ki chamak nahi)
+    if (_fmsTrack && _fmsTrack.fmsId === fid && _fmsTrack.data) {
+      const d = await apiFresh(`/api/fms-tracking/${fid}`);
+      if (!live()) return;
+      if (d && !d.error) { _fmsTrack.data = d; if (_fmsSel === 0) fmsKeepScroll(fmsRenderList); }
+    }
+  })();
+  try { await _fmsAutoBusy; } finally {
+    _fmsAutoBusy = null; _fmsAutoAt = Date.now();
+    const t = new Date();
+    fmsAutoNote('✓ updated ' + String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0'));
+    if (b) { b.disabled = false; b.textContent = '🔄 Refresh'; }
+  }
+  if (_fmsAutoAgain) { _fmsAutoAgain = false; return fmsRefreshAll(true); }
+}
+function fmsAutoTick(minAge) {
+  if (window._currentPage !== 'fms-tasks' || document.hidden || !fmsTasksActiveFmsId) return;
+  if (Date.now() - _fmsAutoAt < minAge || fmsBusyUser()) return;
+  fmsRefreshAll(false);
+}
+setInterval(() => fmsAutoTick(FMS_AUTO_MS - 2000), 15000);
+// Tab par wapas aaye (sheet me kaam karke) -- 15 sec se purana ho to turant taaza
+document.addEventListener('visibilitychange', () => { if (!document.hidden) fmsAutoTick(15000); });
+window.addEventListener('focus', () => fmsAutoTick(15000));
 
 // Cell me link ho to clickable bana do (Drive/photo/video ke links sheet me
 // aate hain — pehle plain text dikhte the, khul hi nahi sakte the).
@@ -14857,9 +14930,9 @@ async function saveFMSDone() {
   if (st) {
     st.rows = st.rows.filter(row => row.sheetRowNumber !== doneRowNum);
     // KPI + pipeline card ki ginti bhi ghatao; ALL wala data purana ho gaya
-    if (_fmsTrack) _fmsTrack = null;
     fmsRender();
   }
+  fmsRefreshAll(true);     // agle step me order aa jaaye, ginti + All Orders taaza
 }
 
 // ══ Manual Order (Online FMS, Order Entry step) ══
@@ -15223,9 +15296,7 @@ async function saveFMSManualOrder(next) {
   if (r.error) return fail(r.error);
   try { localStorage.removeItem(fmsManDraftKey()); } catch (e) {}
   showToast(`✅ Order ${order.poOrder} added (sheet row ${r.row})`);
-  _fmsTrack = null;
-  await fmsLoadEntry(); fmsRender();
-  (window._fmsAllSteps || []).filter(fmsIsMine).forEach(s => loadFMSStepRows(s.id));
+  fmsRefreshAll(true);
   if (next) openFMSManualOrder();                  // "Save & add another"
   else { _fmsManual = null; closeModal('fmsManualModal'); }
 }
