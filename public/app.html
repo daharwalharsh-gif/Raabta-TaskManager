@@ -927,6 +927,15 @@ tr.fms-ent-pend td:first-child{box-shadow:inset 3px 0 0 #f59e0b;}
 .fms-thumb img{width:100%;height:100%;object-fit:cover;}
 .fms-thumb button{position:absolute;top:2px;right:2px;width:18px;height:18px;border:none;border-radius:50%;background:rgba(15,23,42,.7);color:#fff;font-size:12px;line-height:18px;padding:0;cursor:pointer;}
 @media(max-width:600px){ .fms-mf-g.c3,.fms-mf-g.c2{grid-template-columns:1fr;} }
+/* Manual Order: .modal ki fixed 480px chaudai me 3 khaane pis rahe the --
+   placeholder kat rahe, label do line me (3 Nov 2026). Ab chauda modal;
+   beech wali screen par 2 khaane. Phone wala bottom sheet (!important) waisa hi. */
+.modal.fms-mf{width:780px;}
+@media(min-width:601px) and (max-width:700px){ .fms-mf-g.c3{grid-template-columns:repeat(2,minmax(0,1fr));} }
+.fms-lbl{min-height:22px;}
+.fms-lbl > label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+.fms-same{flex-shrink:0;}
+.fms-mf-g .fms-drop b{color:#4338ca;}
 /* FMS Manual Order form */
 .fms-man-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;max-height:62vh;overflow-y:auto;padding-right:4px;}
 .fms-man-grid .full{grid-column:1/-1;}
@@ -3842,7 +3851,7 @@ tr.fms-ent-pend td:first-child{box-shadow:inset 3px 0 0 #f59e0b;}
 
 <!-- Online FMS: Manual Order (Step 1 Order Entry) -- 13 khaane, sab zaroori -->
 <div class="modal-overlay" id="fmsManualModal">
-  <div class="modal fms-mf" style="max-width:740px">
+  <div class="modal fms-mf">
     <div class="fms-mf-head"><h3>➕ Add Manual Order</h3>
       <span id="fmsManDraftNote" class="fms-mf-draft" style="display:none">📝 Draft restored</span>
       <button type="button" class="fms-mf-clear" onclick="fmsManClear()">↺ Clear form</button></div>
