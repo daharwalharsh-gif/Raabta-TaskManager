@@ -34,7 +34,7 @@ function googleTimeout(p) {
   let t;
   return Promise.race([
     p,
-    new Promise((_, rej) => { t = setTimeout(() => rej(Object.assign(new Error('Google Sheet ne ' + Math.round(GOOGLE_TIMEOUT_MS / 1000) + ' sec me jawab nahi diya — thodi der baad Refresh karo'), { googleTimeout: true })), GOOGLE_TIMEOUT_MS); })
+    new Promise((_, rej) => { t = setTimeout(() => rej(Object.assign(new Error('Google Sheet ne ' + Math.round(GOOGLE_TIMEOUT_MS / 1000) + ' sec me jawab nahi diya - thodi der baad Refresh karo'), { googleTimeout: true })), GOOGLE_TIMEOUT_MS); })
   ]).finally(() => clearTimeout(t));
 }
 
@@ -8002,7 +8002,7 @@ app.post('/api/fms-tasks/:fmsId/steps/:stepId/done', requireAuth, async (req, re
     res.json({ success: true, generatedIds });
   } catch(err) {
     let msg = err.message || 'Unknown error';
-    if (msg.includes('403')) msg = 'Access denied — sheet ko service account ke saath Editor access de';
+    if (msg.includes('403')) msg = 'Access denied - sheet ko service account ke saath Editor access de';
     res.status(500).json({ error: msg });
   }
 });
@@ -8026,7 +8026,7 @@ const FMS_MANUAL_FIELDS = [
   { key: 'shipping', label: 'Shipping Address', type: 'textarea', names: ['shipping address'] },
   { key: 'qty',      label: 'Total Qty', type: 'number', names: ['total qty', 'total quantity', 'qty'] },
   { key: 'photo',    label: 'Order Photo', type: 'image', names: ['order photo', 'photo'] },
-  { key: 'stock',    label: 'Piece in Stock ?', type: 'yesno', names: ['piece in stock', 'in stock', 'stock'] },
+  { key: 'stock',    label: 'Piece in Stock?', type: 'yesno', names: ['piece in stock', 'in stock', 'stock'] },
   { key: 'website',  label: 'Website Order?', type: 'yesno', names: ['website order'] }
 ];
 // Har field ka column (index) -- ek column do field ko nahi milta
@@ -8054,8 +8054,8 @@ async function fmsManualCtx(req) {
 }
 const fmsManualErr = (res, err) => {
   let msg = err.message || 'Unknown error';
-  if (msg.includes('403')) msg = 'Access denied — sheet ko service account ke saath Editor access do';
-  if (msg.includes('404')) msg = 'Sheet not found — FMS config me Sheet ID/Tab check karo';
+  if (msg.includes('403')) msg = 'Access denied - sheet ko service account ke saath Editor access do';
+  if (msg.includes('404')) msg = 'Sheet not found - FMS config me Sheet ID/Tab check karo';
   res.status(500).json({ error: msg });
 };
 
@@ -8290,14 +8290,14 @@ app.post('/api/fms-tasks/:fmsId/order-entry/:row', requireAuth, async (req, res)
     const want = fmsKeyNorm(req.body && req.body.key);
     let rowNum = parseInt(req.params.row);
     if (kIdx >= 0) {
-      if (!want) return res.status(400).json({ error: 'Is order ka PO number nahi hai — sheet me PO / Order Number bharo' });
+      if (!want) return res.status(400).json({ error: 'Is order ka PO number nahi hai - sheet me PO / Order Number bharo' });
       const hits = [];
       for (let i = headerRow; i < all.length; i++) if (fmsHasReal(all[i]) && fmsKeyNorm(all[i][kIdx]) === want) hits.push(i + 1);
-      if (!hits.length) return res.status(400).json({ error: 'Ye order sheet me nahi mila — Refresh karo' });
-      if (hits.length > 1) return res.status(400).json({ error: `PO ${req.body.key} sheet me ${hits.length} baar hai (rows ${hits.join(', ')}) — pehle sheet me theek karo` });
+      if (!hits.length) return res.status(400).json({ error: 'Ye order sheet me nahi mila - Refresh karo' });
+      if (hits.length > 1) return res.status(400).json({ error: `PO ${req.body.key} sheet me ${hits.length} baar hai (rows ${hits.join(', ')}) - pehle sheet me theek karo` });
       rowNum = hits[0];
     }
-    if (!(rowNum > headerRow) || !fmsHasReal(all[rowNum - 1])) return res.status(400).json({ error: 'Ye order sheet me nahi mila — Refresh karo' });
+    if (!(rowNum > headerRow) || !fmsHasReal(all[rowNum - 1])) return res.status(400).json({ error: 'Ye order sheet me nahi mila - Refresh karo' });
     const plan = fmsEntryPlan(fms, all[headerRow - 1] || []);
     if (plan.missing.length) return res.status(400).json({ error: `Sheet me ye columns nahi mile: ${plan.missing.join(', ')}` });
     const body = (req.body && req.body.values) || {};

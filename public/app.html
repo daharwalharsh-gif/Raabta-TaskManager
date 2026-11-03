@@ -927,15 +927,52 @@ tr.fms-ent-pend td:first-child{box-shadow:inset 3px 0 0 #f59e0b;}
 .fms-thumb img{width:100%;height:100%;object-fit:cover;}
 .fms-thumb button{position:absolute;top:2px;right:2px;width:18px;height:18px;border:none;border-radius:50%;background:rgba(15,23,42,.7);color:#fff;font-size:12px;line-height:18px;padding:0;cursor:pointer;}
 @media(max-width:600px){ .fms-mf-g.c3,.fms-mf-g.c2{grid-template-columns:1fr;} }
-/* Manual Order: .modal ki fixed 480px chaudai me 3 khaane pis rahe the --
-   placeholder kat rahe, label do line me (3 Nov 2026). Ab chauda modal;
-   beech wali screen par 2 khaane. Phone wala bottom sheet (!important) waisa hi. */
-.modal.fms-mf{width:780px;}
-@media(min-width:601px) and (max-width:700px){ .fms-mf-g.c3{grid-template-columns:repeat(2,minmax(0,1fr));} }
-.fms-lbl{min-height:22px;}
-.fms-lbl > label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+/* Manual Order form v3 (3 Nov 2026): .modal ki fixed 480px chaudai me 3
+   khaane pis rahe the. Ab chauda modal, upar patti / beech me sections /
+   neeche buttons; har section ka number + ek line; har khaane ki oonchai
+   barabar (40px) aur hint ki jagah pakki, taaki row seedhi rahe. */
+.modal.fms-mf{width:820px;padding:0;display:flex;flex-direction:column;overflow:hidden;}
+.fms-mf-top{padding:18px 24px 14px;border-bottom:1px solid #eef2f7;}
+.fms-mf-head{display:flex;align-items:flex-start;gap:12px;}
+.fms-mf-head h3{margin:0 !important;font-size:18px;font-weight:800;color:#0f172a;}
+.fms-mf-ic{width:38px;height:38px;border-radius:10px;background:#eef2ff;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.fms-mf .fms-mf-sub{margin:3px 0 0 !important;font-size:12.5px;color:#64748b;}
+.fms-mf-draft{align-self:center;}
+.fms-mf-clear{align-self:center;white-space:nowrap;}
+.fms-mf .fms-mf-body{max-height:none;flex:1;min-height:0;overflow-y:auto;padding:16px 24px;background:#f8fafc;gap:14px;}
+.fms-mf .fms-mf-sec{padding:16px 18px 6px;border-radius:12px;border-color:#e5e9f0;box-shadow:0 1px 2px rgba(15,23,42,.04);}
+.fms-mf .fms-mf-t{display:flex;align-items:center;gap:10px;margin-bottom:14px;text-transform:none;letter-spacing:0;font-size:14px;font-weight:700;color:#0f172a;}
+.fms-mf-t small{display:block;font-size:12px;font-weight:500;color:#94a3b8;margin-top:1px;}
+.fms-mf-no{width:24px;height:24px;border-radius:50%;background:#4f46e5;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.fms-mf .fms-mf-g{gap:2px 16px;align-items:start;}
+.fms-mf .fms-lbl{min-height:22px;margin-bottom:6px;}
+.fms-mf .fms-lbl > label{font-size:12.5px;font-weight:600;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+.fms-mf .fms-mf-g input:not([type=checkbox]):not([type=file]){height:40px;padding:0 12px;font-size:13.5px;border-radius:9px;}
+.fms-mf .fms-mf-g textarea{padding:10px 12px;font-size:13.5px;border-radius:9px;min-height:76px;}
+.fms-mf .fms-mf-g input::placeholder,.fms-mf .fms-mf-g textarea::placeholder{color:#a0aec0;}
+.fms-mf .fms-man-hint{min-height:16px;margin:4px 0 6px;font-size:11.5px;}
+.fms-mf .fms-yn button{height:40px;padding:0 10px;border-radius:9px;}
 .fms-same{flex-shrink:0;}
+.fms-mf .fms-drop{padding:20px 16px;gap:14px;margin-bottom:12px !important;text-align:left;justify-content:flex-start;}
+.fms-mf .fms-drop .ic{width:44px;height:44px;border-radius:12px;background:#e0e7ff;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
+.fms-mf .fms-drop .tx{font-size:13.5px;color:#334155;line-height:1.5;}
 .fms-mf-g .fms-drop b{color:#4338ca;}
+.fms-mf .fms-thumbs:not(:empty){margin-bottom:12px;}
+#fmsManualErr{margin:12px 24px 0;}
+.fms-mf-foot{margin:0 !important;padding:14px 24px;border-top:1px solid #eef2f7;background:#fff;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.fms-mf-save-note{flex:1;font-size:12px;color:#94a3b8;}
+@media(min-width:601px) and (max-width:700px){ .fms-mf-g.c3{grid-template-columns:repeat(2,minmax(0,1fr));} }
+@media(max-width:600px){
+  .fms-mf-top{padding:16px 16px 12px;}
+  .fms-mf .fms-mf-body{padding:12px;}
+  .fms-mf .fms-mf-sec{padding:14px 14px 4px;}
+  .fms-mf-foot{padding:12px 16px 20px;}
+  .fms-mf-save-note{display:none;}
+  .fms-mf-foot .btn{flex:1;}
+  .fms-mf-sub{display:none;}
+  .fms-mf .fms-man-hint:empty{min-height:0;margin:0 0 10px;}
+  #fmsManualErr{margin:10px 12px 0;}
+}
 /* FMS Manual Order form */
 .fms-man-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;max-height:62vh;overflow-y:auto;padding-right:4px;}
 .fms-man-grid .full{grid-column:1/-1;}
@@ -3852,15 +3889,18 @@ tr.fms-ent-pend td:first-child{box-shadow:inset 3px 0 0 #f59e0b;}
 <!-- Online FMS: Manual Order (Step 1 Order Entry) -- 13 khaane, sab zaroori -->
 <div class="modal-overlay" id="fmsManualModal">
   <div class="modal fms-mf">
-    <div class="fms-mf-head"><h3>➕ Add Manual Order</h3>
-      <span id="fmsManDraftNote" class="fms-mf-draft" style="display:none">📝 Draft restored</span>
-      <button type="button" class="fms-mf-clear" onclick="fmsManClear()">↺ Clear form</button></div>
-    <div class="fms-mf-sub">All fields are required. The order is saved to the FMS sheet and starts at Step 1 Order Entry. Unsaved work is kept as a draft.</div>
+    <div class="fms-mf-top">
+      <div class="fms-mf-head"><span class="fms-mf-ic">➕</span>
+        <div><h3>Add Manual Order</h3>
+          <div class="fms-mf-sub">Fill all fields. The order goes to the FMS sheet and starts at Step 1 Order Entry.</div></div>
+        <span id="fmsManDraftNote" class="fms-mf-draft" style="display:none">📝 Draft restored</span>
+        <button type="button" class="fms-mf-clear" onclick="fmsManClear()">↺ Clear form</button></div>
+    </div>
     <div id="fmsManualFields" class="fms-mf-body"></div>
-    <div class="alert error" id="fmsManualErr" style="margin:10px 0 0"></div>
-    <div class="modal-footer" style="justify-content:space-between;gap:8px;flex-wrap:wrap">
+    <div class="alert error" id="fmsManualErr"></div>
+    <div class="modal-footer fms-mf-foot">
       <button class="btn btn-outline" onclick="fmsManClose()">Cancel</button>
-      <span style="flex:1"></span>
+      <span class="fms-mf-save-note">💾 Your work is saved as a draft</span>
       <button class="btn btn-outline" onclick="saveFMSManualOrder(true)" id="fmsManualSaveNextBtn">💾 Save &amp; add another</button>
       <button class="btn btn-green" onclick="saveFMSManualOrder()" id="fmsManualSaveBtn">💾 Save Order</button>
     </div>
@@ -9651,7 +9691,7 @@ async function _apiFetch(url, method, body, _retries) {
   } catch(e) {
     clearTimeout(tmr);
     console.error('API fetch failed:', url, e);
-    if (e && e.name === 'AbortError') return { error: 'Server ne 90 sec me jawab nahi diya — Refresh karo' };
+    if (e && e.name === 'AbortError') return { error: 'Server ne 90 sec me jawab nahi diya - Refresh karo' };
     return { error: 'Network error — could not connect to the server' };
   }
   if (r.status===401) {
@@ -14235,7 +14275,7 @@ function showFMSNotifPopups() {
       <div style="font-size:20px">🔔</div>
       <div style="flex:1;min-width:0">
         <div style="font-size:11px;font-weight:700;color:#10b981;letter-spacing:.3px">FMS TASK PENDING</div>
-        <div style="font-size:13px;font-weight:700;color:#1e293b;margin-top:2px;">STEP ${fmsNo(s)} — ${s.step_name}</div>
+        <div style="font-size:13px;font-weight:700;color:#1e293b;margin-top:2px;">STEP ${fmsNo(s)}: ${s.step_name}</div>
         <div style="font-size:12px;color:#dc2626;font-weight:600;margin-top:2px;">⏳ ${states[s.id].rows.length} pending row(s)</div>
       </div>
       <button onclick="this.closest('.fms-notif-card').remove()" style="background:none;border:none;font-size:14px;color:#94a3b8;cursor:pointer;padding:0;line-height:1">✕</button>`;
@@ -14829,11 +14869,11 @@ let _fmsManual = null;     // { fields, photos:[{id,name,st,pct,url,thumb,xhr,er
 // Khaane server se aate hain (sheet me jo column hai); yahan sirf unka
 // kram / hissa tay hota hai -- Order, Customer, Address, Photo, Status.
 const FMS_MAN_SECTIONS = [
-  ['&#128230; Order', ['poOrder', 'po', 'dod', 'qty']],
-  ['&#128100; Customer', ['party', 'email', 'phone']],
-  ['&#127968; Address', ['billing', 'shipping']],
-  ['&#128247; Order Photos', ['photo']],
-  ['&#9989; Status', ['stock', 'website']]
+  ['Order details', ['poOrder', 'po', 'dod', 'qty'], 'Order number, delivery date and quantity'],
+  ['Customer', ['party', 'email', 'phone'], 'Who is buying and how to reach them'],
+  ['Address', ['billing', 'shipping'], 'Where to send the bill and the parcel'],
+  ['Order photos', ['photo'], 'Add one or more photos of the piece'],
+  ['Status', ['stock', 'website'], 'Is the piece ready, and did the order come from the website?']
 ];
 const FMS_MAN_PH_MAX = 1600;          // photo badi ho to is px tak chhoti (upload tez, DB halka)
 const fmsManDraftKey = () => 'fmsManDraft_' + fmsTasksActiveFmsId;
@@ -14854,35 +14894,37 @@ async function openFMSManualOrder() {
       <label class="fms-drop" id="${id}_drop" ondragover="event.preventDefault();this.classList.add('over')" ondragleave="this.classList.remove('over')"
         ondrop="event.preventDefault();this.classList.remove('over');fmsManAddFiles(event.dataTransfer.files)">
         <input type="file" accept="image/*" multiple id="${id}_file" onchange="fmsManAddFiles(this.files);this.value=''"/>
-        <span class="ic">&#128228;</span><span><b>Click to choose</b>, drag &amp; drop, or paste (Ctrl+V) photos<br>
-        <small>JPG / PNG / WEBP &middot; max ${FMS_UPLOAD_MAX_MB} MB each &middot; big photos are resized automatically</small></span></label>
+        <span class="ic">&#128247;</span><span class="tx"><b>Click to add photos</b> or drag them here<br>
+        <small>You can also paste with Ctrl+V &middot; JPG, PNG, WEBP &middot; up to ${FMS_UPLOAD_MAX_MB} MB each</small></span></label>
       <div class="fms-thumbs" id="fmsManPhotos"></div>
       <input type="file" accept="image/*" id="fmsManReplace" style="display:none" onchange="fmsManReplaceGo(this.files);this.value=''"/>`;
-    if (fl.type === 'date') return `<input type="date" id="${id}" min="${fmsTodayStr()}" onchange="fmsManDate('${fl.key}');fmsManTouch()"/><div class="fms-man-hint" id="${id}_txt"></div>`;
+    if (fl.type === 'date') return `<input type="date" id="${id}" min="${fmsTodayStr()}" onchange="fmsManDate('${fl.key}');fmsManTouch()"/>`;
     const t = fl.type === 'tel' ? 'tel' : fl.type === 'email' ? 'email' : fl.type === 'number' ? 'number' : 'text';
     const ph = { poOrder: 'e.g. 1245', po: 'PO number', party: 'Customer / party name', email: 'name@example.com', phone: '10-digit mobile number', qty: '1' }[fl.key] || '';
     const ev = fl.key === 'poOrder' ? ' onblur="fmsManCheckPO()"' : t === 'tel' ? ' oninput="this.value=this.value.replace(/[^0-9+]/g,\'\');fmsManPhoneHint()"'
       : t === 'email' ? ' onblur="this.value=this.value.trim().toLowerCase();fmsManEmailHint()"' : '';
-    return `<input type="${t}" id="${id}" placeholder="${ph}" autocomplete="off"${t === 'number' ? ' min="1" step="1"' : ''}${t === 'tel' ? ' maxlength="13" inputmode="numeric"' : ''}${ev} oninput="fmsManTouch()"/>` +
-      (fl.key === 'poOrder' || t === 'tel' || t === 'email' ? `<div class="fms-man-hint" id="${id}_txt"></div>` : '');
+    return `<input type="${t}" id="${id}" placeholder="${ph}" autocomplete="off"${t === 'number' ? ' min="1" step="1"' : ''}${t === 'tel' ? ' maxlength="13" inputmode="numeric"' : ''}${ev} oninput="fmsManTouch()"/>`;
   };
   const used = new Set();
-  let h = FMS_MAN_SECTIONS.map(([title, keys]) => {
+  // Har khaane ke neeche ek hint line (khali bhi) -- ek row ke saare box barabar
+  const hint = x => x.type === 'image' ? '' : `<div class="fms-man-hint" id="fmsMan_${x.key}_txt"></div>`;
+  let no = 0;
+  let h = FMS_MAN_SECTIONS.map(([title, keys, sub]) => {
     const fl = keys.map(k => byKey[k]).filter(Boolean);
     fl.forEach(x => used.add(x.key));
     if (!fl.length) return '';
     const cls = fl.length >= 3 ? 'c3' : fl[0].type === 'image' ? 'c1' : 'c2';
-    return `<div class="fms-mf-sec"><div class="fms-mf-t">${title}</div><div class="fms-mf-g ${cls}">` +
+    return `<div class="fms-mf-sec"><div class="fms-mf-t"><span class="fms-mf-no">${++no}</span><div>${title}<small>${sub}</small></div></div><div class="fms-mf-g ${cls}">` +
       fl.map(x => {
         // Shipping ke label me hi "Same as billing" -- jahan zaroorat hai wahin
         const same = x.key === 'shipping' && byKey.billing
           ? '<span class="fms-same"><input type="checkbox" id="fmsManSame" onchange="fmsManSame()"/><label for="fmsManSame">Same as billing</label></span>' : '';
-        return `<div><div class="fms-lbl"><label for="fmsMan_${x.key}">${obE(x.label)} <b>*</b></label>${same}</div>${inp(x)}</div>`;
+        return `<div><div class="fms-lbl"><label for="fmsMan_${x.key}">${obE(x.label)} <b>*</b></label>${same}</div>${inp(x)}${hint(x)}</div>`;
       }).join('') + '</div></div>';
   }).join('');
   const rest = _fmsManual.fields.filter(x => !used.has(x.key));
-  if (rest.length) h += '<div class="fms-mf-sec"><div class="fms-mf-t">More</div><div class="fms-mf-g c2">' +
-    rest.map(x => `<div><div class="fms-lbl"><label>${obE(x.label)} <b>*</b></label></div>${inp(x)}</div>`).join('') + '</div></div>';
+  if (rest.length) h += `<div class="fms-mf-sec"><div class="fms-mf-t"><span class="fms-mf-no">${++no}</span><div>More<small>Other columns in the sheet</small></div></div><div class="fms-mf-g c2">` +
+    rest.map(x => `<div><div class="fms-lbl"><label>${obE(x.label)} <b>*</b></label></div>${inp(x)}${hint(x)}</div>`).join('') + '</div></div>';
   document.getElementById('fmsManualErr').style.display = 'none';
   document.getElementById('fmsManualFields').innerHTML = h;
   fmsManDraftLoad();
