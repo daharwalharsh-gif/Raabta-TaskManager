@@ -2254,7 +2254,7 @@ tr.fms-ent-pend td:first-child{box-shadow:inset 3px 0 0 #f59e0b;}
          rehti hai (30 Oct 2026; pehle alag bada card tha) -->
     <div class="fms-bar">
       <h2>FMS Tasks</h2>
-      <select id="fmsTasksSelect" onchange="onFMSTasksSelect()" title="FMS chuno">
+      <select id="fmsTasksSelect" onchange="_fmsRoute=null;_fmsSel=0;onFMSTasksSelect();routeSync()" title="FMS chuno">
         <option value="">-- Select an FMS --</option>
       </select>
       <div class="fms-vtabs" id="fmsVTabs" style="display:none">
@@ -2262,6 +2262,7 @@ tr.fms-ent-pend td:first-child{box-shadow:inset 3px 0 0 #f59e0b;}
         <button type="button" data-v="flow" onclick="fmsSetView('flow')">🧭 Workflow</button>
       </div>
       <span class="sp"></span>
+      <a id="fmsSheetLink" class="btn btn-outline btn-sm" target="_blank" rel="noopener" style="display:none;text-decoration:none" title="Is FMS ki Google Sheet naye tab me kholo">📄 Open Sheet</a>
       <div id="fmsTasksRefreshBtn">
         <button class="btn btn-outline btn-sm" onclick="loadFMSTasks()">🔄 Refresh</button>
       </div>
@@ -4636,8 +4637,8 @@ const ROUTES = [
     tabs: [['', 'delegation', 'misTabDel'], ['checklist', 'checklist', 'misTabChl'], ['fms', 'fms', 'misTabFMS'], ['all', 'all', 'misTabAll']] },
   { slug: 'records', page: 'records' },
   { slug: 'fms-admin', page: 'fms' },
-  { slug: 'fms-tasks', page: 'fms-tasks', get: () => _fmsView, set: v => { _fmsView = v; }, go: v => fmsSetView(v),
-    tabs: [['', 'tasks'], ['workflow', 'flow']] },
+  // FMS Tasks: tab nahi, poora rasta -- /fms-tasks/<fms>/<step-3 | order-entry | workflow>
+  { slug: 'fms-tasks', page: 'fms-tasks', sub: { get: () => fmsRouteGet(), set: p => fmsRouteSet(p), go: p => fmsRouteGo(p) } },
   { slug: 'fms-tracking', page: 'fms-tracking', get: () => _ftView, set: v => { _ftView = v; }, go: v => ftSetView(v),
     tabs: [['', 'all'], ['in-progress', 'pending'], ['completed', 'done'], ['delayed', 'delayed']] },
   { slug: 'leave', page: 'leave' },
@@ -4664,6 +4665,7 @@ function routePageOK(page) { const n = routeNavEl(page); return !!n && n.style.d
 function routeUrl() {
   const r = ROUTES.find(x => x.page === window._currentPage);
   if (!r) return '/app';
+  if (r.sub) { const p = r.sub.get().filter(Boolean); return '/app/' + r.slug + (p.length ? '/' + p.join('/') : ''); }
   let tab = '';
   if (r.tabs) { const v = r.get(); const t = r.tabs.find(x => x[1] === v); tab = t ? t[0] : ''; }
   return '/app/' + r.slug + (tab ? '/' + tab : '');
@@ -4685,6 +4687,17 @@ function routeApply(initial) {
   if (!routePageOK(r.page)) {
     if (parts[0]) showToast("You don't have access to that page", 'error');
     r = ROUTES[0];
+  }
+  // Page ke andar ka poora rasta (FMS Tasks: kaunsa FMS, kaunsa step)
+  if (r.sub) {
+    const rest = r.slug === parts[0] || r.page === parts[0] ? parts.slice(1) : [];
+    _routeApplying = true;
+    try {
+      if (!initial && window._currentPage === r.page) r.sub.go(rest);
+      else { r.sub.set(rest); navigate(r.page, routeNavEl(r.page)); }
+      routeSync();
+    } finally { _routeApplying = false; }
+    return;
   }
   let t = null;
   if (r.tabs) {
@@ -4710,6 +4723,8 @@ function routeApply(initial) {
   } finally { _routeApplying = false; }
 }
 window.addEventListener('popstate', () => { if (ME) routeApply(false); });
+// Apne aap hua badlav (jaise doer ka default step) -- history me nayi entry nahi
+function routeReplace() { const a = _routeApplying; _routeApplying = true; try { routeSync(); } finally { _routeApplying = a; } }
 
 // ══════════════════════════════════════════════════════
 // DASHBOARD
@@ -9616,11 +9631,18 @@ async function _apiFetch(url, method, body, _retries) {
   const opts={method, headers:{'Content-Type':'application/json'}, credentials:'include'};
   if (token) opts.headers['Authorization'] = 'Bearer ' + token;
   if (body) opts.body=JSON.stringify(body);
+  // Jawab na aaye to hamesha "loading..." nahi -- 90 sec baad saaf error
+  // (sirf GET -- upload / WhatsApp wale POST lambe chal sakte hain)
+  const ctl = String(method || 'GET').toUpperCase() === 'GET' && typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const tmr = ctl ? setTimeout(() => ctl.abort(), 90000) : null;
+  if (ctl) opts.signal = ctl.signal;
   let r;
   try {
     r = await fetch(url, opts);
   } catch(e) {
+    clearTimeout(tmr);
     console.error('API fetch failed:', url, e);
+    if (e && e.name === 'AbortError') return { error: 'Server ne 90 sec me jawab nahi diya — Refresh karo' };
     return { error: 'Network error — could not connect to the server' };
   }
   if (r.status===401) {
@@ -9636,6 +9658,7 @@ async function _apiFetch(url, method, body, _retries) {
   }
   try {
     const data = await r.json();
+    clearTimeout(tmr);
     // If server sent a JSON error body on non-200, surface it cleanly
     if (!r.ok && !data.error) data.error = `HTTP ${r.status}`;
     return data;
@@ -13342,9 +13365,16 @@ async function loadFMSTasks() {
 
   sel.innerHTML = '<option value="">-- Select an FMS --</option>' +
     list.map(f => `<option value="${f.id}">${f.fms_name || f.sheet_name}</option>`).join('');
+  window._fmsList = list;
 
-  // Pehle wala FMS (Refresh), warna akela ho to wahi
-  if (prevFms && list.some(f => String(f.id) === prevFms)) {
+  // Link me FMS ho (/app/fms-tasks/online-fms/...) to wahi; warna pehle
+  // wala FMS (Refresh), warna akela ho to wahi
+  const want = _fmsRoute && _fmsRoute.fms ? list.find(f => fmsSlug(f.fms_name || f.sheet_name) === _fmsRoute.fms) : null;
+  if (_fmsRoute && _fmsRoute.fms && !want) { showToast('Ye FMS nahi mila (ya aapko access nahi)', 'error'); _fmsRoute = null; routeReplace(); }
+  if (want) {
+    sel.value = want.id;
+    onFMSTasksSelect();
+  } else if (prevFms && list.some(f => String(f.id) === prevFms)) {
     sel.value = prevFms;
     onFMSTasksSelect();
   } else if (list.length === 1) {
@@ -13359,6 +13389,7 @@ async function onFMSTasksSelect() {
   const viewTabs = document.getElementById('fmsTasksViewTabs');
   const formView = document.getElementById('fmsEntryFormView');
 
+  fmsSheetLinkSet(null);
   if (!fmsId) {
     stack.style.display = 'none';
     if (viewTabs) viewTabs.style.display = 'none';
@@ -13385,7 +13416,20 @@ async function onFMSTasksSelect() {
     return;
   }
   window._fmsName = (data.sheet && (data.sheet.fms_name || data.sheet.sheet_name)) || '';
+  fmsSheetLinkSet(data.sheet);
   buildFMSStack(data.steps || []);
+  routeReplace();
+}
+// FMS ki Google Sheet ka link (FMS Admin me sheet_id poora URL ya sirf ID ho sakta hai)
+function fmsSheetLinkSet(sh) {
+  const a = document.getElementById('fmsSheetLink');
+  if (!a) return;
+  const raw = String((sh && sh.sheet_id) || '').trim();
+  const m = raw.match(/\/d\/([\w-]{20,})/) || raw.match(/^([\w-]{20,})$/);
+  if (!m) { a.style.display = 'none'; a.removeAttribute('href'); return; }
+  a.href = 'https://docs.google.com/spreadsheets/d/' + m[1] + '/edit';
+  a.title = 'Google Sheet kholo' + (sh.sheet_name ? ' (tab: ' + sh.sheet_name + ')' : '');
+  a.style.display = '';
 }
 
 // ══════════════════════════════════════════════════════
@@ -13601,6 +13645,62 @@ function fmsFlowStep(s) {
 }
 
 function fmsSetView(v) { _fmsView = v; fmsApplyView(); routeSync(); }
+
+// ── Har FMS aur uske har step ka apna link (3 Nov 2026) ──
+//   /app/fms-tasks/online-fms               -> Online FMS, ALL card
+//   /app/fms-tasks/online-fms/step-3        -> Step 3 ki table
+//   /app/fms-tasks/online-fms/order-entry   -> Step 1 Order Entry
+//   /app/fms-tasks/online-fms/workflow      -> Workflow
+// Purana /app/fms-tasks/workflow bhi chalta hai. Step number wahi jo card par dikhta hai.
+let _fmsRoute = null;         // { fms, sub } -- link se aaya, FMS load hone par lagega
+function fmsSlug(n) { return String(n || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'fms'; }
+function fmsRouteParse(p) {
+  if (p[0] === 'workflow' && !p[1]) return { fms: '', sub: 'workflow' };
+  return { fms: p[0] || '', sub: p[1] || '' };
+}
+function fmsRouteGet() {
+  if (_fmsRoute) return _fmsRoute.fms ? [_fmsRoute.fms, _fmsRoute.sub] : [];
+  const sel = document.getElementById('fmsTasksSelect');
+  const f = (window._fmsList || []).find(x => String(x.id) === String(sel && sel.value));
+  if (!f) return [];
+  const p = [fmsSlug(f.fms_name || f.sheet_name)];
+  if (_fmsView === 'flow') p.push('workflow');
+  else if (_fmsSel === 'E') p.push('order-entry');
+  else if (_fmsSel) { const s = fmsStep(_fmsSel); if (s) p.push('step-' + fmsNo(s)); }
+  return p;
+}
+// Page khulne se pehle (load isi ko padhega)
+function fmsRouteSet(p) {
+  _fmsRoute = p.length ? fmsRouteParse(p) : null;
+  if (_fmsRoute) _fmsView = _fmsRoute.sub === 'workflow' ? 'flow' : 'tasks';
+}
+// Link ka step -> stepId / 'E' / 0 (ALL). Na mile ya assign na ho to null
+function fmsRouteStep(sub) {
+  if (sub === 'order-entry') return 'E';
+  const m = /^step-(\d+)$/.exec(sub || '');
+  if (!m) return 0;
+  if (fmsOffset() && +m[1] === 1) return 'E';
+  const s = (window._fmsAllSteps || []).find(x => fmsNo(x) === +m[1]);
+  if (!s || !fmsIsMine(s)) { showToast(s ? 'Ye step aapko assign nahi hai' : 'Step ' + m[1] + ' is FMS me nahi hai', 'error'); return null; }
+  return s.id;
+}
+// Back / Forward -- page pehle se khula hai
+function fmsRouteGo(p) {
+  const rt = fmsRouteParse(p);
+  const sel = document.getElementById('fmsTasksSelect');
+  const cur = fmsRouteGet()[0] || '';
+  if (rt.fms && rt.fms !== cur) {
+    const f = (window._fmsList || []).find(x => fmsSlug(x.fms_name || x.sheet_name) === rt.fms);
+    if (f && sel) { _fmsRoute = rt; _fmsView = rt.sub === 'workflow' ? 'flow' : 'tasks'; sel.value = f.id; onFMSTasksSelect(); }
+    return;
+  }
+  if (rt.sub === 'workflow') { _fmsView = 'flow'; fmsApplyView(); return; }
+  _fmsView = 'tasks';
+  const id = fmsRouteStep(rt.sub);
+  _fmsSel = id === null || (id === 'E' && !(fmsEntryOn() && _fmsEntry.data.canEdit)) ? 0 : id;
+  fmsApplyView();
+  fmsRender();
+}
 function fmsApplyView() {
   const flow = _fmsView === 'flow';
   document.querySelectorAll('#fmsVTabs button').forEach(b => b.classList.toggle('on', b.dataset.v === _fmsView));
@@ -13696,11 +13796,22 @@ function buildFMSStack(steps) {
   }
   window._fmsAllSteps = steps;
   window._fmsStepStates = {};
+  window._fmsStepErrs = {};     // stepId -> error (rows load nahi hue)
   _fmsTrack = null; _fmsTrackFilter = 'active'; _fmsTrackQ = ''; _fmsAllPage = 1;
   if (_fmsEntry && _fmsEntry.fmsId !== fmsTasksActiveFmsId) _fmsEntry = null;
   const isAdmin = ME.role === 'admin';
   // Admin ko ALL; doer ko apna pehla step jisme kaam ho (load hote hi tay hoga)
   _fmsSel = isAdmin ? 0 : null;
+  // Link me step tha (/app/fms-tasks/online-fms/step-3) to wahi
+  const rt = _fmsRoute && (!_fmsRoute.fms || _fmsRoute.fms === fmsSlug(window._fmsName)) ? _fmsRoute : null;
+  _fmsRoute = null;
+  let wantEntry = false;
+  if (rt) {
+    _fmsView = rt.sub === 'workflow' ? 'flow' : 'tasks';
+    const id = rt.sub && rt.sub !== 'workflow' ? fmsRouteStep(rt.sub) : null;
+    if (id === 'E') { wantEntry = true; _fmsSel = null; }
+    else if (id) _fmsSel = id;
+  }
 
   // KPI + pipeline ek chipki block me (patti ke saath freeze), neeche sirf table
   stack.innerHTML = '<div class="fms-top" id="fmsTop"><div id="fmsKpis" class="ob-kpis fms-kpis overview-cards"></div><div id="fmsPipe" class="fms-pipe"></div></div><div id="fmsList"></div><div id="fmsFlow" style="display:none"></div>';
@@ -13714,14 +13825,19 @@ function buildFMSStack(steps) {
   (async () => {
     await fmsLoadEntry();
     if (seq !== _fmsLoadSeq) return;
+    if (wantEntry) {
+      if (fmsEntryOn() && _fmsEntry.data.canEdit) _fmsSel = 'E';
+      else { showToast('Order Entry aapko assign nahi hai', 'error'); _fmsSel = isAdmin ? 0 : null; }
+    }
     if (_fmsSel === null && fmsEntryPending()) _fmsSel = 'E';
     fmsRender();
+    routeReplace();
     for (const s of steps) {
       if (seq !== _fmsLoadSeq) return;
       if (fmsIsMine(s)) await loadFMSStepRows(s.id);
     }
     if (seq !== _fmsLoadSeq) return;
-    if (_fmsSel === null) { _fmsSel = (steps.find(fmsIsMine) || {}).id || 0; fmsRender(); }
+    if (_fmsSel === null) { _fmsSel = (steps.find(fmsIsMine) || {}).id || 0; fmsRender(); routeReplace(); }
     // Sab load hone ke baad phone-style popup — sirf pending wale steps ke
     showFMSNotifPopups();
   })();
@@ -13750,11 +13866,12 @@ function fmsRenderTop() {
   const cnt = mine.map(s => fmsStepCounts(s.id)).filter(Boolean);
   const ePend = fmsEntryPending();
   const sum = k => cnt.reduce((a, c) => a + c[k], 0) + (k === 'n' ? ePend : 0);
-  const loading = cnt.length < mine.length;
+  const errs = mine.filter(s => !fmsStepCounts(s.id) && fmsStepErr(s.id)).length;
+  const loading = cnt.length + errs < mine.length;
   const card = (cls, label, n, sub) => '<div class="ov-card ' + cls + '"><div class="label">' + label + '</div>' +
     '<div class="number">' + n + '</div>' + (sub ? '<div class="ob-ksub">' + sub + '</div>' : '') + '</div>';
   document.getElementById('fmsKpis').innerHTML =
-    card('obk-blue', '&#128203; Pending Rows', sum('n'), loading ? '&#9203; loading ' + cnt.length + '/' + mine.length + ' steps…' : 'aapke steps par baaki') +
+    card('obk-blue', '&#128203; Pending Rows', sum('n'), loading ? '&#9203; loading ' + cnt.length + '/' + mine.length + ' steps…' : errs ? '&#9888;&#65039; ' + errs + ' step load nahi hue' : 'aapke steps par baaki') +
     card('pending', '&#9200; Late', sum('late'), 'plan date nikal gayi') +
     card('revised', '&#128197; Due Today', sum('today'), 'aaj karne hain') +
     card('completed', '&#9989; My Steps', cnt.filter(c => c.n).length + ' / ' + mine.length, 'steps me kaam pending');
@@ -13785,7 +13902,8 @@ function fmsRenderTop() {
     cards += '<div class="ob-pcard ' + (!c ? 'zero' : c.n ? 'has' : 'zero') + (c && c.late ? ' lt' : '') + (_fmsSel === s.id ? ' on' : '') + '" ' +
       'onclick="fmsPickStep(' + s.id + ')" title="' + obE('Doer: ' + doers) + '">' +
       '<div class="k">STEP ' + fmsNo(s) + '</div><div class="t">' + obE(s.step_name) + '</div>' +
-      '<div class="n">' + (c ? '<b>' + c.n + '</b> pending' + (c.late ? ' <span class="r late">' + c.late + ' late</span>' : '') : '&#9203; loading…') + '</div></div>';
+      '<div class="n">' + (c ? '<b>' + c.n + '</b> pending' + (c.late ? ' <span class="r late">' + c.late + ' late</span>' : '')
+        : fmsStepErr(s.id) ? '<span style="color:#b91c1c">&#9888;&#65039; load nahi hua</span>' : '&#9203; loading…') + '</div></div>';
   });
   document.getElementById('fmsPipe').innerHTML =
     '<div class="ob-pipe"><div class="ob-pipe-head"><div class="ob-pipe-title">&#10697; Step-wise Pipeline</div>' +
@@ -13807,7 +13925,7 @@ function fmsPipeBar() {
   f.style.width = Math.min(100, w) + '%';
   f.style.marginLeft = Math.round((100 - Math.min(100, w)) * (t.scrollLeft / max)) + '%';
 }
-function fmsPickStep(id) { _fmsSel = id; fmsRender(); }
+function fmsPickStep(id) { _fmsSel = id; fmsRender(); routeSync(); }
 
 function fmsRenderList() {
   const el = document.getElementById('fmsList');
@@ -13829,6 +13947,12 @@ function fmsRenderList() {
     '<div id="fmsStepRows_' + s.id + '" style="padding:8px 12px 12px"><div style="padding:16px;text-align:center;color:#94a3b8;font-size:13px">&#9203; Loading...</div></div></div>';
   fmsSetCountLabel(s.id);
   renderFMSStepTable(s.id);
+  if (!c && fmsStepErr(s.id)) { const box = document.getElementById('fmsStepRows_' + s.id); if (box) box.innerHTML = fmsStepErrHtml(s.id); }
+}
+function fmsStepErr(id) { return (window._fmsStepErrs || {})[id] || ''; }
+function fmsStepErrHtml(id) {
+  return '<div style="padding:12px;color:#ef4444;font-size:12px">&#9888;&#65039; ' + obE(fmsStepErr(id) || 'Load nahi hua') +
+    ' <button class="btn btn-outline btn-sm" style="margin-left:8px" onclick="loadFMSStepRows(' + id + ')">&#128260; Dobara try</button></div>';
 }
 // Step header ki label: "N pending row(s)" / Check setup / Not started / All done
 function fmsSetCountLabel(stepId) {
@@ -14134,9 +14258,13 @@ async function loadFMSStepRows(stepId) {
     const cont2 = document.getElementById(`fmsStepRows_${stepId}`);
     const countEl2 = document.getElementById(`fmsStepCount_${stepId}`);
     if (countEl2) countEl2.textContent = '';
-    if (cont2) cont2.innerHTML = `<div style="padding:12px;color:#ef4444;font-size:12px">⚠️ ${r.error}</div>`;
+    // Card / KPI "loading…" par na atke -- error dikhao, card dabake dobara
+    window._fmsStepErrs[stepId] = r.error;
+    if (cont2) cont2.innerHTML = fmsStepErrHtml(stepId);
+    fmsRenderTop();
     return;
   }
+  delete window._fmsStepErrs[stepId];
 
   const step = (window._fmsAllSteps || []).find(s => s.id === stepId) || null;
   const rows = r.rows || [];
@@ -14146,7 +14274,7 @@ async function loadFMSStepRows(stepId) {
   window._fmsStepStates[stepId] = { rows, colKeys, step, emptyWhy: r.emptyWhy || '', emptyNote: r.emptyNote || '',
     filt: (prev && prev.filt) || [], page: 1 };
   // Doer ka default card: pehla apna step jisme kaam pending ho
-  if (_fmsSel === null && rows.length) _fmsSel = stepId;
+  if (_fmsSel === null && rows.length) { _fmsSel = stepId; routeReplace(); }
   // "All done!" tabhi jab kaam SACH ME ho chuka ho. Gadbad par warning, aur
   // jo step abhi apni baari ka intezaar kar raha hai uspar halki si line --
   // teeno alag (fmsSetCountLabel). (20 Sep 2026)

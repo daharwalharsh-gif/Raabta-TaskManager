@@ -271,7 +271,7 @@ function afterLoginUrl() {
   try {
     const p = sessionStorage.getItem('afterLogin') || '';
     sessionStorage.removeItem('afterLogin');
-    if (/^\/app(\/[\w-]+){0,2}\/?$/.test(p)) return p;
+    if (/^\/app(\/[\w-]+){0,3}\/?$/.test(p)) return p;   // /app/fms-tasks/<fms>/<step> = 3 hisse
   } catch (e) {}
   return '/app';
 }

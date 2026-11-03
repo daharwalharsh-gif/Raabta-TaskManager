@@ -25,13 +25,33 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ══════════════════════════════════════════════════════
 // GOOGLE SHEETS DB LAYER
 // ══════════════════════════════════════════════════════
+// Google call ki had (ms). Pehle koi had nahi thi -- ek bhi call atak jaati
+// (jawab hi na aaye) to wo hamesha ke liye "chal rahi" rehti, aur sheet cache /
+// order sync usi ka intezaar karte rehte. Live par FMS Tasks ka har step aur
+// All Orders "loading..." par ruk gaye the (3 Nov 2026).
+const GOOGLE_TIMEOUT_MS = parseInt(process.env.GOOGLE_TIMEOUT_MS, 10) || 45000;
+function googleTimeout(p) {
+  let t;
+  return Promise.race([
+    p,
+    new Promise((_, rej) => { t = setTimeout(() => rej(Object.assign(new Error('Google Sheet ne ' + Math.round(GOOGLE_TIMEOUT_MS / 1000) + ' sec me jawab nahi diya — thodi der baad Refresh karo'), { googleTimeout: true })), GOOGLE_TIMEOUT_MS); })
+  ]).finally(() => clearTimeout(t));
+}
+
 // Retry wrapper for Google Sheets API calls (handles quota exceeded)
 async function withRetry(fn, maxRetries = 5) {
   let delay = 2000; // start at 2s for quota errors
+  let timeouts = 0;
   for (let i = 0; i <= maxRetries; i++) {
     try {
-      return await fn();
+      return await googleTimeout(Promise.resolve().then(fn));
     } catch (err) {
+      // Atki call: Google client (token) naya banao, ek baar dobara try
+      if (err.googleTimeout && timeouts++ < 1) {
+        console.error('Google call timeout -- Sheets client dobara bana rahe hain');
+        await resetSheetsClient().catch(e => console.error('Sheets client reset failed:', e.message));
+        continue;
+      }
       const isQuota = err.message && (
         err.message.includes('Quota exceeded') ||
         err.message.includes('RESOURCE_EXHAUSTED') ||
@@ -317,8 +337,15 @@ async function getSheetsClient() {
     scopes: ['https://www.googleapis.com/auth/spreadsheets']
   });
   const client = await auth.getClient();
-  _sheetsClient = google.sheets({ version: 'v4', auth: client });
+  _sheetsClient = google.sheets({ version: 'v4', auth: client, timeout: GOOGLE_TIMEOUT_MS });
   return _sheetsClient;
+}
+// Naya client (naya token) -- DB ke paas jo purana tha wo bhi badlo
+async function resetSheetsClient() {
+  _sheetsClient = null;
+  const c = await getSheetsClient();
+  if (db && db.sheets) db.sheets = c;
+  return c;
 }
 
 // ══════════════════════════════════════════════════════
@@ -7062,10 +7089,12 @@ const SHEET_CACHE_MS = 30 * 1000;
 async function readSheetCached(d, spreadsheetId, range) {
   const key = `${spreadsheetId}|${range}`;
   const hit = _sheetCache.get(key);
-  if (hit && (Date.now() - hit.at) < SHEET_CACHE_MS) return hit.rows;
   // Ek hi waqt par kai request aayein to sirf PEHLI Google ko jaaye, baaki
   // usi ka intezaar karein -- warna 21 request ek saath nikal jaatin.
-  if (hit && hit.wait) return hit.wait;
+  // (Pehle ye check baad me tha, to beech wali request ko khali [] mil jaata
+  // aur step "0 pending" dikhta. 2 min se purana intezaar = atka hua, chhodo.)
+  if (hit && hit.wait && (Date.now() - hit.at) < 2 * 60 * 1000) return hit.wait;
+  if (hit && !hit.wait && (Date.now() - hit.at) < SHEET_CACHE_MS) return hit.rows;
   const p = withRetry(() => d.sheets.spreadsheets.values.get({ spreadsheetId, range }))
     .then(r => {
       const rows = r.data.values || [];
@@ -8094,7 +8123,7 @@ async function fmsSyncOrders(d, fms, force) {
   const rule = fmsEntryRule(fms);
   if (!rule || !rule.importTab) return null;
   const st = _fmsSync.get(fms.id) || {};
-  if (st.busy) return st.busy;
+  if (st.busy && Date.now() - (st.busyAt || 0) < 3 * 60 * 1000) return st.busy;    // 3 min se zyada = atka, naya chalao
   if (!force && st.at && Date.now() - st.at < 60 * 1000) return st;     // 1 min me ek baar
   const run = (async () => {
     const spreadsheetId = extractSheetId(fms.sheet_id), headerRow = parseInt(fms.header_row) || 1, tab = fms.sheet_name;
@@ -8173,7 +8202,7 @@ async function fmsSyncOrders(d, fms, force) {
       return fail;
     }
   })();
-  _fmsSync.set(fms.id, { ...st, busy: run });
+  _fmsSync.set(fms.id, { ...st, busy: run, busyAt: Date.now() });
   return run;
 }
 // Har ghante saare Online FMS ka sync (server shuru hone ke 1 min baad pehla)
@@ -8211,7 +8240,10 @@ app.get('/api/fms-tasks/:fmsId/order-entry', requireAuth, async (req, res) => {
     if (!canEdit) return res.json(base);       // doosron ko sirf "Not assigned"
 
     // Naye website order pehle FMS tab me (1 min me ek baar; ?sync=1 = abhi)
-    const sync = await fmsSyncOrders(d, fms, req.query.sync === '1');
+    // Sync dheema ho to Order Entry uske liye 20 sec se zyada nahi rukta --
+    // sync peeche chalta rehta hai, orders abhi jo sheet me hain wo dikhte hain
+    const syncP = fmsSyncOrders(d, fms, req.query.sync === '1');
+    const sync = await Promise.race([syncP, new Promise(r => setTimeout(() => r(_fmsSync.get(fms.id) || null), 20000))]);
     const headerRow = parseInt(fms.header_row) || 1;
     const all = await readSheetCached(d, extractSheetId(fms.sheet_id), `${fms.sheet_name}!A1:ZZ`);
     const kIdx = fmsFindCol((all[headerRow - 1] || []).map(fmsNorm), rule.keyNames || [], new Set());
