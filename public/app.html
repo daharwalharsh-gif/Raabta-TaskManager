@@ -1743,8 +1743,9 @@ body.ft-on #toast{bottom:var(--ft-pad,90px) !important;}
 .ft-spark svg{width:100%;height:100%;display:block;}
 @keyframes ftTwinkle{0%,100%{opacity:0;transform:scale(.4) rotate(0)}50%{opacity:.75;transform:scale(1) rotate(45deg)}}
 .ft-corner{position:fixed;z-index:88;transition:opacity .4s;}
-.ft-corner.ft-rangoli{width:64px;height:64px;opacity:.92;}
-.ft-corner.ft-rangoli svg{width:100%;height:100%;animation:ftSpin 80s linear infinite;}
+.ft-corner.ft-rangoli{display:flex;flex-direction:column;align-items:center;opacity:.95;}
+.ft-corner.ft-rangoli svg{width:64px;height:64px;animation:ftSpin 80s linear infinite;}
+body.ft-mode-full .ft-corner.ft-rangoli svg{width:86px;height:86px;filter:drop-shadow(0 4px 10px rgba(179,38,30,.25));}
 @keyframes ftSpin{to{transform:rotate(360deg)}}
 .ft-corner.ft-diyas{display:flex;gap:4px;align-items:flex-end;}
 .ft-corner.ft-diyas svg{width:34px;height:29px;}
@@ -1813,7 +1814,9 @@ body.ft-on #toast{bottom:var(--ft-pad,90px) !important;}
   body.ft-on .topbar{height:calc(52px + var(--ft-th));}
   body.ft-on .fms-bar{top:calc(52px + var(--ft-th));}
   .ft-kandil{width:20px;height:37px;}
-  .ft-corner.ft-rangoli{width:46px;height:46px;}
+  .ft-corner.ft-rangoli svg,body.ft-mode-full .ft-corner.ft-rangoli svg{width:52px;height:52px;}
+  .ft-rpill{font-size:11px !important;padding:1px 8px !important;margin-top:-6px !important;}
+  .ft-hbadge{display:none !important;}
   .ft-corner.ft-diyas svg{width:26px;height:22px;}
   /* bottom nav aur iPhone ki safe-area ke upar */
   .ft-banner{left:10px;right:10px;bottom:calc(80px + env(safe-area-inset-bottom,0px));
@@ -1853,11 +1856,42 @@ body.ft-on.ft-mode-full .main::before{content:'';position:fixed;inset:0;z-index:
   .ft-mode button{padding:3px 8px;font-size:11px;}
   body.ft-on.ft-mode-full .ov-card::after{top:5px;right:5px;width:15px;height:15px;}
 }
+/* ── Full mode ki extra Diwali sajawat (7 Nov, user: "aur diye, kandil, aur Diwali cheezein") ──
+   Lite / Off me ye sab chhupa rehta hai. */
+body:not(.ft-mode-full) .ft-full-only,body:not(.ft-mode-full) .ft-sky,body:not(.ft-mode-full) .ft-deepmala{display:none !important;}
+/* Aasmaan: udte kandil + halki aatishbaazi -- card ke PEECHE (z-index -1), isliye
+   kabhi text / button ke upar nahi aate, sirf khaali jagah me dikhte hain */
+.ft-sky{position:fixed;inset:0;z-index:-1;overflow:hidden;}
+.ft-sky .ft-fly{position:absolute;bottom:-50px;width:20px;height:26px;animation:ftFlyUp linear infinite;}
+.ft-sky .ft-fly > svg{width:100%;height:100%;display:block;animation:ftSwing 3.6s ease-in-out infinite;
+  filter:drop-shadow(0 0 6px rgba(255,170,40,.75));}
+@keyframes ftFlyUp{0%{transform:translateY(0);opacity:0}8%{opacity:.9}85%{opacity:.85}100%{transform:translateY(-118vh);opacity:0}}
+.ft-sky .ft-burst i{animation-duration:6.5s;width:4px;height:4px;margin:-2px;}
+/* Phone par .main ka apna rang aasmaan ko dhak deta -- Full me use paardarshi karo (body ka rang wahi hai) */
+@media(max-width:768px){body.ft-on.ft-mode-full .main{background:transparent;}}
+/* Deepmala -- banner ke upar kinare par diyon ki kataar */
+.ft-deepmala{position:absolute;left:4%;right:4%;top:-17px;display:flex;justify-content:space-between;align-items:flex-end;}
+.ft-deepmala svg{width:24px;height:20px;}
+@media(max-width:768px){.ft-deepmala{top:-14px;}.ft-deepmala svg{width:19px;height:16px;}}
+/* Devanagari ke premium tukde (Rozha One sirf theme chalte waqt load hota hai) */
+.ft-hbadge,.ft-rpill,.ft-hindi{font-family:'Rozha One',serif;font-weight:400;letter-spacing:.2px;}
+.ft-hbadge{flex-shrink:0;white-space:nowrap;font-size:15px;line-height:1.3;color:#ffd76a;padding:4px 14px 3px;border-radius:999px;
+  background:linear-gradient(135deg,#7a1f12,#b3261e 60%,#c2410c);border:1px solid #ffc83d;box-shadow:0 2px 8px rgba(122,31,18,.3),inset 0 1px 0 rgba(255,255,255,.18);}
+.ft-rpill{margin-top:-10px;white-space:nowrap;font-size:13.5px;line-height:1.35;color:#ffd76a;padding:2px 12px 1px;border-radius:999px;
+  background:linear-gradient(135deg,#7a1f12,#b3261e);border:1px solid #ffc83d;box-shadow:0 4px 12px rgba(122,31,18,.3);}
+.ft-hindi{font-size:21px;color:#ffd76a;opacity:.95;margin:-4px 0 2px;}
+/* Neeche sunehri roshni -- card ke peeche, sirf khaali jagah me */
+.ft-floor{position:fixed;left:0;right:0;bottom:0;height:170px;z-index:-1;
+  background:radial-gradient(ellipse 60% 100% at 50% 100%,rgba(255,190,60,.30),rgba(255,214,140,.12) 50%,rgba(255,214,140,0) 78%);}
+/* Page title ke baad chhota sa diya */
+body.ft-on.ft-mode-full #topbarTitle::after{content:'';display:inline-block;width:22px;height:19px;margin-left:8px;vertical-align:-2px;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 34'%3E%3Ccircle cx='20' cy='13' r='11' fill='%23ffcc4d' opacity='.25'/%3E%3Cpath d='M20 2C23 8 25 11 25 15C25 18 22.8 20 20 20C17.2 20 15 18 15 15C15 11 17 8 20 2Z' fill='%23ff9800'/%3E%3Cpath d='M20 7C22 11 23 13 23 15.5C23 17.4 21.6 18.6 20 18.6C18.4 18.6 17 17.4 17 15.5C17 13 18 11 20 7Z' fill='%23ffd54f'/%3E%3Cpath d='M3 21H37C35 29 28 33 20 33C12 33 5 29 3 21Z' fill='%23b5541c'/%3E%3Cellipse cx='20' cy='21' rx='17' ry='2.6' fill='%23d9772b'/%3E%3C/svg%3E") center/contain no-repeat;}
 /* Motion kam chahiye to animation band -- sajawat wahin rehti hai */
 @media (prefers-reduced-motion: reduce){
   .ft-pop,.ft-pop *,.ft-deco,.ft-deco *,.ft-banner,.ft-banner *{animation:none !important;transition:none !important;}
   .ft-pop-fx{display:none;}
   .ft-spark{opacity:.6;}
+  .ft-sky{display:none !important;}       /* udna hi iska kaam hai -- motion band ho to ye bhi */
 }
 
 /* Festival Themes admin page -- app ke apne rang */
@@ -4796,15 +4830,35 @@ function ftRangoli(cls) {
   for (let i = 0; i < 8; i++) s += '<ellipse cy="-16" rx="5" ry="8.5" fill="#f57c00" transform="rotate(' + (i * 45 + 22.5) + ')"/>';
   return s + '<circle r="12" fill="#ffc83d"/><circle r="7" fill="#b3261e"/><circle r="3" fill="#fff4d6"/></svg>';
 }
-function ftKandilSvg() {
+// Kandil ke rang -- har kandil thoda alag [bahar, andar, phundne]
+const FT_KANDIL_COLS = [['#d9480f', '#ffb300', '#b3261e'], ['#c2185b', '#ff80ab', '#7b1fa2'], ['#00897b', '#ffd54f', '#d84315'], ['#e65100', '#ffe082', '#c62828']];
+// Taara wala aakash kandil (5 kone)
+function ftStarKandilSvg(c) {
+  c = c || FT_KANDIL_COLS[1];
+  const pts = (R, r) => { let a = []; for (let k = 0; k < 10; k++) { const ang = -Math.PI / 2 + k * Math.PI / 5, rr = k % 2 ? r : R; a.push(ftN(12 + Math.cos(ang) * rr) + ',' + ftN(21 + Math.sin(ang) * rr)); } return a.join(' '); };
+  return '<svg viewBox="0 0 24 44" aria-hidden="true"><path d="M12 0V8" stroke="#7a2e0e" stroke-width="1"/>' +
+    '<polygon points="' + pts(11.5, 5) + '" fill="' + c[0] + '"/>' +
+    '<polygon points="' + pts(8, 3.5) + '" fill="' + c[1] + '" opacity=".8"/>' +
+    '<circle cx="12" cy="21" r="2.6" fill="#fff3c4"/>' +
+    '<path d="M9.5 30V42M12 30V44M14.5 30V42" stroke="' + c[2] + '" stroke-width="1.1"/>' +
+    '<rect x="8.5" y="29" width="7" height="2" rx="1" fill="#ffc83d"/></svg>';
+}
+// Udne wala kagaz ka kandil (aasmaan ke liye)
+function ftSkyLanternSvg() {
+  return '<svg viewBox="0 0 20 26" aria-hidden="true"><path d="M3 2H17L15 21H5Z" fill="#ff9f1c"/>' +
+    '<ellipse cx="10" cy="13" rx="4.5" ry="7" fill="#ffe08a" opacity=".75"/>' +
+    '<path d="M3 2H17" stroke="#c75c00" stroke-width="1.2"/><circle cx="10" cy="23" r="1.8" fill="#fff3c4"/></svg>';
+}
+function ftKandilSvg(c) {
+  c = c || FT_KANDIL_COLS[0];
   return '<svg viewBox="0 0 24 44" aria-hidden="true"><path d="M12 0V7" stroke="#7a2e0e" stroke-width="1"/>' +
     '<rect x="7" y="7" width="10" height="3" rx="1" fill="#ffc83d"/>' +
-    '<path d="M12 10L22 20L12 33L2 20Z" fill="#d9480f"/>' +
-    '<path d="M12 12L18.5 20L12 30.5L5.5 20Z" fill="#ffb300" opacity=".75"/>' +
+    '<path d="M12 10L22 20L12 33L2 20Z" fill="' + c[0] + '"/>' +
+    '<path d="M12 12L18.5 20L12 30.5L5.5 20Z" fill="' + c[1] + '" opacity=".75"/>' +
     '<path d="M12 15L15 20L12 26L9 20Z" fill="#fff3c4" opacity=".7"/>' +
     '<path d="M12 10V33M2 20H22" stroke="#ffc83d" stroke-width=".7" opacity=".8"/>' +
     '<rect x="9" y="33" width="6" height="2" fill="#ffc83d"/>' +
-    '<path d="M10 35V42.5M12 35V44M14 35V42.5" stroke="#b3261e" stroke-width="1.1"/></svg>';
+    '<path d="M10 35V42.5M12 35V44M14 35V42.5" stroke="' + c[2] + '" stroke-width="1.1"/></svg>';
 }
 function ftSparkSvg() {
   return '<svg viewBox="-6 -6 12 12" aria-hidden="true"><path d="M0-6L1.3-1.3L6 0L1.3 1.3L0 6L-1.3 1.3L-6 0L-1.3-1.3Z" fill="#ffd95a"/></svg>';
@@ -4812,7 +4866,7 @@ function ftSparkSvg() {
 
 // ── Theme kits: theme_key -> look. Naya tyohaar yahan judta hai. ──
 const FT_KITS = {
-  diwali: { label: 'Diwali', font: 'Great+Vibes', popup: ftDiwaliCard, decorate: ftDiwaliDecorate }
+  diwali: { label: 'Diwali', font: 'Great+Vibes&family=Rozha+One', popup: ftDiwaliCard, decorate: ftDiwaliDecorate }
 };
 const FT_KIT_PLAIN = { label: 'Plain', popup: ftPlainCard, decorate: () => {} };
 function ftKit(key) { return FT_KITS[key] || FT_KIT_PLAIN; }
@@ -4822,6 +4876,7 @@ function ftDiwaliCard(f) {
     '<div class="ft-garland">' + ftGarland() + '</div>' +
     '<button class="ft-x" type="button" aria-label="Close" onclick="ftPopClose()">✕</button>' +
     '<h2 class="ft-script" id="ftPopTitle">' + maintEsc(f.title || 'Happy Diwali') + '</h2>' +
+    '<div class="ft-hindi" lang="hi">शुभ दीपावली</div>' +
     '<div class="ft-lotus">' + ftLotus() + '</div>' +
     '<p class="ft-msg">' + maintEsc(f.message) + '</p>' +
     '<div class="ft-pop-art">' + ftDiya('ft-dy') + ftRangoli('ft-rg') + ftDiya('ft-dy', .7) + '</div>' +
@@ -4837,9 +4892,9 @@ function ftPlainCard(f) {
 
 // Script font sirf tab load ho jab tyohaar chal raha ho
 function ftLoadFont(kit) {
-  if (!kit.font || document.getElementById('ftFont-' + kit.font)) return;
+  if (!kit.font || document.getElementById('ftFont-' + kit.font.replace(/[^a-z0-9]/gi, ''))) return;
   const l = document.createElement('link');
-  l.id = 'ftFont-' + kit.font; l.rel = 'stylesheet';
+  l.id = 'ftFont-' + kit.font.replace(/[^a-z0-9]/gi, ''); l.rel = 'stylesheet';
   l.href = 'https://fonts.googleapis.com/css2?family=' + kit.font + '&display=swap';
   document.head.appendChild(l);
 }
@@ -4955,15 +5010,57 @@ function ftDiwaliDecorate() {
     document.body.appendChild(el); return el;
   };
   const phone = window.innerWidth <= 768;
-  for (let i = 0; i < (phone ? 2 : 4); i++) add('ft-kandil', ftKandilSvg()).style.animationDelay = (i * -1.3) + 's';
-  for (let i = 0; i < (phone ? 5 : 9); i++) {
-    const s = add('ft-spark', ftSparkSvg());
+  // Kandil: Lite me 4 (phone 2), Full me 6 (phone 3) -- heera aur taara baari-baari, rang alag
+  const nK = phone ? 3 : 6, nLite = phone ? 2 : 4;
+  for (let i = 0; i < nK; i++) {
+    const c = FT_KANDIL_COLS[i % FT_KANDIL_COLS.length];
+    const k = add('ft-kandil' + (i >= nLite ? ' ft-full-only' : ''), i % 2 ? ftStarKandilSvg(c) : ftKandilSvg(c));
+    k.style.animationDelay = (i * -1.3) + 's';
+  }
+  for (let i = 0; i < (phone ? 7 : 14); i++) {
+    const s = add('ft-spark' + (i >= (phone ? 5 : 9) ? ' ft-full-only' : ''), ftSparkSvg());
     const z = 7 + Math.random() * 6;
     s.style.width = s.style.height = z.toFixed(0) + 'px';
     s.style.animationDuration = (5 + Math.random() * 4).toFixed(1) + 's';
     s.style.animationDelay = (-Math.random() * 8).toFixed(1) + 's';
   }
-  add('ft-corner ft-rangoli', ftRangoli());
+  // Aasmaan (sirf Full): udte kandil + halki aatishbaazi, sab card ke peeche
+  const sky = document.createElement('div');
+  sky.className = 'ft-sky ft-deco'; sky.setAttribute('aria-hidden', 'true');
+  let h = '';
+  for (let i = 0; i < (phone ? 4 : 8); i++) {
+    h += '<div class="ft-fly" style="left:' + (4 + Math.random() * 90).toFixed(1) + '%;animation-duration:' + (26 + Math.random() * 16).toFixed(1) +
+      's;animation-delay:' + (-Math.random() * 40).toFixed(1) + 's;transform-origin:50% 0">' + ftSkyLanternSvg() + '</div>';
+  }
+  const cols = ['#ffc83d', '#ff9800', '#ff8fab', '#ffd95a', '#f06292'];
+  for (let b = 0; b < (phone ? 2 : 4); b++) {
+    h += '<div class="ft-burst" style="left:' + (10 + Math.random() * 80).toFixed(0) + '%;top:' + (14 + Math.random() * 30).toFixed(0) + '%">';
+    for (let k = 0; k < 14; k++) {
+      const a = k / 14 * Math.PI * 2, r = 40 + (k % 3) * 12;
+      h += '<i style="background:' + cols[(k + b) % cols.length] + ';--dx:' + Math.round(Math.cos(a) * r) + 'px;--dy:' + Math.round(Math.sin(a) * r) + 'px;animation-delay:' + (b * 1.6).toFixed(1) + 's"></i>';
+    }
+    h += '</div>';
+  }
+  sky.innerHTML = h;
+  document.body.appendChild(sky);
+  // Deepmala -- banner ke upar kinare par diyon ki kataar (sirf Full)
+  const ban = document.getElementById('ftBanner');
+  if (ban) {
+    const dm = document.createElement('div');
+    dm.className = 'ft-deepmala ft-deco'; dm.setAttribute('aria-hidden', 'true');
+    let d = ''; for (let i = 0; i < (phone ? 9 : 21); i++) d += ftDiya('', (i * .37 % 1.6).toFixed(2));
+    dm.innerHTML = d;
+    ban.appendChild(dm);
+  }
+  add('ft-corner ft-rangoli', ftRangoli() + '<span class="ft-rpill ft-full-only" lang="hi">शुभ दीपावली</span>');
+  const fl = document.createElement('div');
+  fl.className = 'ft-floor ft-deco ft-full-only'; fl.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(fl);
+  if (ban) {                                     // banner me Hindi badge (Full, desktop)
+    const hb = document.createElement('span');
+    hb.className = 'ft-hbadge ft-full-only'; hb.lang = 'hi'; hb.textContent = 'दीपावली की हार्दिक शुभकामनाएँ';
+    ban.insertBefore(hb, ban.querySelector('.ft-bmsg'));
+  }
   add('ft-corner ft-diyas', ftDiya('', 0) + ftDiya('', .6));
 }
 
@@ -4991,7 +5088,8 @@ function ftPad() {
   const m = b.querySelector('.ft-bmsg');
   if (m && !b.classList.contains('open')) b.classList.toggle('ft-clamped', m.scrollHeight > m.clientHeight + 1);
   const r = b.getBoundingClientRect();
-  document.body.style.setProperty('--ft-pad', Math.ceil(window.innerHeight - r.top + 12) + 'px');
+  const extra = ftMode() === 'full' && b.querySelector('.ft-deepmala') ? 18 : 0;   // diyon ki kataar banner ke upar
+  document.body.style.setProperty('--ft-pad', Math.ceil(window.innerHeight - r.top + 12 + extra) + 'px');
 }
 
 // Is jagah text ya control hai? (sajawat pointer-events:none hai, isliye
@@ -5030,13 +5128,14 @@ function ftPlace() {
   const top = Math.round(tb.getBoundingClientRect().bottom) - 1;
   const ml = Math.max(0, main.getBoundingClientRect().left), mw = window.innerWidth - ml;
   const ban = document.getElementById('ftBanner');
-  const banTop = ban ? ban.getBoundingClientRect().top : window.innerHeight;
+  const banTop = ban ? ban.getBoundingClientRect().top - (ftMode() === 'full' && ban.querySelector('.ft-deepmala') ? 18 : 0) : window.innerHeight;
 
   const kands = [...document.querySelectorAll('.ft-kandil')];
   const taken = [];
   const fracs = [.03, .97, .32, .68, .5, .15, .85, .42, .58, .24, .76];
   kands.forEach(k => {
     const w = k.offsetWidth, h = k.offsetHeight;
+    if (!w) return;                               // Lite me chhupa (display:none)
     // dhaaga top bar se nikalta hai -- jaanch uske theek neeche se
     const ok = x => !taken.some(t => Math.abs(t - x) < w * 3) && !ftRectBusy(x, top + 4, w, h - 4);
     let x = k.style.left ? parseFloat(k.style.left) : NaN;
@@ -5059,7 +5158,8 @@ function ftPlace() {
   // Chamak: screen ka lagbhag ek tihai (top bar ke neeche ka upar wala hissa)
   const sh = Math.max(80, Math.round(window.innerHeight / 3));
   document.querySelectorAll('.ft-spark').forEach(s => {
-    const z = s.offsetWidth || 10;
+    if (!s.offsetWidth) return;
+    const z = s.offsetWidth;
     const cur = s.style.left && !s.classList.contains('ft-hide');
     if (cur && !ftRectBusy(parseFloat(s.style.left), parseFloat(s.style.top), z, z)) return;
     for (let i = 0; i < 6; i++) {
