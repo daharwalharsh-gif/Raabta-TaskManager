@@ -564,6 +564,9 @@ const MYSQL_SCHEMA = {
     fest_date: "VARCHAR(20) DEFAULT ''",
     started_at: "VARCHAR(40) DEFAULT ''",
     is_active: "VARCHAR(2) DEFAULT '0'",
+    // full / lite / off -- SIRF owner badalta hai, sabke liye ek (user, 6 Nov:
+    // "control sirf Harsh aur Akhilesh ke paas")
+    mode: "VARCHAR(10) DEFAULT 'full'",
     created_by: "VARCHAR(20) DEFAULT ''",
     created_at: "VARCHAR(40) DEFAULT ''"
   },
@@ -6695,12 +6698,25 @@ async function ensureFestivalsTab(d) {
       range: 'Festivals!A1:K1',
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: [['id', 'theme_key', 'title', 'message', 'date_from', 'date_to',
-        'fest_date', 'started_at', 'is_active', 'created_by', 'created_at']] }
+        'fest_date', 'started_at', 'is_active', 'created_by', 'created_at', 'mode']] }
     }));
     delete d._hdrCache['Festivals'];
     delete d._cache['Festivals'];
   }
+  // Sheets: purana tab (mode column se pehle bana) -- header L1 me jodo. MySQL me schema khud jodta hai.
+  if (d instanceof SheetDB) {
+    const h = await d.getHeaders('Festivals');
+    if (!h.includes('mode')) {
+      await withRetry(() => d.sheets.spreadsheets.values.update({
+        spreadsheetId: SHEET_ID, range: 'Festivals!' + idxToColLetter(h.length) + '1',
+        valueInputOption: 'RAW', requestBody: { values: [['mode']] }
+      }));
+      delete d._hdrCache['Festivals']; delete d._cache['Festivals'];
+    }
+  }
 }
+const FEST_MODES = ['full', 'lite', 'off'];
+function festMode(r) { const m = String((r && r.mode) || '').toLowerCase(); return FEST_MODES.includes(m) ? m : 'full'; }
 
 // Tab + ek baar ka Diwali seed. Marker App_State me, taaki owner seed wali
 // row delete kare to wo dobara na aa jaye.
@@ -6741,7 +6757,7 @@ function festOut(r, today) {
     dateFrom: r.date_from || '', dateTo: r.date_to || '', festDate: r.fest_date || '',
     startedAt: r.started_at || '', isActive: String(r.is_active) === '1',
     createdBy: r.created_by || '', createdAt: r.created_at || '',
-    status: festStatus(r, today), key: festKey(r)
+    mode: festMode(r), status: festStatus(r, today), key: festKey(r)
   };
 }
 
@@ -6764,7 +6780,13 @@ function festClean(body, old) {
   if (!dateTo) return { error: 'Date to is missing or invalid' };
   if (dateTo < dateFrom) return { error: 'Date to must be on or after Date from' };
   if (String(rawFest || '').trim() && !festDate) return { error: 'Festival day is invalid' };
-  return { row: { theme_key: themeKey, title, message, date_from: dateFrom, date_to: dateTo, fest_date: festDate } };
+  const row = { theme_key: themeKey, title, message, date_from: dateFrom, date_to: dateTo, fest_date: festDate };
+  if (b.mode !== undefined) {
+    const m = String(b.mode || '').toLowerCase();
+    if (!FEST_MODES.includes(m)) return { error: 'Look must be Full, Lite or Off' };
+    row.mode = m;
+  }
+  return { row };
 }
 
 // Koi bhi logged-in user: abhi kaunsa tyohaar chal raha hai (ya null).
@@ -6783,7 +6805,7 @@ app.get('/api/festivals/current', requireAuth, async (req, res) => {
       today,
       festival: r ? {
         id: r.id, themeKey: r.theme_key || '', title: r.title || '', message: r.message || '',
-        festDate: r.fest_date || '', today, key: festKey(r)
+        festDate: r.fest_date || '', mode: festMode(r), today, key: festKey(r)
       } : null
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -6854,6 +6876,20 @@ app.post('/api/festivals/:id/start', requireAuth, requireFestOwner, async (req, 
 });
 
 // End: theme band -- sabki screen se agle poll (2 min) par hat jaata hai
+// Full / Lite / Off -- sirf owner; sabke liye agle poll par lagta hai. Key nahi
+// badalti, isliye popup dobara nahi aata.
+app.post('/api/festivals/:id/mode', requireAuth, requireFestOwner, async (req, res) => {
+  try {
+    const d = await festEnsure();
+    const mode = String((req.body && req.body.mode) || '').toLowerCase();
+    if (!FEST_MODES.includes(mode)) return res.status(400).json({ error: 'Mode must be full, lite or off' });
+    const old = await d.findOne('Festivals', { id: String(req.params.id) });
+    if (!old) return res.status(404).json({ error: 'Festival not found' });
+    const row = await d.update('Festivals', old.id, { mode });
+    res.json({ success: true, festival: festOut({ ...old, ...row, mode }, obTodayIST()) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.post('/api/festivals/:id/end', requireAuth, requireFestOwner, async (req, res) => {
   try {
     const d = await festEnsure();

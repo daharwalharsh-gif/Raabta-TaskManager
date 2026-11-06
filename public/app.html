@@ -2386,9 +2386,15 @@ body.ft-on.ft-mode-full #topbarTitle::after{content:'';display:inline-block;widt
               <input type="date" id="ftTo"/>
             </div>
           </div>
-          <div class="form-group">
-            <label for="ftFest">Festival day (optional)</label>
-            <input type="date" id="ftFest"/>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="ftFest">Festival day (optional)</label>
+              <input type="date" id="ftFest"/>
+            </div>
+            <div class="form-group">
+              <label for="ftLook">Look for everyone</label>
+              <select id="ftLook"><option value="full">Full</option><option value="lite">Lite</option><option value="off">Off (greeting only)</option></select>
+            </div>
           </div>
           <div class="ft-adm-btns">
             <button class="btn btn-primary" id="ftBtnSave" onclick="ftAdmSave()">Save</button>
@@ -4960,7 +4966,7 @@ function ftDecorate(f) {
   document.body.classList.add('ft-run', 'ft-k-' + (f.themeKey || 'plain'));
   // Full / Lite / Off -- top bar me, bell ke pehle
   const acts = document.getElementById('topbarActions');
-  if (acts) {
+  if (acts && ME && ME.festOwner === true) {       // control sirf owner ke paas
     const m = document.createElement('div');
     m.id = 'ftMode'; m.className = 'ft-mode'; m.setAttribute('role', 'group'); m.setAttribute('aria-label', 'Festival theme');
     m.innerHTML = '<span class="lbl">Festival theme</span>' +
@@ -5065,9 +5071,17 @@ function ftDiwaliDecorate() {
 }
 
 // Full / Lite / Off (har user ka apna, is browser me yaad)
-const FT_MODE_KEY = 'festThemeMode';
-function ftMode() { const m = ftLsGet(FT_MODE_KEY); return (m === 'lite' || m === 'off') ? m : 'full'; }
-function ftSetMode(m) { ftLsSet(FT_MODE_KEY, m); ftApplyMode(); }
+// Mode server se aata hai (festival ka) -- sabke liye ek. Switch SIRF owner ko
+// (Harsh / Akhilesh); server bhi doosron ko 403 deta hai.
+function ftMode() { const m = _ftCur && _ftCur.mode; return (m === 'lite' || m === 'off') ? m : 'full'; }
+async function ftSetMode(m) {
+  if (!_ftCur || !(ME && ME.festOwner === true)) return;
+  const before = _ftCur.mode;
+  _ftCur.mode = m; ftApplyMode();                  // turant apne paas
+  const r = await api('/api/festivals/' + _ftCur.id + '/mode', 'POST', { mode: m });
+  if (!r || r.error) { _ftCur.mode = before; ftApplyMode(); showToast((r && r.error) || 'Could not change theme', 'error'); return; }
+  showToast('Theme set to ' + m[0].toUpperCase() + m.slice(1) + ' for everyone (within 2 minutes)');
+}
 function ftApplyMode() {
   if (_ftState !== 'decor') return;
   const m = ftMode(), cl = document.body.classList;
@@ -5203,6 +5217,7 @@ function ftApply(f) {
   if (same) {                                        // wahi tyohaar -- sirf message badla ho sakta hai
     const m = document.querySelector('#ftBanner .ft-bmsg');
     if (m && m.textContent !== f.message) { m.textContent = f.message; document.getElementById('ftBanner').title = f.message; ftPad(); }
+    if (_ftState === 'decor') ftApplyMode();       // owner ne Full / Lite / Off badla ho
     return;
   }
   ftUndecorate();
@@ -5252,7 +5267,7 @@ function ftAdmRenderList() {
     '<div class="ft-adm-row' + (String(f.id) === String(_ftSelId) ? ' sel' : '') + '" onclick="ftAdmSelect(\'' + f.id + '\')">' +
       '<div style="flex:1;min-width:0"><div class="t">' + maintEsc(f.title) + '</div>' +
       '<div class="s">' + maintEsc((ftKit(f.themeKey).label) + ' · ' + ftFmtD(f.dateFrom) + ' to ' + ftFmtD(f.dateTo) +
-        (f.festDate ? ' · festival day ' + ftFmtD(f.festDate) : '')) + '</div></div>' + ftChip(f.status) + '</div>').join('');
+        (f.festDate ? ' · festival day ' + ftFmtD(f.festDate) : '') + ' · look ' + (f.mode || 'full')) + '</div></div>' + ftChip(f.status) + '</div>').join('');
 }
 function ftAdmSelect(id) { _ftSelId = String(id); ftAdmRenderList(); ftAdmFill(); }
 function ftAdmNew() { _ftSelId = ''; ftAdmRenderList(); ftAdmFill(); document.getElementById('ftTitle').focus(); }
@@ -5261,7 +5276,7 @@ function ftAdmFill() {
   const f = _ftList.find(x => String(x.id) === String(_ftSelId)) || null;
   const v = (id, val) => { document.getElementById(id).value = val || ''; };
   v('ftTitle', f ? f.title : 'Happy Diwali'); v('ftTheme', f ? f.themeKey : 'diwali'); v('ftMsg', f ? f.message : '');
-  v('ftFrom', f ? f.dateFrom : ''); v('ftTo', f ? f.dateTo : ''); v('ftFest', f ? f.festDate : '');
+  v('ftFrom', f ? f.dateFrom : ''); v('ftTo', f ? f.dateTo : ''); v('ftFest', f ? f.festDate : ''); v('ftLook', f ? f.mode : 'full');
   if (f && !FT_KITS[f.themeKey]) {      // purana / naya key jiska kit nahi -- select me dikhao
     const o = document.createElement('option'); o.value = f.themeKey; o.textContent = f.themeKey + ' (plain)';
     document.getElementById('ftTheme').appendChild(o); v('ftTheme', f.themeKey);
@@ -5279,7 +5294,8 @@ function ftAdmForm() {
   return {
     title: document.getElementById('ftTitle').value.trim(), themeKey: document.getElementById('ftTheme').value,
     message: document.getElementById('ftMsg').value.trim(), dateFrom: document.getElementById('ftFrom').value,
-    dateTo: document.getElementById('ftTo').value, festDate: document.getElementById('ftFest').value
+    dateTo: document.getElementById('ftTo').value, festDate: document.getElementById('ftFest').value,
+    mode: document.getElementById('ftLook').value
   };
 }
 async function ftAdmSave(quiet) {
@@ -5287,7 +5303,7 @@ async function ftAdmSave(quiet) {
   const r = _ftSelId ? await api('/api/festivals/' + _ftSelId, 'PUT', body) : await api('/api/festivals', 'POST', body);
   if (!r || r.error) { ftAdmErr((r && r.error) || 'Could not save'); return null; }
   _ftSelId = String(r.festival.id);
-  if (!quiet) { showToast('Festival saved'); await loadFestivals(); }
+  if (!quiet) { showToast('Festival saved'); await loadFestivals(); ftPoll(); }
   return r.festival;
 }
 async function ftAdmStart() {
