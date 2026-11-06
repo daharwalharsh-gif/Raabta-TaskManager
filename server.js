@@ -552,6 +552,21 @@ const MYSQL_SCHEMA = {
     name: "VARCHAR(160) DEFAULT ''",
     created_at: "VARCHAR(40) DEFAULT ''"
   },
+  // Festival Themes (6 Nov 2026): owner ek tyohaar "Start" karta hai -> sabko
+  // pehle greeting popup, phir theme khatam hone tak app sajta hai.
+  // theme_key = kaunsa look ('diwali'; aage 'holi', 'christmas'...).
+  // Dates YYYY-MM-DD (IST). started_at = "Start now" dabane ka waqt -- har
+  // baar badalta hai, isliye popup dobara dikhta hai.
+  Festivals: {
+    theme_key: "VARCHAR(40) DEFAULT ''", title: "VARCHAR(160) DEFAULT ''",
+    message: "TEXT",
+    date_from: "VARCHAR(20) DEFAULT ''", date_to: "VARCHAR(20) DEFAULT ''",
+    fest_date: "VARCHAR(20) DEFAULT ''",
+    started_at: "VARCHAR(40) DEFAULT ''",
+    is_active: "VARCHAR(2) DEFAULT '0'",
+    created_by: "VARCHAR(20) DEFAULT ''",
+    created_at: "VARCHAR(40) DEFAULT ''"
+  },
   Task_Comments: {
     task_id: "VARCHAR(20) DEFAULT ''", task_type: "VARCHAR(20) DEFAULT ''",
     user_id: "VARCHAR(20) DEFAULT ''", comment: "TEXT", created_at: "VARCHAR(40) DEFAULT ''"
@@ -2356,6 +2371,8 @@ app.get('/api/me', requireAuth, async (req, res) => {
       goldSystem: goldAllowed(user),
       castingSystem: castingAllowed(user),
       misAll: misAllowedUser(user),
+      // Festival Themes ka menu -- sirf FESTIVAL_OWNER_EMAILS wale (server bhi yahi jaanchta hai)
+      festOwner: festOwnerAllowed(user),
       maintView: maintAccessFor(user).view,
       maintPerson: maintAccessFor(user).person
     });
@@ -6619,6 +6636,231 @@ app.delete('/api/holidays/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
     await db.delete('Holidays', req.params.id);
     res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ══════════════════════════════════════════════════════
+// FESTIVAL THEMES
+// ══════════════════════════════════════════════════════
+// Owner "Start now" dabata hai -> har logged-in user ko pehle greeting
+// popup, phir theme khatam hone tak app sajta hai. Look client me hai
+// (theme_key se), yahan sirf data. Sab kuch db.findAll/insert/update/delete
+// se -- MySQL aur Google Sheets dono par ek jaisa chalta hai.
+//
+// Kaun chala sakta hai: sirf FESTIVAL_OWNER_EMAILS (comma se kai). Env set
+// na ho to Harsh + Akhilesh. Menu chhupana kaafi nahi -- har admin endpoint
+// par yahin jaanch hoti hai.
+const FESTIVAL_OWNER_DEFAULT = ['harsh@gmail.com', 'akhileshvyas@e-marketingtech.in'];
+function festOwnerEmails() {
+  const env = String(process.env.FESTIVAL_OWNER_EMAILS || '')
+    .split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+  return env.length ? env : FESTIVAL_OWNER_DEFAULT;
+}
+function festOwnerAllowed(user) {
+  const em = String((user && user.email) || '').trim().toLowerCase();
+  return !!em && festOwnerEmails().includes(em);
+}
+async function requireFestOwner(req, res, next) {
+  try {
+    const me = await db.findOne('Users', { id: String(req.session.userId) });
+    if (festOwnerAllowed(me)) return next();
+  } catch (e) { /* neeche 403 */ }
+  res.status(403).json({ error: 'Only the festival owner can manage festival themes' });
+}
+
+const FEST_SEED_MARKER = 'festivals_seed_diwali_v1';
+const FEST_SEED = {
+  theme_key: 'diwali', title: 'Happy Diwali',
+  message: 'May the lights of Diwali fill your home with joy, good health and prosperity. ' +
+    'Thank you for your hard work this year; enjoy the holidays with your family — warm wishes from the Team',
+  // Date-specific (user, 6 Nov): 11 Nov 2026 tak -- uske baad apne aap band
+  date_from: '2026-11-06', date_to: '2026-11-11', fest_date: '2026-11-08',
+  // '0' = Draft: deploy hote hi apne aap live NAHI hota, owner Start dabata hai
+  is_active: '0'
+};
+
+// Google Sheets me tab pehli baar khud banana padta hai (MySQL me schema se ban jaata hai)
+async function ensureFestivalsTab(d) {
+  try {
+    await d.findAll('Festivals');
+  } catch (e) {
+    try {
+      await withRetry(() => d.sheets.spreadsheets.batchUpdate({
+        spreadsheetId: SHEET_ID,
+        requestBody: { requests: [{ addSheet: { properties: { title: 'Festivals' } } }] }
+      }));
+    } catch (e2) { /* already exists race */ }
+    await withRetry(() => d.sheets.spreadsheets.values.update({
+      spreadsheetId: SHEET_ID,
+      range: 'Festivals!A1:K1',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [['id', 'theme_key', 'title', 'message', 'date_from', 'date_to',
+        'fest_date', 'started_at', 'is_active', 'created_by', 'created_at']] }
+    }));
+    delete d._hdrCache['Festivals'];
+    delete d._cache['Festivals'];
+  }
+}
+
+// Tab + ek baar ka Diwali seed. Marker App_State me, taaki owner seed wali
+// row delete kare to wo dobara na aa jaye.
+let _festReady = null;
+function festEnsure() {
+  if (!_festReady) {
+    _festReady = (async () => {
+      const d = await getDB();
+      await ensureFestivalsTab(d);
+      await ensureAppStateTab(d);
+      const done = await d.findWhere('App_State', { key_name: FEST_SEED_MARKER });
+      if (!done.length) {
+        const nowStr = obNowIST();
+        await d.insert('Festivals', { ...FEST_SEED, started_at: '', created_by: '', created_at: nowStr });
+        await d.insert('App_State', { key_name: FEST_SEED_MARKER, value: 'diwali seed', updated_at: nowStr });
+      }
+      return d;
+    })().catch(e => { _festReady = null; throw e; });
+  }
+  return _festReady;
+}
+
+// running   = active, aur aaj date_from..date_to ke beech
+// scheduled = active, date_from abhi aage hai (us din apne aap chalega)
+// ended     = End dabaya (pehle chala tha) ya date_to nikal gayi
+// draft     = kabhi start hi nahi hua
+function festStatus(r, today) {
+  const on = String(r.is_active) === '1';
+  if (r.date_to && today > r.date_to) return 'ended';
+  if (!on) return r.started_at ? 'ended' : 'draft';
+  if (r.date_from && today < r.date_from) return 'scheduled';
+  return 'running';
+}
+function festKey(r) { return r.id + ':' + (r.started_at || '') + ':' + (r.date_from || ''); }
+function festOut(r, today) {
+  return {
+    id: r.id, themeKey: r.theme_key || '', title: r.title || '', message: r.message || '',
+    dateFrom: r.date_from || '', dateTo: r.date_to || '', festDate: r.fest_date || '',
+    startedAt: r.started_at || '', isActive: String(r.is_active) === '1',
+    createdBy: r.created_by || '', createdAt: r.created_at || '',
+    status: festStatus(r, today), key: festKey(r)
+  };
+}
+
+// Form se aaya data jaancho. Galti ho to { error }.
+function festClean(body, old) {
+  const b = body || {};
+  const pick = (k, oldK) => (b[k] !== undefined ? b[k] : (old ? old[oldK] : ''));
+  const themeKey = String(pick('themeKey', 'theme_key') || '').trim().toLowerCase();
+  const title = String(pick('title', 'title') || '').trim();
+  const message = String(pick('message', 'message') || '').trim();
+  const rawFrom = pick('dateFrom', 'date_from'), rawTo = pick('dateTo', 'date_to'), rawFest = pick('festDate', 'fest_date');
+  const dateFrom = toIsoDateSrv(rawFrom), dateTo = toIsoDateSrv(rawTo);
+  const festDate = String(rawFest || '').trim() ? toIsoDateSrv(rawFest) : '';
+  if (!/^[a-z][a-z0-9-]{1,29}$/.test(themeKey)) return { error: 'Choose a theme' };
+  if (!title) return { error: 'Title is required' };
+  if (title.length > 120) return { error: 'Title is too long (max 120 characters)' };
+  if (!message) return { error: 'Message is required' };
+  if (message.length > 600) return { error: 'Message is too long (max 600 characters)' };
+  if (!dateFrom) return { error: 'Date from is missing or invalid' };
+  if (!dateTo) return { error: 'Date to is missing or invalid' };
+  if (dateTo < dateFrom) return { error: 'Date to must be on or after Date from' };
+  if (String(rawFest || '').trim() && !festDate) return { error: 'Festival day is invalid' };
+  return { row: { theme_key: themeKey, title, message, date_from: dateFrom, date_to: dateTo, fest_date: festDate } };
+}
+
+// Koi bhi logged-in user: abhi kaunsa tyohaar chal raha hai (ya null).
+// Har 2 min poll hota hai -- findAll cache se aata hai, halka hai.
+app.get('/api/festivals/current', requireAuth, async (req, res) => {
+  try {
+    const d = await festEnsure();
+    const today = obTodayIST();
+    const running = (await d.findAll('Festivals'))
+      .filter(r => festStatus(r, today) === 'running')
+      // kai chal rahe hon to jo sabse baad me start hua wahi
+      .sort((a, b) => String(b.started_at || b.date_from || '').localeCompare(String(a.started_at || a.date_from || ''))
+        || (parseInt(b.id, 10) || 0) - (parseInt(a.id, 10) || 0));
+    const r = running[0];
+    res.json({
+      today,
+      festival: r ? {
+        id: r.id, themeKey: r.theme_key || '', title: r.title || '', message: r.message || '',
+        festDate: r.fest_date || '', today, key: festKey(r)
+      } : null
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/festivals', requireAuth, requireFestOwner, async (req, res) => {
+  try {
+    const d = await festEnsure();
+    const today = obTodayIST();
+    const rows = (await d.findAll('Festivals')).map(r => festOut(r, today));
+    rows.sort((a, b) => String(b.dateFrom).localeCompare(String(a.dateFrom)) || (parseInt(b.id, 10) || 0) - (parseInt(a.id, 10) || 0));
+    res.json({ today, festivals: rows });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Naya tyohaar: active = scheduled, date_from aane par khud chalega
+app.post('/api/festivals', requireAuth, requireFestOwner, async (req, res) => {
+  try {
+    const d = await festEnsure();
+    const c = festClean(req.body, null);
+    if (c.error) return res.status(400).json({ error: c.error });
+    const row = await d.insert('Festivals', {
+      ...c.row, started_at: '', is_active: '1',
+      created_by: String(req.session.userId), created_at: obNowIST()
+    });
+    res.json({ success: true, festival: festOut(row, obTodayIST()) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/festivals/:id', requireAuth, requireFestOwner, async (req, res) => {
+  try {
+    const d = await festEnsure();
+    const old = await d.findOne('Festivals', { id: String(req.params.id) });
+    if (!old) return res.status(404).json({ error: 'Festival not found' });
+    const c = festClean(req.body, old);
+    if (c.error) return res.status(400).json({ error: c.error });
+    const row = await d.update('Festivals', old.id, c.row);
+    res.json({ success: true, festival: festOut({ ...old, ...row }, obTodayIST()) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/festivals/:id', requireAuth, requireFestOwner, async (req, res) => {
+  try {
+    const d = await festEnsure();
+    const old = await d.findOne('Festivals', { id: String(req.params.id) });
+    if (!old) return res.status(404).json({ error: 'Festival not found' });
+    await d.delete('Festivals', old.id);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Start now: theme chalu (is_active=1). Dates KABHI nahi badalte -- user
+// (6 Nov): "date specific hona chahiye". date_from..date_to ke beech ho to
+// turant chalta hai; date_from aage ho to us din apne aap. started_at naya
+// -> key nayi -> sabko popup ek baar aur.
+app.post('/api/festivals/:id/start', requireAuth, requireFestOwner, async (req, res) => {
+  try {
+    const d = await festEnsure();
+    const old = await d.findOne('Festivals', { id: String(req.params.id) });
+    if (!old) return res.status(404).json({ error: 'Festival not found' });
+    const today = obTodayIST();
+    if (old.date_to && old.date_to < today)
+      return res.status(400).json({ error: 'Date to has already passed. Change Date to first, then Start.' });
+    const patch = { is_active: '1', started_at: obNowIST() };
+    const row = await d.update('Festivals', old.id, patch);
+    res.json({ success: true, festival: festOut({ ...old, ...row }, today) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// End: theme band -- sabki screen se agle poll (2 min) par hat jaata hai
+app.post('/api/festivals/:id/end', requireAuth, requireFestOwner, async (req, res) => {
+  try {
+    const d = await festEnsure();
+    const old = await d.findOne('Festivals', { id: String(req.params.id) });
+    if (!old) return res.status(404).json({ error: 'Festival not found' });
+    const row = await d.update('Festivals', old.id, { is_active: '0' });
+    res.json({ success: true, festival: festOut({ ...old, ...row }, obTodayIST()) });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

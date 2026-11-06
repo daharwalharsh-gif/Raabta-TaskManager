@@ -1715,6 +1715,173 @@ tr.fms-ent-pend td:first-child{box-shadow:inset 3px 0 0 #f59e0b;}
   .fest-wish{font-size:24px;}
 }
 
+/* ══════════════════════════════════════════════════════
+   FESTIVAL THEMES (6 Nov 2026) -- owner "Start now" dabata hai
+   ══════════════════════════════════════════════════════
+   Pehle greeting popup, band karne ke baad sajawat. Tyohaar ke rang SIRF
+   sajawat, popup aur neeche wale banner me -- app ke apne button, table,
+   menu apne normal rang me. Sajawat pointer-events:none, koi click nahi
+   rokti. Ye CSS tab tak kuch nahi karta jab tak body par ft-on na lage. */
+.ft-deco,.ft-deco *{pointer-events:none;}
+body.ft-on{--ft-th:40px;}
+/* Toran top bar ki apni jagah (padding) me -- title / button kabhi nahi dhakta */
+body.ft-on .topbar{height:calc(60px + var(--ft-th));padding-top:var(--ft-th);}
+.ft-toran{position:absolute;left:0;right:0;top:0;height:var(--ft-th);
+  background-repeat:repeat-x;background-size:auto 100%;background-position:0 0;}
+body.ft-on .fms-bar{top:calc(60px + var(--ft-th));}
+body.ft-on .fms-top{top:calc(60px + var(--ft-th) + var(--fms-bar-h,55px));}
+body.ft-on #fmsList .ob-listcard{max-height:calc(100vh - 60px - var(--ft-th) - var(--fms-bar-h,55px) - var(--fms-top-h,0px) - 34px - var(--ft-pad,0px));}
+body.ft-on .main{padding-bottom:var(--ft-pad,90px);}
+body.ft-on #toast{bottom:var(--ft-pad,90px) !important;}
+
+/* Kandil -- JS top bar ke theek neeche latkata hai, jahan text / control na ho */
+.ft-kandil{position:fixed;z-index:89;width:24px;height:44px;transform-origin:50% 0;
+  animation:ftSwing 4.8s ease-in-out infinite;transition:opacity .4s;}
+.ft-kandil svg{width:100%;height:100%;display:block;filter:drop-shadow(0 2px 4px rgba(179,38,30,.35));}
+@keyframes ftSwing{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}}
+.ft-spark{position:fixed;z-index:88;width:10px;height:10px;opacity:0;animation:ftTwinkle 6s ease-in-out infinite;}
+.ft-spark svg{width:100%;height:100%;display:block;}
+@keyframes ftTwinkle{0%,100%{opacity:0;transform:scale(.4) rotate(0)}50%{opacity:.75;transform:scale(1) rotate(45deg)}}
+.ft-corner{position:fixed;z-index:88;transition:opacity .4s;}
+.ft-corner.ft-rangoli{width:64px;height:64px;opacity:.92;}
+.ft-corner.ft-rangoli svg{width:100%;height:100%;animation:ftSpin 80s linear infinite;}
+@keyframes ftSpin{to{transform:rotate(360deg)}}
+.ft-corner.ft-diyas{display:flex;gap:4px;align-items:flex-end;}
+.ft-corner.ft-diyas svg{width:34px;height:29px;}
+.ft-kandil.ft-hide,.ft-corner.ft-hide,.ft-spark.ft-hide{opacity:0 !important;animation-play-state:paused;}
+
+/* Diya ki lau -- halki si timtimahat */
+.ft-flame{transform-box:fill-box;transform-origin:50% 100%;animation:ftFlick 1.6s ease-in-out infinite alternate;}
+@keyframes ftFlick{0%{transform:scale(1,1) skewX(0)}25%{transform:scale(.94,1.07) skewX(2deg)}
+  50%{transform:scale(1.04,.95) skewX(-2deg)}75%{transform:scale(.97,1.04) skewX(1deg)}100%{transform:scale(1,1) skewX(-1deg)}}
+.ft-glow{animation:ftGlow 2.2s ease-in-out infinite alternate;}
+@keyframes ftGlow{from{opacity:.12}to{opacity:.32}}
+
+/* Neeche ki patti -- greeting ka message (date nahi) */
+.ft-banner{position:fixed;z-index:150;left:80px;right:16px;bottom:12px;display:flex;align-items:center;gap:12px;
+  background:#fff4d6;border:1.5px solid #ffc83d;border-radius:12px;padding:6px 14px;
+  box-shadow:0 6px 20px rgba(93,46,11,.14);color:#5d2e0b;font-size:13px;font-weight:600;line-height:1.45;
+  animation:ftFade .5s ease both;}
+.ft-banner > svg{width:30px;height:26px;flex-shrink:0;}
+.ft-bmsg{flex:1;min-width:0;text-align:center;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.ft-banner.ft-clamped{cursor:pointer;}
+.ft-banner.open .ft-bmsg{display:block;-webkit-line-clamp:unset;}
+
+/* Greeting popup */
+.ft-pop{position:fixed;inset:0;z-index:4100;display:flex;align-items:center;justify-content:center;padding:16px;
+  background:rgba(26,8,3,.74);animation:ftFade .4s ease both;overflow-y:auto;overflow-x:hidden;}
+.ft-pop.closing{animation:ftFadeOut .25s ease forwards;}
+@keyframes ftFade{from{opacity:0}to{opacity:1}}
+@keyframes ftFadeOut{to{opacity:0}}
+.ft-pop-fx{position:fixed;inset:0;overflow:hidden;pointer-events:none;}
+.ft-burst{position:absolute;width:0;height:0;}
+.ft-burst i{position:absolute;left:0;top:0;width:5px;height:5px;margin:-2.5px;border-radius:50%;opacity:0;
+  animation:ftBurst 4.2s ease-out infinite;}
+@keyframes ftBurst{0%{transform:translate(0,0) scale(.3);opacity:0}10%{opacity:1}70%{opacity:.7}
+  100%{transform:translate(var(--dx),var(--dy)) scale(.15);opacity:0}}
+.ft-card{position:relative;width:100%;max-width:440px;margin:auto;text-align:center;color:#fff4d6;
+  background:linear-gradient(160deg,#5d2e0b 0%,#8a2a12 55%,#b3261e 100%);border:2px solid #ffc83d;border-radius:16px;
+  padding:0 26px 22px;overflow:hidden;
+  box-shadow:0 24px 70px rgba(0,0,0,.5),inset 0 0 40px rgba(255,200,61,.12);
+  animation:ftRise .6s cubic-bezier(.2,1,.3,1) both;}
+@keyframes ftRise{from{opacity:0;transform:translateY(18px) scale(.95)}to{opacity:1;transform:none}}
+.ft-garland{margin:0 -26px;line-height:0;}
+.ft-garland svg{width:100%;height:auto;display:block;}
+.ft-x{position:absolute;top:8px;right:8px;z-index:2;width:32px;height:32px;border-radius:50%;cursor:pointer;
+  border:1px solid rgba(255,200,61,.7);background:rgba(93,46,11,.85);color:#ffc83d;font-size:15px;line-height:1;}
+.ft-x:hover{background:#5d2e0b;}
+.ft-script{font-family:'Great Vibes',cursive;font-weight:400;font-size:58px;line-height:1.1;color:#ffc83d;
+  margin:2px 0 0;text-shadow:0 2px 14px rgba(255,170,0,.45);}
+.ft-lotus{line-height:0;}
+.ft-lotus svg{width:170px;height:22px;}
+.ft-msg{font-size:14.5px;line-height:1.65;margin:10px 4px 4px;color:#fff4d6;}
+.ft-pop-art{display:flex;align-items:flex-end;justify-content:center;gap:14px;margin:10px 0 14px;}
+.ft-pop-art .ft-rg{width:92px;height:92px;}
+.ft-pop-art .ft-dy{width:46px;height:39px;}
+.ft-ok{border:none;cursor:pointer;background:#ffc83d;color:#5d2e0b;font:700 14px 'Inter',sans-serif;
+  padding:11px 34px;border-radius:999px;box-shadow:0 8px 20px rgba(0,0,0,.3);transition:background .15s;}
+.ft-ok:hover{background:#ffd76a;}
+.ft-ok:focus-visible,.ft-x:focus-visible{outline:3px solid #fff4d6;outline-offset:2px;}
+/* Theme jiska kit abhi nahi bana -- saada card */
+.ft-card.ft-plain{background:#fff;color:#1e293b;border-color:#e2e8f0;padding-top:26px;}
+.ft-card.ft-plain .ft-script{color:#0f172a;font-family:'Inter',sans-serif;font-weight:800;font-size:28px;text-shadow:none;}
+.ft-card.ft-plain .ft-msg{color:#334155;}
+.ft-card.ft-plain .ft-x{background:#f1f5f9;color:#475569;border-color:#e2e8f0;}
+
+@media(max-width:768px){
+  body.ft-on{--ft-th:30px;}
+  body.ft-on .topbar{height:calc(52px + var(--ft-th));}
+  body.ft-on .fms-bar{top:calc(52px + var(--ft-th));}
+  .ft-kandil{width:20px;height:37px;}
+  .ft-corner.ft-rangoli{width:46px;height:46px;}
+  .ft-corner.ft-diyas svg{width:26px;height:22px;}
+  /* bottom nav aur iPhone ki safe-area ke upar */
+  .ft-banner{left:10px;right:10px;bottom:calc(80px + env(safe-area-inset-bottom,0px));
+    font-size:11.5px;padding:5px 10px;gap:8px;}
+  .ft-banner > svg{width:24px;height:21px;}
+}
+@media(max-width:480px){
+  .ft-card{padding:0 16px 18px;}
+  .ft-garland{margin:0 -16px;}
+  .ft-script{font-size:46px;}
+  .ft-msg{font-size:13.5px;}
+  .ft-pop-art{gap:10px;}
+  .ft-pop-art .ft-rg{width:74px;height:74px;}
+  .ft-pop-art .ft-dy{width:38px;height:32px;}
+}
+/* Full / Lite / Off -- har user apne liye (localStorage). Lite = toran,
+   kandil aur banner; Full = upar se chamak, kone ke diye/rangoli, card ke
+   phool aur halka phool-pattern; Off = kuch nahi (greeting phir bhi ek baar). */
+.ft-mode{display:none;align-items:center;gap:2px;background:#fff;border:1px solid #e2e8f0;border-radius:999px;
+  padding:3px;font-family:'Inter',sans-serif;}
+body.ft-run .ft-mode{display:inline-flex;}
+.ft-mode .lbl{font-size:12px;font-weight:600;color:#334155;padding:0 8px 0 9px;white-space:nowrap;}
+.ft-mode button{border:none;background:none;cursor:pointer;font:600 12px 'Inter',sans-serif;color:#64748b;
+  padding:4px 11px;border-radius:999px;}
+.ft-mode button:hover{color:#0f172a;}
+.ft-mode button[aria-pressed="true"]{background:#ffc83d;color:#5d2e0b;}
+.ft-mode button:focus-visible{outline:2px solid #10b981;outline-offset:1px;}
+body.ft-mode-lite .ft-spark,body.ft-mode-lite .ft-corner{display:none;}
+body.ft-on.ft-mode-full .ov-card{position:relative;}
+body.ft-on.ft-mode-full .ov-card::after{content:'';position:absolute;top:10px;right:10px;width:26px;height:26px;pointer-events:none;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-12 -12 24 24'%3E%3Cg fill='%23f7931e'%3E%3Cellipse cy='-7' rx='2.3' ry='4.6'/%3E%3Cellipse cy='-7' rx='2.3' ry='4.6' transform='rotate(30)'/%3E%3Cellipse cy='-7' rx='2.3' ry='4.6' transform='rotate(60)'/%3E%3Cellipse cy='-7' rx='2.3' ry='4.6' transform='rotate(90)'/%3E%3Cellipse cy='-7' rx='2.3' ry='4.6' transform='rotate(120)'/%3E%3Cellipse cy='-7' rx='2.3' ry='4.6' transform='rotate(150)'/%3E%3Cellipse cy='-7' rx='2.3' ry='4.6' transform='rotate(180)'/%3E%3Cellipse cy='-7' rx='2.3' ry='4.6' transform='rotate(210)'/%3E%3Cellipse cy='-7' rx='2.3' ry='4.6' transform='rotate(240)'/%3E%3Cellipse cy='-7' rx='2.3' ry='4.6' transform='rotate(270)'/%3E%3Cellipse cy='-7' rx='2.3' ry='4.6' transform='rotate(300)'/%3E%3Cellipse cy='-7' rx='2.3' ry='4.6' transform='rotate(330)'/%3E%3C/g%3E%3Cg fill='%23ffc928'%3E%3Cellipse cy='-4.6' rx='1.7' ry='3' transform='rotate(15)'/%3E%3Cellipse cy='-4.6' rx='1.7' ry='3' transform='rotate(75)'/%3E%3Cellipse cy='-4.6' rx='1.7' ry='3' transform='rotate(135)'/%3E%3Cellipse cy='-4.6' rx='1.7' ry='3' transform='rotate(195)'/%3E%3Cellipse cy='-4.6' rx='1.7' ry='3' transform='rotate(255)'/%3E%3Cellipse cy='-4.6' rx='1.7' ry='3' transform='rotate(315)'/%3E%3C/g%3E%3Ccircle r='3' fill='%23d9480f'/%3E%3Ccircle r='1.3' fill='%23ffc928'/%3E%3C/svg%3E") center/contain no-repeat;}
+/* Halka phool-pattern -- sirf khaali jagah me dikhta hai (card safed rehte hain) */
+body.ft-on.ft-mode-full .main::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='170' height='170' viewBox='-85 -85 170 170'%3E%3Cg fill='none' stroke='%23e8a000' stroke-opacity='.16' stroke-width='1.2'%3E%3Ccircle r='9'/%3E%3Ccircle r='26'/%3E%3Cellipse cy='-17' rx='6' ry='11'/%3E%3Cellipse cy='-17' rx='6' ry='11' transform='rotate(45)'/%3E%3Cellipse cy='-17' rx='6' ry='11' transform='rotate(90)'/%3E%3Cellipse cy='-17' rx='6' ry='11' transform='rotate(135)'/%3E%3Cellipse cy='-17' rx='6' ry='11' transform='rotate(180)'/%3E%3Cellipse cy='-17' rx='6' ry='11' transform='rotate(225)'/%3E%3Cellipse cy='-17' rx='6' ry='11' transform='rotate(270)'/%3E%3Cellipse cy='-17' rx='6' ry='11' transform='rotate(315)'/%3E%3C/g%3E%3C/svg%3E") 0 0/170px 170px repeat;}
+@media(max-width:768px){
+  .ft-mode .lbl{display:none;}
+  .ft-mode button{padding:3px 8px;font-size:11px;}
+  body.ft-on.ft-mode-full .ov-card::after{top:5px;right:5px;width:15px;height:15px;}
+}
+/* Motion kam chahiye to animation band -- sajawat wahin rehti hai */
+@media (prefers-reduced-motion: reduce){
+  .ft-pop,.ft-pop *,.ft-deco,.ft-deco *,.ft-banner,.ft-banner *{animation:none !important;transition:none !important;}
+  .ft-pop-fx{display:none;}
+  .ft-spark{opacity:.6;}
+}
+
+/* Festival Themes admin page -- app ke apne rang */
+.ft-adm-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:16px;align-items:start;}
+.ft-adm-card{background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;}
+.ft-adm-head{padding:14px 18px;border-bottom:1px solid #eef2f7;font-weight:700;color:#1e293b;font-size:14px;
+  display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.ft-adm-body{padding:16px 18px;}
+.ft-adm-row{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid #f1f5f9;cursor:pointer;}
+.ft-adm-row:hover{background:#f8fafc;}
+.ft-adm-row.sel{background:#ecfdf5;}
+.ft-adm-row .t{font-weight:700;color:#1e293b;font-size:13.5px;}
+.ft-adm-row .s{font-size:12px;color:#64748b;margin-top:2px;}
+.ft-chip{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;white-space:nowrap;}
+.ft-chip.running{background:#dcfce7;color:#15803d;}
+.ft-chip.scheduled{background:#dbeafe;color:#1d4ed8;}
+.ft-chip.ended{background:#f1f5f9;color:#64748b;}
+.ft-chip.draft{background:#fef3c7;color:#b45309;}
+.ft-adm-btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;}
+.ft-adm-btns .sp{flex:1;}
+.ft-adm-note{font-size:12px;color:#64748b;line-height:1.55;margin-top:12px;}
+.ft-adm-count{font-size:11px;color:#94a3b8;text-align:right;margin-top:3px;}
+@media(max-width:900px){.ft-adm-grid{grid-template-columns:1fr;}}
+
 </style>
 </head>
 <body>
@@ -1764,6 +1931,10 @@ tr.fms-ent-pend td:first-child{box-shadow:inset 3px 0 0 #f59e0b;}
     <button class="mob-nav-item" id="mob-casting" style="display:none" onclick="navigate('casting',this);setMobActive(this)">
       <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3zm0 9l8-4.5M12 12v9m0-9L4 7.5"/></svg>
       <span class="mob-nav-label">Casting</span>
+    </button>
+    <button class="mob-nav-item" id="mob-festivals" style="display:none" onclick="navigate('festivals',this);setMobActive(this)">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3c1.8 2.2 2.7 4 2.7 5.4a2.7 2.7 0 01-5.4 0C9.3 7 10.2 5.2 12 3zM4 14h16c-.6 3.9-3.9 6-8 6s-7.4-2.1-8-6zM12 11v3"/></svg>
+      <span class="mob-nav-label">Festival</span>
     </button>
     <button class="mob-nav-item" id="mob-profile" onclick="navigate('profile',this);setMobActive(this)">
       <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
@@ -1850,6 +2021,10 @@ tr.fms-ent-pend td:first-child{box-shadow:inset 3px 0 0 #f59e0b;}
     <div class="nav-item" id="nav-casting" style="display:none" onclick="navigate('casting',this)">
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3zm0 9l8-4.5M12 12v9m0-9L4 7.5"/></svg>
       <span class="nav-label-text">Casting / Stone</span>
+    </div>
+    <div class="nav-item" id="nav-festivals" style="display:none" onclick="navigate('festivals',this)">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3c1.8 2.2 2.7 4 2.7 5.4a2.7 2.7 0 01-5.4 0C9.3 7 10.2 5.2 12 3zM4 14h16c-.6 3.9-3.9 6-8 6s-7.4-2.1-8-6zM12 11v3"/></svg>
+      <span class="nav-label-text">Festival Themes</span>
     </div>
     <div class="nav-divider"></div>
     <div class="nav-item" onclick="navigate('profile',this)">
@@ -2138,6 +2313,69 @@ tr.fms-ent-pend td:first-child{box-shadow:inset 3px 0 0 #f59e0b;}
     <div style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden">
       <div id="leaveListTitle" style="padding:14px 18px;border-bottom:1px solid #eef2f7;font-weight:700;color:#1e293b;font-size:14px">My Leave Requests</div>
       <div id="leaveList"></div>
+    </div>
+  </div>
+
+  <!-- ── FESTIVAL THEMES (sirf owner -- server bhi 403 deta hai) ── -->
+  <div id="page-festivals" class="page">
+    <div class="page-header">
+      <h2>Festival Themes</h2>
+      <button class="btn btn-outline" onclick="ftAdmNew()">+ New festival</button>
+    </div>
+    <div class="ft-adm-grid">
+      <div class="ft-adm-card">
+        <div class="ft-adm-head"><span id="ftAdmFormTitle">New festival</span><span id="ftAdmFormChip"></span></div>
+        <div class="ft-adm-body">
+          <div class="alert error" id="ftAdmErr"></div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="ftTitle">Title</label>
+              <input type="text" id="ftTitle" maxlength="120" placeholder="e.g. Happy Diwali"/>
+            </div>
+            <div class="form-group">
+              <label for="ftTheme">Theme</label>
+              <select id="ftTheme"></select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="ftMsg">Message (greeting text)</label>
+            <textarea id="ftMsg" maxlength="600" style="min-height:92px" placeholder="Shown in the greeting popup and the footer banner" oninput="ftAdmCount()"></textarea>
+            <div class="ft-adm-count" id="ftMsgCount">0 / 600</div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="ftFrom">Date from</label>
+              <input type="date" id="ftFrom"/>
+            </div>
+            <div class="form-group">
+              <label for="ftTo">Date to</label>
+              <input type="date" id="ftTo"/>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="ftFest">Festival day (optional)</label>
+            <input type="date" id="ftFest"/>
+          </div>
+          <div class="ft-adm-btns">
+            <button class="btn btn-primary" id="ftBtnSave" onclick="ftAdmSave()">Save</button>
+            <button class="btn btn-yellow" id="ftBtnStart" onclick="ftAdmStart()">Start now</button>
+            <button class="btn btn-outline" id="ftBtnEnd" onclick="ftAdmEnd()">End</button>
+            <button class="btn btn-outline" onclick="ftAdmPreview()">Preview</button>
+            <span class="sp"></span>
+            <button class="btn btn-sm btn-danger" id="ftBtnDel" onclick="ftAdmDelete()">Delete</button>
+          </div>
+          <div class="ft-adm-note">
+            The theme shows only between <b>Date from</b> and <b>Date to</b>, and stops by itself after Date to.
+            A new festival is scheduled when you save it. <b>Start now</b> turns it on (today if today is in the
+            dates, otherwise on Date from) and shows the greeting once more to everyone. Dates never change on
+            their own. <b>End</b> removes it from every screen within about 2 minutes. No date is shown to users.
+          </div>
+        </div>
+      </div>
+      <div class="ft-adm-card">
+        <div class="ft-adm-head">Festivals <span style="font-weight:500;color:#94a3b8;font-size:12px" id="ftAdmToday"></span></div>
+        <div id="ftAdmList"><div style="padding:18px;color:#94a3b8;font-size:13px">Loading…</div></div>
+      </div>
     </div>
   </div>
 
@@ -4438,6 +4676,9 @@ function festSpanToday(today) {
 
 async function festCheckToday() {
   try {
+    // Festival Theme chal raha ho to purana greeting / patti nahi (user, 6 Nov:
+    // do popup na aayein). Baaki chhuttiyon par purana jaisa hi.
+    try { if (_ftFirst && await _ftFirst) return; } catch (e) {}
     // Browser ki APNI taarikh lo, UTC waali nahi. toISOString() hamesha UTC
     // deta hai, aur IST UTC se 5:30 aage hai -- isliye raat 12 se subah 5:30
     // ke beech wo PICHHLI taarikh bolta hai. 11 October ko raat 1 baje isi
@@ -4457,6 +4698,530 @@ async function festCheckToday() {
     localStorage.setItem('fest_shown', today);
     setTimeout(function () { festShow(naam, today, FEST_AUTO_MS); }, 700);   // page settle hone do
   } catch (e) { /* greeting na aaye to app ka kaam nahi rukna chahiye */ }
+}
+
+// ══════════════════════════════════════════════════════
+// FESTIVAL THEMES (6 Nov 2026)
+// ══════════════════════════════════════════════════════
+// Owner (FESTIVAL_OWNER_EMAILS) ek tyohaar Start karta hai. Har 2 min (aur
+// tab par wapas aane par) /api/festivals/current poochhte hain, isliye jo
+// log pehle se login hain unko bhi bina refresh dikh jaata hai.
+//   1. key != localStorage festWishSeen -> pehle GREETING POPUP
+//   2. popup band (button / ✕ / Esc) -> key save + SAJAWAT shuru
+// Key = id:startedAt:dateFrom -- Start dobara dabane par badalti hai.
+// Koi tyohaar na chale to kuch nahi banta, font bhi load nahi hota.
+// Naya tyohaar = FT_KITS me ek naya theme_key (popup + decorate).
+const FT_POLL_MS = 120000;
+const FT_SEEN_KEY = 'festWishSeen';
+function ftLsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function ftLsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+let _ftCur = null;       // chal raha tyohaar (server ka jawab)
+let _ftState = 'none';   // none | popup | decor
+let _ftFirst = null;     // pehle poll ka promise -> purana greeting iska intezaar karta hai
+let _ftPollT = null, _ftPlaceT = null, _ftLastPoll = 0, _ftObs = null, _ftObsT = 0;
+let _ftPopKey = null, _ftPreview = false, _ftPrevFocus = null;
+
+// ── Diwali ki apni banayi art (inline SVG, koi image / GIF nahi) ──
+const FT_C = { orange: ['#f7931e', '#d9480f'], yellow: ['#ffc928', '#e8a000'], gold: '#ffc83d', maroon: '#5d2e0b' };
+function ftN(v) { return (+v).toFixed(2).replace(/\.?0+$/, ''); }
+// Genda phool: kinare par tooti dashed lakeer = jhaalardaar pankhudiyan
+function ftMarigold(x, y, r, c) {
+  return '<circle cx="' + ftN(x) + '" cy="' + ftN(y) + '" r="' + ftN(r) + '" fill="' + c[0] + '" stroke="' + c[1] +
+    '" stroke-width="' + ftN(r * .5) + '" stroke-dasharray="' + ftN(r * .38) + ' ' + ftN(r * .22) + '"/>' +
+    '<circle cx="' + ftN(x) + '" cy="' + ftN(y) + '" r="' + ftN(r * .42) + '" fill="' + c[1] + '"/>';
+}
+// Aam ka patta (origin = dandi, neeche latakta hai)
+function ftLeaf(x, y, rot, s) {
+  return '<g transform="translate(' + ftN(x) + ' ' + ftN(y) + ') rotate(' + rot + ') scale(' + (s || 1) + ')">' +
+    '<path d="M0 0C3.6 5 3.8 13 0 19.5C-3.8 13-3.6 5 0 0Z" fill="#2e7d32"/>' +
+    '<path d="M0 1.5V18" stroke="#9ccc65" stroke-width=".7"/></g>';
+}
+function ftBell(x, y, s) {
+  return '<g transform="translate(' + ftN(x) + ' ' + ftN(y) + ') scale(' + (s || 1) + ')">' +
+    '<path d="M-3.4 6.2C-3.4 1.4-2 0 0 0S3.4 1.4 3.4 6.2Z" fill="#ffc83d" stroke="#a66f00" stroke-width=".6"/>' +
+    '<circle cy="7.1" r="1.1" fill="#a66f00"/></g>';
+}
+// Toran ka ek tukda 120x40: genda ki jhool, aam ke patton ki jodi, ghanti wali ladi
+function ftToranTile() {
+  const y = t => 3 * (1 - t) * (1 - t) + 58 * (1 - t) * t + 3 * t * t;
+  let s = '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="40" viewBox="0 0 120 40">';
+  s += '<path d="M0 2H120" stroke="#7a2e0e" stroke-width="1.6"/>';
+  [30, 90].forEach(x => { const yy = y(x / 120); s += ftLeaf(x - 1.5, yy, 24) + ftLeaf(x + 1.5, yy, -24); });
+  [15, 105].forEach(x => { const yy = y(x / 120);
+    s += '<path d="M' + x + ' ' + ftN(yy) + 'V' + ftN(yy + 12) + '" stroke="#a66f00" stroke-width=".7"/>' +
+      ftMarigold(x, yy + 8, 2.1, FT_C.orange) + ftBell(x, yy + 12.5, .8); });
+  s += '<path d="M60 16V31" stroke="#a66f00" stroke-width=".8"/>' + ftMarigold(60, 22.5, 2.6, FT_C.yellow) +
+    ftMarigold(60, 27.6, 2.2, FT_C.orange) + ftBell(60, 31.2);
+  s += '<path d="M0 3Q60 29 120 3" fill="none" stroke="#7a2e0e" stroke-width="1"/>';
+  for (let i = 0; i <= 8; i++) { const t = i / 8; s += ftMarigold(t * 120, y(t), 4.3, i % 2 ? FT_C.yellow : FT_C.orange); }
+  return s + '</svg>';
+}
+// Popup ke upar ki maala (poori chaudai)
+function ftGarland() {
+  const y = t => 4 + 112 * t * (1 - t);
+  let s = '<svg viewBox="0 0 400 46" aria-hidden="true"><path d="M0 3Q200 60 400 3" fill="none" stroke="#7a2e0e" stroke-width="1.4"/>';
+  [100, 300].forEach(x => { const yy = y(x / 400); s += ftLeaf(x - 2, yy, 26, 1.2) + ftLeaf(x + 2, yy, -26, 1.2); });
+  s += '<path d="M200 32V40" stroke="#a66f00" stroke-width="1"/>' + ftBell(200, 38.5, 1.1);
+  for (let i = 0; i <= 16; i++) { const t = i / 16; s += ftMarigold(t * 400, y(t), 7, i % 2 ? FT_C.yellow : FT_C.orange); }
+  return s + '</svg>';
+}
+function ftLotus() {
+  return '<svg viewBox="0 0 160 20" aria-hidden="true">' +
+    '<path d="M6 13H62M98 13H154" stroke="#ffc83d" stroke-width="1" opacity=".7"/>' +
+    '<circle cx="62" cy="13" r="1.7" fill="#ffc83d"/><circle cx="98" cy="13" r="1.7" fill="#ffc83d"/>' +
+    '<path d="M80 17C76 16 70 13 68 7C73 8 78 11 80 17Z" fill="#f06292"/>' +
+    '<path d="M80 17C84 16 90 13 92 7C87 8 82 11 80 17Z" fill="#f06292"/>' +
+    '<path d="M80 2C84 7 84 13 80 17C76 13 76 7 80 2Z" fill="#ff8fab"/>' +
+    '<path d="M67 17.5H93" stroke="#ffc83d" stroke-width="1.5" stroke-linecap="round"/></svg>';
+}
+// Diya: mitti ka katora + timtimati lau (delay alag taaki sab ek saath na hilein)
+function ftDiya(cls, delay) {
+  const d = delay ? ' style="animation-delay:' + delay + 's"' : '';
+  return '<svg class="' + (cls || '') + '" viewBox="0 0 40 34" aria-hidden="true">' +
+    '<circle class="ft-glow" cx="20" cy="13" r="11" fill="#ffcc4d" opacity=".2"' + d + '/>' +
+    '<g class="ft-flame"' + d + '><path d="M20 2C23 8 25 11 25 15C25 18 22.8 20 20 20C17.2 20 15 18 15 15C15 11 17 8 20 2Z" fill="#ff9800"/>' +
+    '<path d="M20 7C22 11 23 13 23 15.5C23 17.4 21.6 18.6 20 18.6C18.4 18.6 17 17.4 17 15.5C17 13 18 11 20 7Z" fill="#ffd54f"/>' +
+    '<ellipse cx="20" cy="16.4" rx="1.3" ry="2" fill="#fff8e1"/></g>' +
+    '<path d="M3 21H37C35 29 28 33 20 33C12 33 5 29 3 21Z" fill="#b5541c"/>' +
+    '<ellipse cx="20" cy="21" rx="17" ry="2.6" fill="#d9772b"/><ellipse cx="20" cy="21" rx="11" ry="1.3" fill="#7a2e0e"/>' +
+    [[10, 25.5], [15, 27.8], [20, 28.6], [25, 27.8], [30, 25.5]].map(p => '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="1" fill="#ffc83d"/>').join('') +
+    '</svg>';
+}
+function ftRangoli(cls) {
+  let s = '<svg class="' + (cls || '') + '" viewBox="-50 -50 100 100" aria-hidden="true">';
+  for (let i = 0; i < 16; i++) { const a = i * Math.PI / 8; s += '<circle cx="' + ftN(Math.sin(a) * 46) + '" cy="' + ftN(-Math.cos(a) * 46) + '" r="2" fill="#ffc83d"/>'; }
+  for (let i = 0; i < 12; i++) s += '<ellipse cy="-36" rx="5.5" ry="9" fill="#00897b" transform="rotate(' + (i * 30) + ')"/>';
+  for (let i = 0; i < 8; i++) s += '<ellipse cy="-25" rx="7" ry="11" fill="#d81b60" transform="rotate(' + (i * 45) + ')"/>';
+  for (let i = 0; i < 8; i++) s += '<ellipse cy="-16" rx="5" ry="8.5" fill="#f57c00" transform="rotate(' + (i * 45 + 22.5) + ')"/>';
+  return s + '<circle r="12" fill="#ffc83d"/><circle r="7" fill="#b3261e"/><circle r="3" fill="#fff4d6"/></svg>';
+}
+function ftKandilSvg() {
+  return '<svg viewBox="0 0 24 44" aria-hidden="true"><path d="M12 0V7" stroke="#7a2e0e" stroke-width="1"/>' +
+    '<rect x="7" y="7" width="10" height="3" rx="1" fill="#ffc83d"/>' +
+    '<path d="M12 10L22 20L12 33L2 20Z" fill="#d9480f"/>' +
+    '<path d="M12 12L18.5 20L12 30.5L5.5 20Z" fill="#ffb300" opacity=".75"/>' +
+    '<path d="M12 15L15 20L12 26L9 20Z" fill="#fff3c4" opacity=".7"/>' +
+    '<path d="M12 10V33M2 20H22" stroke="#ffc83d" stroke-width=".7" opacity=".8"/>' +
+    '<rect x="9" y="33" width="6" height="2" fill="#ffc83d"/>' +
+    '<path d="M10 35V42.5M12 35V44M14 35V42.5" stroke="#b3261e" stroke-width="1.1"/></svg>';
+}
+function ftSparkSvg() {
+  return '<svg viewBox="-6 -6 12 12" aria-hidden="true"><path d="M0-6L1.3-1.3L6 0L1.3 1.3L0 6L-1.3 1.3L-6 0L-1.3-1.3Z" fill="#ffd95a"/></svg>';
+}
+
+// ── Theme kits: theme_key -> look. Naya tyohaar yahan judta hai. ──
+const FT_KITS = {
+  diwali: { label: 'Diwali', font: 'Great+Vibes', popup: ftDiwaliCard, decorate: ftDiwaliDecorate }
+};
+const FT_KIT_PLAIN = { label: 'Plain', popup: ftPlainCard, decorate: () => {} };
+function ftKit(key) { return FT_KITS[key] || FT_KIT_PLAIN; }
+
+function ftDiwaliCard(f) {
+  return '<div class="ft-card">' +
+    '<div class="ft-garland">' + ftGarland() + '</div>' +
+    '<button class="ft-x" type="button" aria-label="Close" onclick="ftPopClose()">✕</button>' +
+    '<h2 class="ft-script" id="ftPopTitle">' + maintEsc(f.title || 'Happy Diwali') + '</h2>' +
+    '<div class="ft-lotus">' + ftLotus() + '</div>' +
+    '<p class="ft-msg">' + maintEsc(f.message) + '</p>' +
+    '<div class="ft-pop-art">' + ftDiya('ft-dy') + ftRangoli('ft-rg') + ftDiya('ft-dy', .7) + '</div>' +
+    '<button class="ft-ok" type="button" onclick="ftPopClose()">Thank you</button></div>';
+}
+function ftPlainCard(f) {
+  return '<div class="ft-card ft-plain">' +
+    '<button class="ft-x" type="button" aria-label="Close" onclick="ftPopClose()">✕</button>' +
+    '<h2 class="ft-script" id="ftPopTitle">' + maintEsc(f.title) + '</h2>' +
+    '<p class="ft-msg">' + maintEsc(f.message) + '</p>' +
+    '<button class="ft-ok" type="button" onclick="ftPopClose()">Thank you</button></div>';
+}
+
+// Script font sirf tab load ho jab tyohaar chal raha ho
+function ftLoadFont(kit) {
+  if (!kit.font || document.getElementById('ftFont-' + kit.font)) return;
+  const l = document.createElement('link');
+  l.id = 'ftFont-' + kit.font; l.rel = 'stylesheet';
+  l.href = 'https://fonts.googleapis.com/css2?family=' + kit.font + '&display=swap';
+  document.head.appendChild(l);
+}
+
+// Popup ke peeche halke phuljhadi ke phool (sirf CSS animation)
+function ftBursts() {
+  const cols = ['#ffc83d', '#ff9800', '#ff8fab', '#fff4d6', '#ffd95a'];
+  const spots = [[14, 22], [86, 18], [22, 78], [80, 74], [50, 9]];
+  return spots.map((p, b) => {
+    let s = '<div class="ft-burst" style="left:' + p[0] + '%;top:' + p[1] + '%">';
+    for (let k = 0; k < 12; k++) {
+      const a = k / 12 * Math.PI * 2, r = 46 + (k % 3) * 14;
+      s += '<i style="background:' + cols[(k + b) % cols.length] + ';--dx:' + Math.round(Math.cos(a) * r) + 'px;--dy:' +
+        Math.round(Math.sin(a) * r) + 'px;animation-delay:' + (b * .85).toFixed(2) + 's"></i>';
+    }
+    return s + '</div>';
+  }).join('');
+}
+
+function ftPopOpen(f, preview) {
+  ftPopRemove();
+  const kit = ftKit(f.themeKey);
+  ftLoadFont(kit);
+  ftHideOldGreeting();
+  _ftPopKey = f.key; _ftPreview = !!preview;
+  if (!preview) _ftState = 'popup';
+  _ftPrevFocus = document.activeElement;
+  const w = document.createElement('div');
+  w.id = 'ftPop'; w.className = 'ft-pop';
+  w.setAttribute('role', 'dialog'); w.setAttribute('aria-modal', 'true'); w.setAttribute('aria-labelledby', 'ftPopTitle');
+  w.innerHTML = '<div class="ft-pop-fx" aria-hidden="true">' + (f.themeKey === 'diwali' ? ftBursts() : '') + '</div>' + kit.popup(f);
+  document.body.appendChild(w);
+  const ok = w.querySelector('.ft-ok'); if (ok) ok.focus({ preventScroll: true });
+}
+function ftPopRemove() { const w = document.getElementById('ftPop'); if (w) w.remove(); }
+// Band (button / ✕ / Esc): TABHI key save hoti hai aur sajawat shuru
+function ftPopClose() {
+  const w = document.getElementById('ftPop');
+  if (!w || w.classList.contains('closing')) return;
+  w.classList.add('closing');
+  const wasPreview = _ftPreview;
+  setTimeout(() => {
+    w.remove();
+    if (_ftPrevFocus && _ftPrevFocus.focus) try { _ftPrevFocus.focus({ preventScroll: true }); } catch (e) {}
+    if (wasPreview) return;                        // owner ka Preview -- kuch save nahi
+    if (_ftCur && _ftCur.key === _ftPopKey) { ftLsSet(FT_SEEN_KEY, _ftCur.key); ftDecorate(_ftCur); }
+  }, 240);
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.getElementById('ftPop')) ftPopClose(); });
+
+function ftHideOldGreeting() {
+  const st = document.getElementById('festStrip'); if (st) st.classList.remove('on');
+  const fw = document.getElementById('festWrap'); if (fw && fw.classList.contains('on') && typeof festClose === 'function') festClose();
+}
+
+// ── Sajawat ──
+function ftDecorate(f) {
+  ftUndecorate();
+  _ftState = 'decor';
+  const kit = ftKit(f.themeKey);
+  ftLoadFont(kit);
+  ftHideOldGreeting();
+  document.body.classList.add('ft-run', 'ft-k-' + (f.themeKey || 'plain'));
+  // Full / Lite / Off -- top bar me, bell ke pehle
+  const acts = document.getElementById('topbarActions');
+  if (acts) {
+    const m = document.createElement('div');
+    m.id = 'ftMode'; m.className = 'ft-mode'; m.setAttribute('role', 'group'); m.setAttribute('aria-label', 'Festival theme');
+    m.innerHTML = '<span class="lbl">Festival theme</span>' +
+      ['full', 'lite', 'off'].map(k => '<button type="button" data-m="' + k + '" onclick="ftSetMode(this.dataset.m)">' + k[0].toUpperCase() + k.slice(1) + '</button>').join('');
+    acts.insertBefore(m, acts.firstChild);
+  }
+  // Neeche ki patti -- sirf message, date nahi
+  const b = document.createElement('div');
+  b.id = 'ftBanner'; b.className = 'ft-banner'; b.setAttribute('role', 'note');
+  b.innerHTML = (f.themeKey === 'diwali' ? ftDiya('', .3) : '') + '<div class="ft-bmsg"></div>' + (f.themeKey === 'diwali' ? ftDiya('', 1.1) : '');
+  b.querySelector('.ft-bmsg').textContent = f.message || '';
+  b.title = f.message || '';
+  b.addEventListener('click', () => { if (b.classList.contains('ft-clamped') || b.classList.contains('open')) { b.classList.toggle('open'); ftPad(); } });
+  document.body.appendChild(b);
+  kit.decorate(f);
+  ftApplyMode();
+  ftPlace();
+  clearInterval(_ftPlaceT);
+  _ftPlaceT = setInterval(ftPlace, 4000);    // page ka content badalta rehta hai
+  // Content aate hi (table, button) turant jagah dobara dekho -- 4 sec ka intezaar nahi
+  const mc = document.getElementById('mainContent');
+  if (mc && window.MutationObserver) {
+    _ftObs = new MutationObserver(() => { if (!_ftObsT) _ftObsT = setTimeout(() => { _ftObsT = 0; ftPlace(); }, 250); });
+    _ftObs.observe(mc, { childList: true, subtree: true });
+  }
+}
+function ftUndecorate() {
+  clearInterval(_ftPlaceT); _ftPlaceT = null;
+  if (_ftObs) { _ftObs.disconnect(); _ftObs = null; }
+  document.querySelectorAll('.ft-deco,#ftBanner,#ftMode').forEach(el => el.remove());
+  [...document.body.classList].forEach(c => { if (c.indexOf('ft-') === 0) document.body.classList.remove(c); });   // copy -- live list par hatane se kuch chhoot jaate the
+  document.body.style.removeProperty('--ft-pad');
+  if (_ftState === 'decor') _ftState = 'none';
+}
+
+function ftDiwaliDecorate() {
+  const tb = document.querySelector('#mainContent .topbar');
+  if (tb) {
+    const t = document.createElement('div');
+    t.className = 'ft-toran ft-deco'; t.setAttribute('aria-hidden', 'true');
+    t.style.backgroundImage = 'url("data:image/svg+xml,' + encodeURIComponent(ftToranTile()) + '")';
+    tb.insertBefore(t, tb.firstChild);
+  }
+  const add = (cls, html) => {
+    const el = document.createElement('div');
+    el.className = cls + ' ft-deco ft-hide'; el.setAttribute('aria-hidden', 'true'); el.innerHTML = html;
+    document.body.appendChild(el); return el;
+  };
+  const phone = window.innerWidth <= 768;
+  for (let i = 0; i < (phone ? 2 : 4); i++) add('ft-kandil', ftKandilSvg()).style.animationDelay = (i * -1.3) + 's';
+  for (let i = 0; i < (phone ? 5 : 9); i++) {
+    const s = add('ft-spark', ftSparkSvg());
+    const z = 7 + Math.random() * 6;
+    s.style.width = s.style.height = z.toFixed(0) + 'px';
+    s.style.animationDuration = (5 + Math.random() * 4).toFixed(1) + 's';
+    s.style.animationDelay = (-Math.random() * 8).toFixed(1) + 's';
+  }
+  add('ft-corner ft-rangoli', ftRangoli());
+  add('ft-corner ft-diyas', ftDiya('', 0) + ftDiya('', .6));
+}
+
+// Full / Lite / Off (har user ka apna, is browser me yaad)
+const FT_MODE_KEY = 'festThemeMode';
+function ftMode() { const m = ftLsGet(FT_MODE_KEY); return (m === 'lite' || m === 'off') ? m : 'full'; }
+function ftSetMode(m) { ftLsSet(FT_MODE_KEY, m); ftApplyMode(); }
+function ftApplyMode() {
+  if (_ftState !== 'decor') return;
+  const m = ftMode(), cl = document.body.classList;
+  cl.remove('ft-mode-full', 'ft-mode-lite', 'ft-mode-off');
+  cl.add('ft-mode-' + m);
+  cl.toggle('ft-on', m !== 'off');          // off = top bar / content ki jagah bilkul normal
+  document.querySelectorAll('#ftMode button').forEach(b => b.setAttribute('aria-pressed', b.dataset.m === m ? 'true' : 'false'));
+  const ban = document.getElementById('ftBanner'); if (ban) ban.style.display = m === 'off' ? 'none' : '';
+  document.querySelectorAll('.ft-deco').forEach(el => { el.style.display = m === 'off' ? 'none' : ''; });
+  if (m === 'off') document.body.style.removeProperty('--ft-pad');
+  ftPlace();
+}
+
+// Banner jitna uncha hai utni jagah main content ke neeche -- kuch na chhupe
+function ftPad() {
+  const b = document.getElementById('ftBanner');
+  if (!b || ftMode() === 'off') return;
+  const m = b.querySelector('.ft-bmsg');
+  if (m && !b.classList.contains('open')) b.classList.toggle('ft-clamped', m.scrollHeight > m.clientHeight + 1);
+  const r = b.getBoundingClientRect();
+  document.body.style.setProperty('--ft-pad', Math.ceil(window.innerHeight - r.top + 12) + 'px');
+}
+
+// Is jagah text ya control hai? (sajawat pointer-events:none hai, isliye
+// elementsFromPoint use chhod deta hai -- jo milta hai wo asli page hai)
+const FT_BUSY_SEL = 'a,button,input,select,textarea,label,[onclick],[role="button"],th,td,img,video,canvas,.btn,h1,h2,h3,h4,p,li';
+function ftBusyAt(x, y) {
+  if (x < 0 || y < 0 || x >= window.innerWidth || y >= window.innerHeight) return true;
+  const els = document.elementsFromPoint(x, y);
+  for (const el of els) {
+    if (el.closest('.ft-deco')) continue;
+    if (el.closest('#ftBanner,.sidebar,.mobile-bottom-nav,.topbar')) return true;
+    if (el === document.body || el === document.documentElement) return false;
+    if (el.closest(FT_BUSY_SEL)) return true;
+    for (const n of el.childNodes) {
+      if (n.nodeType !== 3 || !n.textContent.trim()) continue;
+      const rg = document.createRange(); rg.selectNodeContents(n);
+      for (const rc of rg.getClientRects()) if (x >= rc.left - 3 && x <= rc.right + 3 && y >= rc.top - 3 && y <= rc.bottom + 3) return true;
+    }
+    return false;          // sirf sabse upar wala asli element dekhte hain
+  }
+  return false;
+}
+function ftRectBusy(l, t, w, h) {
+  for (let i = 0; i <= 2; i++) for (let j = 0; j <= 4; j++)
+    if (ftBusyAt(l + w * i / 2, t + h * j / 4)) return true;
+  return false;
+}
+// Kandil, chamak aur kone ke diye/rangoli: jahan khali jagah ho wahin. Pehle
+// wali jagah ab bhi khali ho to wahin raho (scroll par idhar-udhar na kudein).
+function ftPlace() {
+  if (_ftState !== 'decor' || document.hidden || ftMode() === 'off') return;
+  ftPad();
+  const tb = document.querySelector('#mainContent .topbar');
+  const main = document.getElementById('mainContent');
+  if (!tb || !main) return;
+  const top = Math.round(tb.getBoundingClientRect().bottom) - 1;
+  const ml = Math.max(0, main.getBoundingClientRect().left), mw = window.innerWidth - ml;
+  const ban = document.getElementById('ftBanner');
+  const banTop = ban ? ban.getBoundingClientRect().top : window.innerHeight;
+
+  const kands = [...document.querySelectorAll('.ft-kandil')];
+  const taken = [];
+  const fracs = [.03, .97, .32, .68, .5, .15, .85, .42, .58, .24, .76];
+  kands.forEach(k => {
+    const w = k.offsetWidth, h = k.offsetHeight;
+    // dhaaga top bar se nikalta hai -- jaanch uske theek neeche se
+    const ok = x => !taken.some(t => Math.abs(t - x) < w * 3) && !ftRectBusy(x, top + 4, w, h - 4);
+    let x = k.style.left ? parseFloat(k.style.left) : NaN;
+    if (!(k.style.top === top + 'px' && !k.classList.contains('ft-hide') && ok(x))) {
+      x = NaN;
+      for (const f of fracs) {
+        for (const nud of [0, -14, 14, -28, 28]) {
+          const cx = Math.round(ml + 6 + (mw - 12 - w) * f) + nud;
+          if (ok(cx)) { x = cx; break; }
+        }
+        if (!isNaN(x)) break;
+      }
+    }
+    if (isNaN(x)) { k.classList.add('ft-hide'); return; }
+    taken.push(x);
+    k.style.left = x + 'px'; k.style.top = top + 'px';
+    k.classList.remove('ft-hide');
+  });
+
+  // Chamak: screen ka lagbhag ek tihai (top bar ke neeche ka upar wala hissa)
+  const sh = Math.max(80, Math.round(window.innerHeight / 3));
+  document.querySelectorAll('.ft-spark').forEach(s => {
+    const z = s.offsetWidth || 10;
+    const cur = s.style.left && !s.classList.contains('ft-hide');
+    if (cur && !ftRectBusy(parseFloat(s.style.left), parseFloat(s.style.top), z, z)) return;
+    for (let i = 0; i < 6; i++) {
+      const x = ml + 8 + Math.random() * (mw - 16 - z), y = top + 50 + Math.random() * (sh - 50);
+      if (!ftRectBusy(x, y, z, z)) { s.style.left = x.toFixed(0) + 'px'; s.style.top = y.toFixed(0) + 'px'; s.classList.remove('ft-hide'); return; }
+    }
+    s.classList.add('ft-hide');
+  });
+
+  // Kone: rangoli neeche-baayein, diye neeche-daayein -- banner ke upar
+  const rg = document.querySelector('.ft-corner.ft-rangoli'), dy = document.querySelector('.ft-corner.ft-diyas');
+  const place = (el, left) => {
+    if (!el) return;
+    const w = el.offsetWidth, h = el.offsetHeight;
+    const x = left ? ml + 12 : window.innerWidth - w - 14, y = banTop - h - 10;
+    el.style.left = x + 'px'; el.style.top = y + 'px';
+    el.classList.toggle('ft-hide', y < top + 40 || ftRectBusy(x, y, w, h));
+  };
+  place(rg, true); place(dy, false);
+}
+let _ftScrollT = 0;
+window.addEventListener('scroll', () => {
+  if (_ftState !== 'decor' || _ftScrollT) return;
+  _ftScrollT = setTimeout(() => { _ftScrollT = 0; ftPlace(); }, 250);
+}, { passive: true });
+window.addEventListener('resize', () => {
+  if (_ftState !== 'decor') return;
+  clearTimeout(_ftScrollT); _ftScrollT = setTimeout(() => { _ftScrollT = 0; ftPlace(); }, 200);
+});
+
+// Server ka jawab lagao
+function ftApply(f) {
+  if (!f) {                                          // khatam / End / date_to nikal gayi
+    _ftCur = null;
+    if (!_ftPreview) ftPopRemove();
+    ftUndecorate(); _ftState = 'none';
+    return;
+  }
+  const same = _ftCur && _ftCur.key === f.key && _ftState !== 'none';
+  _ftCur = f;
+  if (same) {                                        // wahi tyohaar -- sirf message badla ho sakta hai
+    const m = document.querySelector('#ftBanner .ft-bmsg');
+    if (m && m.textContent !== f.message) { m.textContent = f.message; document.getElementById('ftBanner').title = f.message; ftPad(); }
+    return;
+  }
+  ftUndecorate();
+  if (ftLsGet(FT_SEEN_KEY) !== f.key) ftPopOpen(f);   // pehle greeting
+  else ftDecorate(f);                                 // dekh chuke -- seedha sajawat
+}
+async function ftPoll() {
+  _ftLastPoll = Date.now();
+  try {
+    const r = await apiFresh('/api/festivals/current');
+    if (!r || r.error) return _ftCur;                 // network gadbad -- jo hai wahi rehne do
+    ftApply(r.festival || null);
+    return r.festival || null;
+  } catch (e) { return _ftCur; }
+}
+function ftStart() {
+  _ftFirst = ftPoll();
+  clearInterval(_ftPollT);
+  _ftPollT = setInterval(() => { if (!document.hidden) ftPoll(); }, FT_POLL_MS);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && Date.now() - _ftLastPoll > 5000) ftPoll();
+  });
+}
+
+// ── Admin page (sirf owner; server bhi 403 deta hai) ──
+let _ftList = [], _ftSelId = '';
+const FT_STATUS = { running: 'Running', scheduled: 'Scheduled', ended: 'Ended', draft: 'Draft' };
+function ftChip(st) { return '<span class="ft-chip ' + st + '">' + (FT_STATUS[st] || st) + '</span>'; }
+function ftFmtD(d) { return d && typeof fmtDate === 'function' ? fmtDate(d) : (d || '-'); }
+async function loadFestivals() {
+  const sel = document.getElementById('ftTheme');
+  if (sel && !sel.options.length) sel.innerHTML = Object.keys(FT_KITS).map(k => '<option value="' + k + '">' + FT_KITS[k].label + '</option>').join('');
+  const r = await apiFresh('/api/festivals');
+  const box = document.getElementById('ftAdmList');
+  if (!r || r.error) { box.innerHTML = '<div style="padding:18px;color:#b91c1c;font-size:13px">' + maintEsc((r && r.error) || 'Could not load') + '</div>'; return; }
+  _ftList = r.festivals || [];
+  document.getElementById('ftAdmToday').textContent = 'today ' + ftFmtD(r.today);
+  if (_ftSelId && !_ftList.some(x => String(x.id) === String(_ftSelId))) _ftSelId = '';
+  if (!_ftSelId && _ftList.length) _ftSelId = String((_ftList.find(x => x.status === 'running') || _ftList[0]).id);
+  ftAdmRenderList();
+  ftAdmFill();
+}
+function ftAdmRenderList() {
+  const box = document.getElementById('ftAdmList');
+  if (!_ftList.length) { box.innerHTML = '<div style="padding:18px;color:#94a3b8;font-size:13px">No festivals yet. Fill the form and press Save.</div>'; return; }
+  box.innerHTML = _ftList.map(f =>
+    '<div class="ft-adm-row' + (String(f.id) === String(_ftSelId) ? ' sel' : '') + '" onclick="ftAdmSelect(\'' + f.id + '\')">' +
+      '<div style="flex:1;min-width:0"><div class="t">' + maintEsc(f.title) + '</div>' +
+      '<div class="s">' + maintEsc((ftKit(f.themeKey).label) + ' · ' + ftFmtD(f.dateFrom) + ' to ' + ftFmtD(f.dateTo) +
+        (f.festDate ? ' · festival day ' + ftFmtD(f.festDate) : '')) + '</div></div>' + ftChip(f.status) + '</div>').join('');
+}
+function ftAdmSelect(id) { _ftSelId = String(id); ftAdmRenderList(); ftAdmFill(); }
+function ftAdmNew() { _ftSelId = ''; ftAdmRenderList(); ftAdmFill(); document.getElementById('ftTitle').focus(); }
+function ftAdmCount() { const m = document.getElementById('ftMsg'); document.getElementById('ftMsgCount').textContent = m.value.length + ' / 600'; }
+function ftAdmFill() {
+  const f = _ftList.find(x => String(x.id) === String(_ftSelId)) || null;
+  const v = (id, val) => { document.getElementById(id).value = val || ''; };
+  v('ftTitle', f ? f.title : 'Happy Diwali'); v('ftTheme', f ? f.themeKey : 'diwali'); v('ftMsg', f ? f.message : '');
+  v('ftFrom', f ? f.dateFrom : ''); v('ftTo', f ? f.dateTo : ''); v('ftFest', f ? f.festDate : '');
+  if (f && !FT_KITS[f.themeKey]) {      // purana / naya key jiska kit nahi -- select me dikhao
+    const o = document.createElement('option'); o.value = f.themeKey; o.textContent = f.themeKey + ' (plain)';
+    document.getElementById('ftTheme').appendChild(o); v('ftTheme', f.themeKey);
+  }
+  document.getElementById('ftAdmFormTitle').textContent = f ? 'Edit festival' : 'New festival';
+  document.getElementById('ftAdmFormChip').innerHTML = f ? ftChip(f.status) : '';
+  document.getElementById('ftBtnEnd').disabled = !f || !f.isActive || f.status === 'ended';
+  document.getElementById('ftBtnDel').style.display = f ? '' : 'none';
+  document.getElementById('ftBtnStart').textContent = f && (f.status === 'running') ? 'Start again' : 'Start now';
+  ftAdmErr('');
+  ftAdmCount();
+}
+function ftAdmErr(msg) { const e = document.getElementById('ftAdmErr'); e.textContent = msg; e.style.display = msg ? 'block' : 'none'; }
+function ftAdmForm() {
+  return {
+    title: document.getElementById('ftTitle').value.trim(), themeKey: document.getElementById('ftTheme').value,
+    message: document.getElementById('ftMsg').value.trim(), dateFrom: document.getElementById('ftFrom').value,
+    dateTo: document.getElementById('ftTo').value, festDate: document.getElementById('ftFest').value
+  };
+}
+async function ftAdmSave(quiet) {
+  const body = ftAdmForm();
+  const r = _ftSelId ? await api('/api/festivals/' + _ftSelId, 'PUT', body) : await api('/api/festivals', 'POST', body);
+  if (!r || r.error) { ftAdmErr((r && r.error) || 'Could not save'); return null; }
+  _ftSelId = String(r.festival.id);
+  if (!quiet) { showToast('Festival saved'); await loadFestivals(); }
+  return r.festival;
+}
+async function ftAdmStart() {
+  const t = document.getElementById('ftTitle').value.trim() || 'this festival';
+  if (!confirm('Start "' + t + '"? Everyone will see the greeting popup once more (only between Date from and Date to).')) return;
+  const f = await ftAdmSave(true);                     // form ki badli baatein pehle save
+  if (!f) return;
+  const r = await api('/api/festivals/' + f.id + '/start', 'POST', {});
+  if (!r || r.error) { ftAdmErr((r && r.error) || 'Could not start'); await loadFestivals(); return; }
+  showToast(r.festival.status === 'running' ? 'Started. Everyone sees it within 2 minutes.' : 'Turned on. It starts by itself on Date from.');
+  await loadFestivals();
+  ftPoll();
+}
+async function ftAdmEnd() {
+  if (!_ftSelId || !confirm('End this festival theme for everyone?')) return;
+  const r = await api('/api/festivals/' + _ftSelId + '/end', 'POST', {});
+  if (!r || r.error) { ftAdmErr((r && r.error) || 'Could not end'); return; }
+  showToast('Ended. Decorations go away within 2 minutes.');
+  await loadFestivals();
+  ftPoll();
+}
+async function ftAdmDelete() {
+  if (!_ftSelId || !confirm('Delete this festival? This cannot be undone.')) return;
+  const r = await api('/api/festivals/' + _ftSelId, 'DELETE');
+  if (!r || r.error) { ftAdmErr((r && r.error) || 'Could not delete'); return; }
+  _ftSelId = '';
+  showToast('Festival deleted');
+  await loadFestivals();
+  ftPoll();
+}
+// Sirf owner ko dikhta hai -- kuch save nahi hota
+function ftAdmPreview() {
+  const b = ftAdmForm();
+  ftPopOpen({ themeKey: b.themeKey, title: b.title || 'Happy Diwali', message: b.message || '(message)', key: 'preview' }, true);
 }
 
 async function init() {
@@ -4555,8 +5320,12 @@ async function init() {
       const mMob = document.getElementById('mob-maintenance');
       if (mMob) mMob.style.display = 'flex';
     }
+    // Festival Themes menu -- sirf owner (server ka festOwner flag; endpoints bhi 403)
+    const ftOK = ME.festOwner === true;
+    ['nav-festivals', 'mob-festivals'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = ftOK ? 'flex' : 'none'; });
     setMinDates();
     routeApply(true);            // address bar wala page + tab (khali = Dashboard)
+    ftStart();                   // chal raha tyohaar: greeting popup, phir sajawat (har 2 min poll)
     festCheckToday();            // aaj tyohaar ho to greeting (din me ek baar)
     loadApprovalBadge();
     loadTransferBadge();
@@ -4634,7 +5403,7 @@ function setMinDates() {
 // ══════════════════════════════════════════════════════
 // NAVIGATION
 // ══════════════════════════════════════════════════════
-const pageTitles = {dashboard:'Dashboard',alltasks:'All Tasks',approvals:'Approvals',users:'Users',profile:'Profile',mis:'MIS Report',fms:'FMS Admin','fms-tasks':'FMS Tasks','fms-tracking':'FMS Tracking',records:'Employee Records',leave:'Leave',crm:'PC',hrreport:'HR Reporting',maintenance:'Maintenance',gold:'Gold System',casting:'Casting / Stone Entry'};
+const pageTitles = {dashboard:'Dashboard',alltasks:'All Tasks',approvals:'Approvals',users:'Users',profile:'Profile',mis:'MIS Report',fms:'FMS Admin','fms-tasks':'FMS Tasks','fms-tracking':'FMS Tracking',records:'Employee Records',leave:'Leave',crm:'PC',hrreport:'HR Reporting',maintenance:'Maintenance',gold:'Gold System',casting:'Casting / Stone Entry',festivals:'Festival Themes'};
 
 function navigate(page, el) {
   window._currentPage = page;
@@ -4644,7 +5413,7 @@ function navigate(page, el) {
   if (el && el.classList.contains('nav-item')) el.classList.add('active');
   document.getElementById('topbarTitle').textContent = pageTitles[page] || page;
   // Sync mobile bottom nav active state
-  const mobMap = {dashboard:'mob-dashboard',alltasks:'mob-alltasks','fms-tasks':'mob-fms-tasks',approvals:'mob-approvals',users:'mob-users',mis:'mob-mis',profile:'mob-profile',leave:'mob-leave',maintenance:'mob-maintenance',gold:'mob-gold',casting:'mob-casting'};
+  const mobMap = {dashboard:'mob-dashboard',alltasks:'mob-alltasks','fms-tasks':'mob-fms-tasks',approvals:'mob-approvals',users:'mob-users',mis:'mob-mis',profile:'mob-profile',leave:'mob-leave',maintenance:'mob-maintenance',gold:'mob-gold',casting:'mob-casting',festivals:'mob-festivals'};
   document.querySelectorAll('.mob-nav-item').forEach(b=>b.classList.remove('active'));
   if (mobMap[page]) { const mb=document.getElementById(mobMap[page]); if(mb) mb.classList.add('active'); }
   if (page==='dashboard') loadDashboard();
@@ -4662,6 +5431,8 @@ function navigate(page, el) {
   if (page==='maintenance') loadMaintenance();
   if (page==='gold') loadGold();
   if (page==='casting') loadCasting();
+  if (page==='festivals') loadFestivals();
+  if (_ftState === 'decor') setTimeout(ftPlace, 400);   // naya page -- kandil ki jagah dobara dekho
   window.scrollTo(0,0);
   routeSync();
 }
@@ -4695,6 +5466,7 @@ const ROUTES = [
   { slug: 'fms-tracking', page: 'fms-tracking', get: () => _ftView, set: v => { _ftView = v; }, go: v => ftSetView(v),
     tabs: [['', 'all'], ['in-progress', 'pending'], ['completed', 'done'], ['delayed', 'delayed']] },
   { slug: 'leave', page: 'leave' },
+  { slug: 'festivals', page: 'festivals' },
   { slug: 'pc', page: 'crm', get: () => _crmTab, set: v => { _crmTab = v; }, go: (v, el) => switchCRMTab(v, el),
     tabs: [['', 'upcoming', 'crmTabUncompleted'], ['overdue', 'overdue', 'crmTabOverdue']] },
   { slug: 'hr-reporting', page: 'hrreport', get: () => _obView, set: v => { _obView = v; _obOpenId = ''; }, go: v => obSetView(v),
